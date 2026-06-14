@@ -674,13 +674,18 @@ async function fetchAll() {
     // Normaliza "11,23" (locale CO) → 11.23 antes de parseFloat
     const n = s => parseFloat(String(s ?? '').replace(',', '.')) || 0;
 
-    // Normaliza fecha DD/MM/YYYY → YYYY-MM-DD (mantiene ISO y con hora)
+    // Normaliza fechas del Sheet a ISO:
+    //   "14/06/2026 17:56:00" → "2026-06-14T17:56"
+    //   "2026-06-14T17:56"    → sin cambio
     const d = s => {
       if (!s) return '';
       s = String(s).trim();
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;           // ya ISO
-      const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(.*)/);
-      if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}${m[4]}`;
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
+      const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{2}:\d{2}))?/);
+      if (m) {
+        const iso = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+        return m[4] ? `${iso}T${m[4]}` : iso;
+      }
       return s;
     };
 
