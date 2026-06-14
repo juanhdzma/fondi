@@ -671,27 +671,30 @@ async function fetchAll() {
     const histRows = MOCK_MODE ? MOCK_HISTORIAL : await fetchCSV('historial_fondo');
     const movRows  = MOCK_MODE ? MOCK_MOVIMIENTOS : await fetchCSV('movimientos');
 
+    // Normaliza "11,23" (locale CO) → 11.23 antes de parseFloat
+    const n = s => parseFloat(String(s ?? '').replace(',', '.')) || 0;
+
     S.historial = histRows
       .filter(r => r[0])
       .map(r => ({
         fecha: r[0],
-        valor_total: parseFloat(r[1]) || 0,
-        precio_cuota: parseFloat(r[2]) || 0,
-        cuotas_circ: parseFloat(r[3]) || 0,
-        trm: parseFloat(r[4]) || 0,
+        valor_total: n(r[1]),
+        precio_cuota: n(r[2]),
+        cuotas_circ:  n(r[3]),
+        trm:          n(r[4]),
       }));
 
     S.movimientos = movRows
       .filter(r => r[0])
       .map(r => ({
-        fecha: r[0],
-        persona: r[1] || '',
-        tipo: (r[2] || '').toLowerCase(),
-        monto: parseFloat(r[3]) || 0,
-        precio_cuota_dia: parseFloat(r[4]) || 0,
-        cuotas: parseFloat(r[5]) || 0,
-        monto_cop: parseFloat(r[6]) || 0,
-        trm_dia: parseFloat(r[7]) || 0,
+        fecha:           r[0],
+        persona:         r[1] || '',
+        tipo:            (r[2] || '').toLowerCase(),
+        monto:           n(r[3]),
+        precio_cuota_dia: n(r[4]),
+        cuotas:          n(r[5]),
+        monto_cop:       n(r[6]),
+        trm_dia:         n(r[7]),
       }));
 
     hideBanner();
