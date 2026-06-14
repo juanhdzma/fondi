@@ -540,9 +540,12 @@
             <input class="form-input" type="number" id="f-monto-cop" step="1000" min="0" placeholder="0" />
           </div>
           <div class="form-group">
-            <label class="form-label">TRM del banco (COP/USD)</label>
-            <input class="form-input" type="number" id="f-trm" step="1" min="0" placeholder="0" />
-            <div class="form-hint" id="hint-trm-oficial"></div>
+            <label class="form-label">Monto (USD)</label>
+            <input class="form-input" type="number" id="f-monto" step="0.01" min="0.01" placeholder="0.00" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor total del fondo después (USD) <span style="color:var(--red)">*</span></label>
+            <input class="form-input" type="number" id="f-valor-mov" step="0.01" min="0" placeholder="0.00" />
           </div>
           <div class="form-group">
             <label class="form-label">Fecha y hora</label>
@@ -1277,12 +1280,6 @@ function initAdminForms() {
   document.getElementById('f-hora').value         = time;
   document.getElementById('f-fecha-fondo').value  = today;
   document.getElementById('f-hora-fondo').value   = time;
-  if (S.trm) {
-    const trmFmt = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(S.trm);
-    document.getElementById('f-trm').value = S.trm.toFixed(2);
-    document.getElementById('hint-trm-oficial').textContent =
-      `TRM oficial: $${trmFmt} · Ajusta al TRM real de tu banco`;
-  }
   previewFondo();
 }
 
@@ -1306,29 +1303,35 @@ function previewFondo() {
 }
 
 async function submitMov() {
-  const persona   = document.getElementById('f-persona').value;
-  const tipo      = document.getElementById('f-tipo').value;
-  const monto_cop = parseFloat(document.getElementById('f-monto-cop').value);
-  const trm_dia   = parseFloat(document.getElementById('f-trm').value);
-  const fecha     = document.getElementById('f-fecha').value + 'T' + (document.getElementById('f-hora').value || '00:00');
-  const st        = document.getElementById('st-mov');
-  const btn       = document.getElementById('btn-mov');
+  const persona    = document.getElementById('f-persona').value;
+  const tipo       = document.getElementById('f-tipo').value;
+  const monto_cop  = parseFloat(document.getElementById('f-monto-cop').value);
+  const monto_usd  = parseFloat(document.getElementById('f-monto').value);
+  const valorFondo = parseFloat(document.getElementById('f-valor-mov').value);
+  const fecha      = document.getElementById('f-fecha').value + 'T' + (document.getElementById('f-hora').value || '00:00');
+  const st         = document.getElementById('st-mov');
+  const btn        = document.getElementById('btn-mov');
 
-  if (!monto_cop || monto_cop <= 0) { setStatus(st, 'err', 'Ingresa el monto en COP'); return; }
-  if (!trm_dia   || trm_dia   <= 0) { setStatus(st, 'err', 'Ingresa la TRM del banco'); return; }
-  if (!fecha)                       { setStatus(st, 'err', 'Fecha requerida'); return; }
+  if (!monto_cop || monto_cop <= 0)  { setStatus(st, 'err', 'Ingresa el monto en COP'); return; }
+  if (!monto_usd || monto_usd <= 0)  { setStatus(st, 'err', 'Ingresa el monto en USD'); return; }
+  if (!valorFondo || valorFondo <= 0) { setStatus(st, 'err', 'Ingresa el valor del fondo después'); return; }
+  if (!fecha)                         { setStatus(st, 'err', 'Fecha requerida'); return; }
 
-  const monto_usd      = monto_cop / trm_dia;
+  const trm_dia        = monto_cop / monto_usd;   // TRM calculada internamente
   const pc             = precioCuota();
   const cuotas         = tipo === 'retiro' ? -Math.abs(monto_usd / pc) : Math.abs(monto_usd / pc);
+  const cuotasNuevas   = cuotasCirc() + cuotas;
+  const pcNuevo        = cuotasNuevas > 0 ? valorFondo / cuotasNuevas : 1;
 
   btn.disabled = true;
   setStatus(st, '', 'Guardando...');
   try {
     await postScript({ action: 'movimiento', fecha, persona, tipo, monto_usd, precio_cuota_dia: pc, cuotas, monto_cop, trm_dia });
-    setStatus(st, 'ok', '✅ Movimiento guardado');
-    document.getElementById('f-monto-cop').value = '';
-    document.getElementById('f-trm').value       = '';
+    await postScript({ action: 'actualizar_fondo', fecha, valor_total_usd: valorFondo, precio_cuota_usd: pcNuevo, cuotas_en_circulacion: cuotasNuevas, trm: S.trm || 0 });
+    setStatus(st, 'ok', '✅ Guardado');
+    document.getElementById('f-monto-cop').value  = '';
+    document.getElementById('f-monto').value      = '';
+    document.getElementById('f-valor-mov').value  = '';
     await fetchAll();
   } catch (err) {
     setStatus(st, 'err', '❌ ' + err.message);
