@@ -590,17 +590,34 @@ function fmt(usd, dec = 2) {
   return '$' + new Intl.NumberFormat('es-CO', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(usd);
 }
 
+// Normaliza cualquier formato de fecha del Sheet a ISO YYYY-MM-DD[Thh:mm]
+function normDate(s) {
+  if (!s) return '';
+  s = String(s).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;                        // ya ISO
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[\s,]+(\d{1,2}:\d{2}))?/);
+  if (m) {
+    const iso = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    return m[4] ? `${iso}T${m[4].padStart(5,'0')}` : iso;
+  }
+  return s;
+}
+
 function fmtDate(s) {
   if (!s) return '—';
-  const [datePart, timePart] = s.split('T');
+  const norm = normDate(s);
+  const [datePart, timePart] = norm.split('T');
   const d = new Date(datePart + 'T12:00:00');
+  if (isNaN(d)) return s;
   const dateStr = d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
   return timePart ? `${dateStr} ${timePart.slice(0, 5)}` : dateStr;
 }
 
 function fmtDateShort(s) {
   if (!s) return '—';
-  const d = new Date(s.split('T')[0] + 'T12:00:00');
+  const iso = normDate(s).split('T')[0];
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return '—';
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
 }
 
@@ -674,25 +691,11 @@ async function fetchAll() {
     // Normaliza "11,23" (locale CO) → 11.23 antes de parseFloat
     const n = s => parseFloat(String(s ?? '').replace(',', '.')) || 0;
 
-    // Normaliza fechas del Sheet a ISO:
-    //   "14/06/2026 17:56:00" → "2026-06-14T17:56"
-    //   "2026-06-14T17:56"    → sin cambio
-    const d = s => {
-      if (!s) return '';
-      s = String(s).trim();
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
-      const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{2}:\d{2}))?/);
-      if (m) {
-        const iso = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-        return m[4] ? `${iso}T${m[4]}` : iso;
-      }
-      return s;
-    };
 
     S.historial = histRows
       .filter(r => r[0])
       .map(r => ({
-        fecha: d(r[0]),
+        fecha: normDate(r[0]),
         valor_total: n(r[1]),
         precio_cuota: n(r[2]),
         cuotas_circ:  n(r[3]),
