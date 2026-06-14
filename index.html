@@ -705,7 +705,7 @@ async function fetchAll() {
     S.movimientos = movRows
       .filter(r => r[0])
       .map(r => ({
-        fecha:           d(r[0]),
+        fecha:           normDate(r[0]),
         persona:         r[1] || '',
         tipo:            (r[2] || '').toLowerCase(),
         monto:           n(r[3]),
