@@ -300,19 +300,51 @@
     .cv { transition: opacity 0.2s; }
     .cv.fade { opacity: 0; }
 
-    /* ── Responsive ── */
+    /* ── Participant card layout classes ── */
+    .p-row   { display: flex; align-items: center; gap: 14px; }
+    .p-ident { min-width: 88px; flex-shrink: 0; }
+    .p-val   { flex: 1; min-width: 0; }
+    .p-gains { flex-shrink: 0; text-align: right; }
+
+    /* ── Responsive 640px ── */
     @media (max-width: 640px) {
       .header { padding: 0 12px; }
       .header-title { display: none; }
       .trm-badge { display: none; }
       .nav-btn { padding: 6px 10px; font-size: 12px; }
-      .main { padding: 20px 16px; }
-      .nav { padding: 0 10px; }
-      .nav-btn { padding: 12px 12px; font-size: 12px; }
-      .participants-grid { grid-template-columns: 1fr; }
+      .main { padding: 16px 12px; }
       .admin-grid { grid-template-columns: 1fr; }
-      .summary-value { font-size: 24px; }
-      .chart-header { flex-direction: column; align-items: flex-start; }
+      .summary-value { font-size: 22px; }
+      .dash-grid { gap: 12px; margin-bottom: 12px; }
+      .parts-grid {
+        flex-direction: column;
+        height: auto;         /* libera el 420px fijo */
+      }
+      .parts-left .participants-grid {
+        grid-auto-rows: auto; /* tarjetas a altura natural en mobile */
+      }
+      .parts-right .chart-card { min-height: 300px; }
+      .chart-header { flex-wrap: wrap; gap: 8px; }
+      .range-btn { padding: 4px 9px; font-size: 10px; }
+      thead th { font-size: 10px; padding: 8px 10px; }
+      tbody td { font-size: 12px; padding: 8px 10px; }
+      .card { padding: 16px; }
+    }
+
+    /* ── Responsive 480px — tarjetas de participantes en 2 filas ── */
+    @media (max-width: 480px) {
+      .p-row   { flex-wrap: wrap; column-gap: 10px; row-gap: 5px; }
+      .p-ident { flex: 1; min-width: 0; }   /* fila 1: avatar + nombre ocupa el ancho */
+      .p-val   {
+        order: 3; flex: 0 0 100%;           /* fila 2: ocupa todo el ancho */
+        display: flex; justify-content: space-between; align-items: baseline;
+        gap: 8px;
+      }
+      .p-gains { order: 2; }                /* fila 1: badge a la derecha del nombre */
+      .p-avatar { width: 28px !important; height: 28px !important; font-size: 11px !important; }
+      .participant-card { padding: 10px 12px; }
+      .parts-right .chart-card { min-height: 260px; }
+      .nav-btn { padding: 6px 8px; font-size: 11px; }
     }
   </style>
 </head>
@@ -825,27 +857,27 @@ function renderResumen() {
 
     return `
     <div class="participant-card">
-      <div style="display:flex;align-items:center;gap:14px">
+      <div class="p-row">
 
-        <div style="width:36px;height:36px;border-radius:50%;background:${avatarBg};color:${avatarFg};
+        <div class="p-avatar" style="width:36px;height:36px;border-radius:50%;background:${avatarBg};color:${avatarFg};
              display:flex;align-items:center;justify-content:center;
              font-size:14px;font-weight:700;flex-shrink:0;letter-spacing:-0.5px">
           ${inicial}
         </div>
 
-        <div style="min-width:88px;flex-shrink:0">
+        <div class="p-ident">
           <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.2">${p.nombre}</div>
           <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${fmtN(p.cuotas)} cuotas</div>
         </div>
 
-        <div style="flex:1;min-width:0">
+        <div class="p-val">
           <div style="font-size:17px;font-weight:700;color:var(--text);line-height:1.1">
             ${fmt(p.valor_actual)}<span style="font-size:11px;font-weight:500;color:var(--text-secondary);margin-left:3px">USD</span>
           </div>
           ${p.has_cop ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:3px">${COP(Math.round(p.valor_cop))} COP</div>` : ''}
         </div>
 
-        <div style="flex-shrink:0;text-align:right">
+        <div class="p-gains">
           <div style="display:flex;align-items:center;gap:7px;justify-content:flex-end">
             <span style="font-size:11px;font-weight:500;color:var(--text-secondary);white-space:nowrap">${signStr(p.ganancia_monto)}${fmt(Math.abs(p.ganancia_monto))} USD</span>
             <span class="gain-badge ${clsUSD}">${signStr(p.ganancia_pct)}${fmtPct(Math.abs(p.ganancia_pct))}%</span>
