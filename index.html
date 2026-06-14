@@ -473,31 +473,19 @@
           </div>
           <div class="form-group">
             <label class="form-label">Tipo</label>
-            <select class="form-input" id="f-tipo" onchange="previewCuotas()">
+            <select class="form-input" id="f-tipo">
               <option value="aporte">Aporte</option>
               <option value="retiro">Retiro</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Monto (USD)</label>
-            <input class="form-input" type="number" id="f-monto" step="0.01" min="0.01" placeholder="0.00" oninput="syncCOP()" />
+            <label class="form-label">Monto (COP)</label>
+            <input class="form-input" type="number" id="f-monto-cop" step="1000" min="0" placeholder="0" />
           </div>
           <div class="form-group">
             <label class="form-label">TRM del banco (COP/USD)</label>
-            <input class="form-input" type="number" id="f-trm" step="1" min="0" placeholder="0" oninput="syncCOP()" />
+            <input class="form-input" type="number" id="f-trm" step="1" min="0" placeholder="0" />
             <div class="form-hint" id="hint-trm-oficial"></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Monto (COP)</label>
-            <input class="form-input" type="number" id="f-monto-cop" step="1000" min="0" placeholder="0" oninput="syncUSD()" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">
-              Valor del portafolio después del movimiento (USD)
-              <span style="color:var(--red);margin-left:2px">*</span>
-            </label>
-            <input class="form-input" type="number" id="f-valor-mov" step="0.01" min="0" placeholder="0.00" oninput="previewCuotas()" />
-            <div class="form-hint" id="hint-cuotas"></div>
           </div>
           <div class="form-group">
             <label class="form-label">Fecha y hora</label>
@@ -831,8 +819,8 @@ function renderResumen() {
 
     const copGains = p.has_cop ? `
       <div style="display:flex;align-items:center;gap:7px;justify-content:flex-end;margin-top:4px">
-        <span class="gain-badge ${clsCOP}">${signStr(p.ganancia_cop_pct)}${fmtPct(Math.abs(p.ganancia_cop_pct))}%</span>
         <span style="font-size:11px;font-weight:500;color:var(--text-secondary);white-space:nowrap">${signStr(p.ganancia_cop)}${COP(Math.abs(p.ganancia_cop))} COP</span>
+        <span class="gain-badge ${clsCOP}">${signStr(p.ganancia_cop_pct)}${fmtPct(Math.abs(p.ganancia_cop_pct))}%</span>
       </div>` : '';
 
     return `
@@ -859,8 +847,8 @@ function renderResumen() {
 
         <div style="flex-shrink:0;text-align:right">
           <div style="display:flex;align-items:center;gap:7px;justify-content:flex-end">
-            <span class="gain-badge ${clsUSD}">${signStr(p.ganancia_pct)}${fmtPct(Math.abs(p.ganancia_pct))}%</span>
             <span style="font-size:11px;font-weight:500;color:var(--text-secondary);white-space:nowrap">${signStr(p.ganancia_monto)}${fmt(Math.abs(p.ganancia_monto))} USD</span>
+            <span class="gain-badge ${clsUSD}">${signStr(p.ganancia_pct)}${fmtPct(Math.abs(p.ganancia_pct))}%</span>
           </div>
           ${copGains}
         </div>
@@ -1222,79 +1210,23 @@ function lockAdmin() {
   document.getElementById('key-err').textContent = '';
 }
 
-function getTRM() {
-  return parseFloat(document.getElementById('f-trm').value) || S.trm || 1;
-}
-
-function syncCOP() {
-  const usd = parseFloat(document.getElementById('f-monto').value) || 0;
-  const trm = getTRM();
-  const copEl = document.getElementById('f-monto-cop');
-  if (usd > 0) copEl.value = Math.round(usd * trm);
-  else copEl.value = '';
-  previewCuotas();
-}
-
-function syncUSD() {
-  const cop = parseFloat(document.getElementById('f-monto-cop').value) || 0;
-  const trm = getTRM();
-  const usdEl = document.getElementById('f-monto');
-  if (cop > 0) usdEl.value = (cop / trm).toFixed(2);
-  else usdEl.value = '';
-  previewCuotas();
-}
-
 function initAdminForms() {
   const now   = new Date();
   const today = now.toISOString().split('T')[0];
   const hh    = String(now.getHours()).padStart(2, '0');
   const mm    = String(now.getMinutes()).padStart(2, '0');
   const time  = `${hh}:${mm}`;
-  document.getElementById('f-fecha').value       = today;
-  document.getElementById('f-hora').value        = time;
+  document.getElementById('f-fecha').value        = today;
+  document.getElementById('f-hora').value         = time;
   document.getElementById('f-fecha-fondo').value  = today;
   document.getElementById('f-hora-fondo').value   = time;
   if (S.trm) {
     const trmFmt = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(S.trm);
     document.getElementById('f-trm').value = S.trm.toFixed(2);
     document.getElementById('hint-trm-oficial').textContent =
-      `TRM oficial hoy: $${trmFmt} · Ajusta al TRM real de tu banco`;
+      `TRM oficial: $${trmFmt} · Ajusta al TRM real de tu banco`;
   }
-  previewCuotas();
   previewFondo();
-}
-
-function previewCuotas() {
-  const monto      = parseFloat(document.getElementById('f-monto').value)     || 0;
-  const valorFondo = parseFloat(document.getElementById('f-valor-mov').value) || 0;
-  const tipo       = document.getElementById('f-tipo').value;
-  const el         = document.getElementById('hint-cuotas');
-  const pc         = precioCuota();
-
-  const valorActual  = latest()?.valor_total || 0;
-
-  if (!monto) {
-    el.textContent = `Precio cuota actual: $${pc.toFixed(2)} USD`;
-    return;
-  }
-
-  const cuotas       = monto / pc;
-  const cuotasActuales = cuotasCirc();
-  const cuotasNuevas   = tipo === 'retiro' ? cuotasActuales - cuotas : cuotasActuales + cuotas;
-
-  // Sugerir el valor del fondo automáticamente si el campo está vacío
-  const sugerido = tipo === 'retiro' ? valorActual - monto : valorActual + monto;
-  const fieldEl  = document.getElementById('f-valor-mov');
-  if (!fieldEl.value && sugerido > 0) {
-    fieldEl.value = sugerido.toFixed(2);
-  }
-
-  const fondoUsado = parseFloat(fieldEl.value) || sugerido;
-  const pcNuevo    = cuotasNuevas > 0 ? fondoUsado / cuotasNuevas : 0;
-  const diff       = pc > 0 ? (pcNuevo - pc) / pc * 100 : 0;
-  const sign       = diff >= 0 ? '+' : '';
-
-  el.textContent = `${cuotas.toFixed(2)} cuotas · Nuevo precio: $${pcNuevo.toFixed(2)} (${sign}${diff.toFixed(2)}%) · Ajusta el valor si el mercado también se movió`;
 }
 
 function previewFondo() {
@@ -1317,35 +1249,29 @@ function previewFondo() {
 }
 
 async function submitMov() {
-  const persona    = document.getElementById('f-persona').value;
-  const tipo       = document.getElementById('f-tipo').value;
-  const monto      = parseFloat(document.getElementById('f-monto').value);
-  const valorFondo = parseFloat(document.getElementById('f-valor-mov').value);
-  const fecha      = document.getElementById('f-fecha').value + 'T' + (document.getElementById('f-hora').value || '00:00');
-  const st         = document.getElementById('st-mov');
-  const btn        = document.getElementById('btn-mov');
+  const persona   = document.getElementById('f-persona').value;
+  const tipo      = document.getElementById('f-tipo').value;
+  const monto_cop = parseFloat(document.getElementById('f-monto-cop').value);
+  const trm_dia   = parseFloat(document.getElementById('f-trm').value);
+  const fecha     = document.getElementById('f-fecha').value + 'T' + (document.getElementById('f-hora').value || '00:00');
+  const st        = document.getElementById('st-mov');
+  const btn       = document.getElementById('btn-mov');
 
-  if (!monto || monto <= 0)      { setStatus(st, 'err', 'Monto inválido'); return; }
-  if (!valorFondo || valorFondo <= 0) { setStatus(st, 'err', 'Ingresa el valor total del fondo después del movimiento'); return; }
-  if (!fecha)                    { setStatus(st, 'err', 'Fecha requerida'); return; }
+  if (!monto_cop || monto_cop <= 0) { setStatus(st, 'err', 'Ingresa el monto en COP'); return; }
+  if (!trm_dia   || trm_dia   <= 0) { setStatus(st, 'err', 'Ingresa la TRM del banco'); return; }
+  if (!fecha)                       { setStatus(st, 'err', 'Fecha requerida'); return; }
 
-  const pc           = precioCuota();
-  const cuotas       = tipo === 'retiro' ? -Math.abs(monto / pc) : Math.abs(monto / pc);
-  const cuotasNuevas = cuotasCirc() + cuotas;
-  const pcNuevo      = cuotasNuevas > 0 ? valorFondo / cuotasNuevas : 1;
-
-  const monto_cop = parseFloat(document.getElementById('f-monto-cop').value) || 0;
-  const trm_dia   = getTRM();
+  const monto_usd      = monto_cop / trm_dia;
+  const pc             = precioCuota();
+  const cuotas         = tipo === 'retiro' ? -Math.abs(monto_usd / pc) : Math.abs(monto_usd / pc);
 
   btn.disabled = true;
   setStatus(st, '', 'Guardando...');
   try {
-    await postScript({ action: 'movimiento', fecha, persona, tipo, monto_usd: monto, precio_cuota_dia: pc, cuotas, monto_cop, trm_dia });
-    await postScript({ action: 'actualizar_fondo', fecha, valor_total_usd: valorFondo, precio_cuota_usd: pcNuevo, cuotas_en_circulacion: cuotasNuevas, trm: S.trm || 0 });
-    setStatus(st, 'ok', '✅ Movimiento y valuación guardados');
-    document.getElementById('f-monto').value     = '';
+    await postScript({ action: 'movimiento', fecha, persona, tipo, monto_usd, precio_cuota_dia: pc, cuotas, monto_cop, trm_dia });
+    setStatus(st, 'ok', '✅ Movimiento guardado');
     document.getElementById('f-monto-cop').value = '';
-    document.getElementById('f-valor-mov').value = '';
+    document.getElementById('f-trm').value       = '';
     await fetchAll();
   } catch (err) {
     setStatus(st, 'err', '❌ ' + err.message);
