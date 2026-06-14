@@ -331,6 +331,31 @@
       .card { padding: 16px; }
     }
 
+    /* ── Tabla mobile: filas → cards ── */
+    @media (max-width: 640px) {
+      .table-wrap { overflow-x: visible; border: none; border-radius: 0; background: transparent; }
+      table { min-width: 0 !important; }
+      thead { display: none; }
+      tbody tr {
+        display: flex; flex-direction: column;
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: var(--radius-sm); padding: 10px 14px;
+        margin-bottom: 8px;
+      }
+      tbody tr:hover { background: var(--bg-card); }
+      tbody td {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 3px 0; border: none; font-size: 13px;
+      }
+      tbody td::before {
+        content: attr(data-label);
+        font-size: 10px; font-weight: 700; color: var(--text-secondary);
+        text-transform: uppercase; letter-spacing: 0.05em;
+        flex-shrink: 0; margin-right: 8px;
+      }
+      .td-hide { display: none; }
+    }
+
     /* ── Responsive 480px — tarjetas de participantes en 2 filas ── */
     @media (max-width: 480px) {
       .p-row   { flex-wrap: wrap; column-gap: 10px; row-gap: 5px; }
@@ -906,13 +931,13 @@ function renderMovimientos() {
   const fmtCOP = n => n ? '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(n) : '—';
   tbody.innerHTML = movs.map(m => `
     <tr>
-      <td>${fmtDate(m.fecha)}</td>
-      <td>${m.persona}</td>
-      <td><span class="badge badge-${m.tipo}">${m.tipo}</span></td>
-      <td>${fmt(m.monto)}</td>
-      <td>${fmtCOP(m.monto_cop)}</td>
-      <td>${m.trm_dia ? '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(m.trm_dia) : '—'}</td>
-      <td>${fmtN(m.cuotas)}</td>
+      <td data-label="Fecha">${fmtDate(m.fecha)}</td>
+      <td data-label="Persona">${m.persona}</td>
+      <td data-label="Tipo"><span class="badge badge-${m.tipo}">${m.tipo}</span></td>
+      <td data-label="USD">${fmt(m.monto)}</td>
+      <td data-label="COP">${fmtCOP(m.monto_cop)}</td>
+      <td data-label="TRM" class="td-hide">${m.trm_dia ? '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(m.trm_dia) : '—'}</td>
+      <td data-label="Cuotas" class="td-hide">${fmtN(m.cuotas)}</td>
     </tr>`).join('');
 }
 
