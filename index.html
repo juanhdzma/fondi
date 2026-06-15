@@ -431,6 +431,11 @@
   </nav>
   <div class="header-right">
     <div class="trm-badge" id="trm-badge">TRM: —</div>
+    <button id="refresh-btn" onclick="refreshData()"
+      title="Actualizar datos"
+      style="background:none;border:none;cursor:pointer;color:var(--text-secondary);
+             font-size:18px;line-height:1;padding:4px;border-radius:6px;
+             transition:color .15s,transform .3s">↻</button>
   </div>
 </header>
 
@@ -1320,16 +1325,15 @@ function hideBanner() {
 // ── Admin ────────────────────────────────────────────────────────────────────
 // ── Money input formatting ────────────────────────────────────────────────────
 function fmtMoneyInput(el, decimals) {
-  const pos = el.selectionStart;
   let raw = el.value.replace(/[^\d,]/g, '');
   const parts = raw.split(',');
   if (parts.length > 2) raw = parts[0] + ',' + parts.slice(1).join('');
   const intStr = (raw.split(',')[0] || '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   const decStr = raw.includes(',') ? ',' + (raw.split(',')[1] || '').slice(0, decimals) : '';
-  const newVal = intStr + decStr;
-  el.value = newVal;
-  // Restore cursor approximately
-  try { el.setSelectionRange(pos, pos); } catch(e) {}
+  el.value = intStr + decStr;
+  // Cursor siempre al final
+  const len = el.value.length;
+  el.setSelectionRange(len, len);
 }
 
 function parseMoneyInput(el) {
@@ -1540,6 +1544,17 @@ function setStatus(el, cls, msg) {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.style.transform = 'rotate(360deg)';
+  btn.style.color = 'var(--green)';
+  await fetchAll();
+  setTimeout(() => {
+    btn.style.transform = '';
+    btn.style.color = '';
+  }, 600);
+}
+
 fetchAll();
 
 /*
