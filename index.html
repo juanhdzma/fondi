@@ -238,8 +238,7 @@
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn-green { background: var(--green); color: #FFFFFF; }
     .btn-dim { background: var(--border-hover); color: var(--text); }
-    .admin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    @media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr 1fr; } }
+    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
     /* ── Tipo toggle ── */
     .tipo-toggle { display: flex; gap: 8px; }
@@ -559,7 +558,6 @@
     <div id="admin-panel" style="display:none">
       <div class="admin-header">
         <div class="admin-header-title">Panel de administración</div>
-        <button class="btn btn-dim" style="font-size:12px;padding:6px 12px" onclick="lockAdmin()">Salir</button>
       </div>
       <div class="admin-grid">
 
@@ -637,47 +635,6 @@
           <div class="form-footer">
             <button class="btn btn-green" id="btn-fondo" onclick="submitFondo()">Guardar valuación</button>
             <span class="form-status" id="st-fondo"></span>
-          </div>
-        </div>
-
-        <!-- Calculadora (3er columna del admin-grid) -->
-        <div class="card">
-          <div class="section-title" style="margin-bottom:12px">Calculadora</div>
-          <div class="calc-wrap">
-            <div id="calc-expr" class="calc-expr"></div>
-            <div style="position:relative">
-              <div id="calc-disp" class="calc-display">0</div>
-              <button onclick="calcCopy()" title="Copiar resultado"
-                style="position:absolute;right:8px;top:50%;transform:translateY(-50%);
-                       background:var(--border);border:none;border-radius:5px;
-                       padding:4px 8px;font-size:11px;font-weight:600;
-                       color:var(--text-secondary);cursor:pointer">⎘</button>
-            </div>
-            <div class="calc-grid">
-              <button class="calc-btn calc-op"  onclick="calcInput('C')">C</button>
-              <button class="calc-btn calc-op"  onclick="calcInput('←')">←</button>
-              <button class="calc-btn calc-op"  onclick="calcInput('%')">%</button>
-              <button class="calc-btn calc-main" onclick="calcInput('÷')">÷</button>
-
-              <button class="calc-btn" onclick="calcInput('7')">7</button>
-              <button class="calc-btn" onclick="calcInput('8')">8</button>
-              <button class="calc-btn" onclick="calcInput('9')">9</button>
-              <button class="calc-btn calc-main" onclick="calcInput('×')">×</button>
-
-              <button class="calc-btn" onclick="calcInput('4')">4</button>
-              <button class="calc-btn" onclick="calcInput('5')">5</button>
-              <button class="calc-btn" onclick="calcInput('6')">6</button>
-              <button class="calc-btn calc-main" onclick="calcInput('−')">−</button>
-
-              <button class="calc-btn" onclick="calcInput('1')">1</button>
-              <button class="calc-btn" onclick="calcInput('2')">2</button>
-              <button class="calc-btn" onclick="calcInput('3')">3</button>
-              <button class="calc-btn calc-main" onclick="calcInput('+')">+</button>
-
-              <button class="calc-btn" style="grid-column:span 2" onclick="calcInput('0')">0</button>
-              <button class="calc-btn" onclick="calcInput(',')">.</button>
-              <button class="calc-btn calc-main" onclick="calcInput('=')">=</button>
-            </div>
           </div>
         </div>
 
