@@ -238,7 +238,19 @@
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn-green { background: var(--green); color: #FFFFFF; }
     .btn-dim { background: var(--border-hover); color: var(--text); }
-    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .admin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    @media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr 1fr; } }
+
+    /* ── Tipo toggle ── */
+    .tipo-toggle { display: flex; gap: 8px; }
+    .tipo-btn {
+      flex: 1; padding: 10px; border: 2px solid var(--border);
+      border-radius: var(--radius-sm); background: transparent;
+      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+      cursor: pointer; color: var(--text-secondary); transition: all 0.15s;
+    }
+    .tipo-btn.aporte.sel { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+    .tipo-btn.retiro.sel { background: var(--red-dim);   border-color: var(--red);   color: var(--red); }
     .admin-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 24px;
@@ -346,6 +358,7 @@
       .nav-btn { padding: 6px 10px; font-size: 12px; }
       .main { padding: 16px 12px; }
       .admin-grid { grid-template-columns: 1fr; }
+      .tipo-toggle { gap: 6px; }
       .summary-value { font-size: 22px; }
       .dash-grid { gap: 12px; margin-bottom: 12px; }
       .parts-grid {
@@ -562,10 +575,11 @@
           </div>
           <div class="form-group">
             <label class="form-label">Tipo</label>
-            <select class="form-input" id="f-tipo">
-              <option value="aporte">Aporte</option>
-              <option value="retiro">Retiro</option>
-            </select>
+            <div class="tipo-toggle">
+              <button type="button" class="tipo-btn aporte sel" onclick="setTipo('aporte')">Aporte</button>
+              <button type="button" class="tipo-btn retiro"     onclick="setTipo('retiro')">Retiro</button>
+            </div>
+            <input type="hidden" id="f-tipo" value="aporte" />
           </div>
           <div class="form-group">
             <label class="form-label">Monto (COP)</label>
@@ -626,43 +640,48 @@
           </div>
         </div>
 
-      </div>
+        <!-- Calculadora (3er columna del admin-grid) -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom:12px">Calculadora</div>
+          <div class="calc-wrap">
+            <div id="calc-expr" class="calc-expr"></div>
+            <div style="position:relative">
+              <div id="calc-disp" class="calc-display">0</div>
+              <button onclick="calcCopy()" title="Copiar resultado"
+                style="position:absolute;right:8px;top:50%;transform:translateY(-50%);
+                       background:var(--border);border:none;border-radius:5px;
+                       padding:4px 8px;font-size:11px;font-weight:600;
+                       color:var(--text-secondary);cursor:pointer">⎘</button>
+            </div>
+            <div class="calc-grid">
+              <button class="calc-btn calc-op"  onclick="calcInput('C')">C</button>
+              <button class="calc-btn calc-op"  onclick="calcInput('←')">←</button>
+              <button class="calc-btn calc-op"  onclick="calcInput('%')">%</button>
+              <button class="calc-btn calc-main" onclick="calcInput('÷')">÷</button>
 
-      <!-- Calculadora -->
-      <div class="card" style="margin-top:24px">
-        <div class="section-title" style="margin-bottom:14px">Calculadora</div>
-        <div class="calc-wrap">
-          <div id="calc-expr" class="calc-expr"></div>
-          <div id="calc-disp" class="calc-display">0</div>
-          <div class="calc-grid">
-            <button class="calc-btn calc-op" onclick="calcInput('C')">C</button>
-            <button class="calc-btn calc-op" onclick="calcInput('←')">←</button>
-            <button class="calc-btn calc-op" onclick="calcInput('%')">%</button>
-            <button class="calc-btn calc-main" onclick="calcInput('÷')">÷</button>
+              <button class="calc-btn" onclick="calcInput('7')">7</button>
+              <button class="calc-btn" onclick="calcInput('8')">8</button>
+              <button class="calc-btn" onclick="calcInput('9')">9</button>
+              <button class="calc-btn calc-main" onclick="calcInput('×')">×</button>
 
-            <button class="calc-btn" onclick="calcInput('7')">7</button>
-            <button class="calc-btn" onclick="calcInput('8')">8</button>
-            <button class="calc-btn" onclick="calcInput('9')">9</button>
-            <button class="calc-btn calc-main" onclick="calcInput('×')">×</button>
+              <button class="calc-btn" onclick="calcInput('4')">4</button>
+              <button class="calc-btn" onclick="calcInput('5')">5</button>
+              <button class="calc-btn" onclick="calcInput('6')">6</button>
+              <button class="calc-btn calc-main" onclick="calcInput('−')">−</button>
 
-            <button class="calc-btn" onclick="calcInput('4')">4</button>
-            <button class="calc-btn" onclick="calcInput('5')">5</button>
-            <button class="calc-btn" onclick="calcInput('6')">6</button>
-            <button class="calc-btn calc-main" onclick="calcInput('−')">−</button>
+              <button class="calc-btn" onclick="calcInput('1')">1</button>
+              <button class="calc-btn" onclick="calcInput('2')">2</button>
+              <button class="calc-btn" onclick="calcInput('3')">3</button>
+              <button class="calc-btn calc-main" onclick="calcInput('+')">+</button>
 
-            <button class="calc-btn" onclick="calcInput('1')">1</button>
-            <button class="calc-btn" onclick="calcInput('2')">2</button>
-            <button class="calc-btn" onclick="calcInput('3')">3</button>
-            <button class="calc-btn calc-main" onclick="calcInput('+')">+</button>
-
-            <button class="calc-btn" style="grid-column:span 2" onclick="calcInput('0')">0</button>
-            <button class="calc-btn" onclick="calcInput(',')">.</button>
-            <button class="calc-btn calc-main" onclick="calcInput('=')">=</button>
+              <button class="calc-btn" style="grid-column:span 2" onclick="calcInput('0')">0</button>
+              <button class="calc-btn" onclick="calcInput(',')">.</button>
+              <button class="calc-btn calc-main" onclick="calcInput('=')">=</button>
+            </div>
           </div>
         </div>
-      </div>
 
-    </div>
+      </div>
   </div>
 
 </main>
@@ -1361,49 +1380,67 @@ function parseMoneyInput(el) {
   return parseFloat(raw) || 0;
 }
 
+// ── Tipo toggle ───────────────────────────────────────────────────────────────
+function setTipo(tipo) {
+  document.getElementById('f-tipo').value = tipo;
+  document.querySelector('.tipo-btn.aporte').classList.toggle('sel', tipo === 'aporte');
+  document.querySelector('.tipo-btn.retiro').classList.toggle('sel', tipo === 'retiro');
+}
+
 // ── Calculadora ───────────────────────────────────────────────────────────────
-const CS = { disp: '0', expr: '', prev: null, op: null, rst: false };
+const CS = { raw: '0', expr: '', prev: null, op: null, rst: false };
+
+function calcDispFmt(raw) {
+  // Formatea el número que se está digitando con separador de miles
+  const parts = raw.split(',');
+  const intPart = (parts[0] || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return parts.length > 1 ? intPart + ',' + parts[1] : intPart;
+}
 
 function calcInput(k) {
   const s = CS;
-  const upd = () => {
-    document.getElementById('calc-disp').textContent = s.disp;
-    document.getElementById('calc-expr').textContent = s.expr;
-  };
-
   if (k === 'C') {
-    s.disp = '0'; s.expr = ''; s.prev = null; s.op = null; s.rst = false;
+    s.raw = '0'; s.expr = ''; s.prev = null; s.op = null; s.rst = false;
   } else if (k === '←') {
-    s.disp = s.disp.length > 1 ? s.disp.slice(0, -1) : '0';
+    s.raw = s.raw.length > 1 ? s.raw.slice(0, -1) : '0';
   } else if ('0123456789'.includes(k)) {
-    if (s.rst) { s.disp = k; s.rst = false; }
-    else s.disp = s.disp === '0' ? k : s.disp + k;
+    if (s.rst) { s.raw = k; s.rst = false; }
+    else s.raw = s.raw === '0' ? k : s.raw + k;
   } else if (k === ',') {
-    if (s.rst) { s.disp = '0,'; s.rst = false; }
-    else if (!s.disp.includes(',')) s.disp += ',';
+    if (s.rst) { s.raw = '0,'; s.rst = false; }
+    else if (!s.raw.includes(',')) s.raw += ',';
+  } else if (k === '%') {
+    const n = calcParse(s.raw);
+    s.raw = String(n / 100).replace('.', ',');
   } else if (['+', '−', '×', '÷'].includes(k)) {
+    const cur = calcParse(s.raw);
     if (s.op && !s.rst) {
-      const res = calcEval(s.prev, calcParse(s.disp), s.op);
-      s.disp = calcFmt(res);
+      const res = calcEval(s.prev, cur, s.op);
+      s.raw = calcFmt(res).replace(/\./g, '');
       s.prev = res;
     } else {
-      s.prev = calcParse(s.disp);
+      s.prev = cur;
     }
     s.op = k; s.rst = true;
     s.expr = calcFmt(s.prev) + ' ' + k;
   } else if (k === '=') {
     if (s.op !== null && s.prev !== null) {
-      const res = calcEval(s.prev, calcParse(s.disp), s.op);
-      s.expr = calcFmt(s.prev) + ' ' + s.op + ' ' + s.disp + ' =';
-      s.disp = calcFmt(res);
+      const res = calcEval(s.prev, calcParse(s.raw), s.op);
+      s.expr = calcFmt(s.prev) + ' ' + s.op + ' ' + calcDispFmt(s.raw) + ' =';
+      s.raw = calcFmt(res).replace(/\./g, '');
       s.prev = null; s.op = null; s.rst = true;
     }
   }
-  upd();
+  document.getElementById('calc-disp').textContent = calcDispFmt(s.raw);
+  document.getElementById('calc-expr').textContent = s.expr;
+}
+
+function calcCopy() {
+  navigator.clipboard.writeText(calcDispFmt(CS.raw)).catch(() => {});
 }
 
 function calcParse(s) {
-  return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+  return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
 }
 function calcFmt(n) {
   if (isNaN(n) || !isFinite(n)) return 'Error';
