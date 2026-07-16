@@ -126,10 +126,7 @@ function xAxis(tickValues) {
     bounds: 'data',
     min: tickValues[0],
     max: tickValues[tickValues.length - 1],
-    ticks: {
-      color: '#6E6F76', font: { size: 13 }, maxRotation: 0,
-      callback: v => fmtTs(v),
-    },
+    ticks: { display: false },
     afterBuildTicks: axis => { axis.ticks = tickValues.map(value => ({ value })); },
     grid: { display: false },
     border: { display: false },
