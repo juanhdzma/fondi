@@ -118,7 +118,7 @@ button, input, select { font: inherit; }
 .stat-sub { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--divider); display: flex; gap: 12px; }
 .stat-sub-item { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .stat-sub-item span { font-size: 11px; color: var(--text-secondary); }
-.stat-sub-item b { font-size: 13px; font-weight: 700; }
+.stat-sub-item b { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stat-sub-item b.pos { color: var(--green); }
 .stat-sub-item b.neg { color: var(--red); }
 
