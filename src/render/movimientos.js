@@ -38,6 +38,7 @@ function renderPersonaPanel(nombre) {
       <div>
         <div class="summary-label">Total aportado</div>
         <div class="summary-value">${fmt(p.aportes_monto)}<span class="summary-unit">USD</span></div>
+        ${p.has_cop ? `<div class="summary-sub">${fmtCOP(p.cop_invertido)} COP · TRM prom ${fmtCOP(p.trm_avg_entrada)}</div>` : ''}
         ${p.retiros_monto > 0 ? `<div class="summary-sub">${fmt(p.retiros_monto)} USD retirados</div>` : ''}
       </div>
     </div>`;
