@@ -4,418 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ahorro Familiar</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #F6F8FA;
-      --bg-card: #FFFFFF;
-      --border: #E5E7EB;
-      --border-hover: #D1D5DB;
-      --green: #059669;
-      --green-dim: rgba(5,150,105,0.10);
-      --red: #DC2626;
-      --red-dim: rgba(220,38,38,0.10);
-      --text: #111827;
-      --text-secondary: #6B7280;
-      --radius: 12px;
-      --radius-sm: 8px;
-    }
-
-    body {
-      font-family: 'Inter', -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── Header ── */
-    .header {
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(246,248,250,0.96);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      padding: 0 24px; height: 60px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .header-left { display: flex; align-items: center; gap: 12px; }
-    .logo {
-      width: 30px; height: 30px;
-      background: linear-gradient(135deg, #059669, #0284C7);
-      border-radius: 7px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 700; color: #FFFFFF;
-      flex-shrink: 0;
-    }
-    .header-title { font-size: 15px; font-weight: 600; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
-    .trm-badge {
-      font-size: 11px; color: var(--text-secondary);
-      background: var(--bg-card); border: 1px solid var(--border);
-      padding: 4px 10px; border-radius: 20px;
-    }
-
-    /* ── Currency toggle ── */
-    .currency-toggle {
-      display: flex; align-items: center;
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: 24px; padding: 3px; gap: 2px;
-    }
-    .currency-btn {
-      padding: 5px 13px; border-radius: 20px; border: none;
-      background: transparent; color: var(--text-secondary);
-      font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
-      cursor: pointer; transition: all 0.15s;
-    }
-    .currency-btn.active { background: var(--green); color: #FFFFFF; }
-
-    /* ── Header nav ── */
-    .header-nav { display: flex; gap: 2px; }
-    .nav-btn {
-      padding: 6px 14px; border: none; background: transparent;
-      color: var(--text-secondary); font-family: 'Inter', sans-serif;
-      font-size: 13px; font-weight: 500; cursor: pointer;
-      border-radius: 6px; white-space: nowrap;
-      transition: background 0.15s, color 0.15s;
-    }
-    .nav-btn.active { background: var(--border); color: var(--text); }
-    .nav-btn:hover:not(.active) { color: var(--text); }
-
-    /* ── Main ── */
-    .main { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    /* ── Cards ── */
-    .card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 24px;
-    }
-    .dash-grid {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 16px; margin-bottom: 16px;
-    }
-    .parts-grid {
-      display: flex; gap: 16px; margin-top: 16px;
-      height: 420px;
-    }
-    .parts-grid > .parts-left  { flex: 3; display: flex; flex-direction: column; min-height: 0; }
-    .parts-grid > .parts-right { flex: 2; display: flex; flex-direction: column; min-height: 0; }
-    @media (max-width: 640px) {
-      .dash-grid  { grid-template-columns: 1fr; }
-      .parts-grid { flex-direction: column; }
-    }
-    .summary-label {
-      font-size: 11px; font-weight: 600; color: var(--text-secondary);
-      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;
-    }
-    .summary-value {
-      font-size: 30px; font-weight: 700; line-height: 1;
-      transition: opacity 0.2s;
-    }
-    .summary-unit { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 4px; }
-    .summary-sub { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
-
-    /* ── Participant cards ── */
-    .section-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.05em; }
-    .participants-grid {
-      display: grid; grid-template-columns: 1fr;
-      grid-auto-rows: 1fr; gap: 6px; flex: 1;
-    }
-    .participant-card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 14px 18px;
-      transition: border-color 0.15s;
-      display: flex; flex-direction: column; justify-content: center;
-    }
-    .participant-card:hover { border-color: var(--border-hover); }
-    .p-name { font-size: 13px; font-weight: 600; margin-bottom: 14px; }
-    .p-value {
-      font-size: 22px; font-weight: 700; margin-bottom: 3px;
-      transition: opacity 0.2s;
-    }
-    .p-cuotas { font-size: 11px; color: var(--text-secondary); margin-bottom: 14px; }
-    .p-gain { display: flex; align-items: center; gap: 8px; }
-    .gain-badge {
-      display: inline-flex; padding: 2px 8px; border-radius: 5px;
-      font-size: 11px; font-weight: 700;
-    }
-    .gain-badge.pos { color: var(--green); background: var(--green-dim); }
-    .gain-badge.neg { color: var(--red); background: var(--red-dim); }
-    .gain-badge.zero { color: var(--text-secondary); background: var(--border); }
-    .gain-monto { font-size: 11px; color: var(--text-secondary); transition: opacity 0.2s; }
-
-    /* ── Charts ── */
-    .chart-card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 24px; margin-bottom: 16px;
-    }
-    .chart-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
-    }
-    .chart-title { font-size: 13px; font-weight: 600; }
-    .range-btns {
-      display: flex; gap: 2px; background: var(--bg);
-      border: 1px solid var(--border); border-radius: 8px; padding: 3px;
-      overflow-x: auto; scrollbar-width: none; flex-shrink: 0;
-    }
-    .range-btns::-webkit-scrollbar { display: none; }
-    .chg-badge { font-size: 12px; font-weight: 700; }
-    .chg-badge.pos { color: #059669; }
-    .chg-badge.neg { color: #DC2626; }
-    .range-btn {
-      padding: 3px 10px; border-radius: 5px; border: none;
-      background: transparent; color: var(--text-secondary);
-      font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
-      cursor: pointer; transition: all 0.15s;
-    }
-    .range-btn.active { background: var(--border-hover); color: var(--text); }
-    .chart-wrap { position: relative; height: 200px; }
-
-    /* ── Table ── */
-    .table-filters { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
-    .select-styled {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); color: var(--text);
-      font-family: 'Inter', sans-serif; font-size: 13px; padding: 8px 28px 8px 12px;
-      cursor: pointer; outline: none; appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%238B949E' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 10px center;
-    }
-    .table-wrap {
-      overflow-x: auto; border-radius: var(--radius);
-      border: 1px solid var(--border);
-    }
-    table { width: 100%; border-collapse: collapse; min-width: 560px; }
-    thead th {
-      background: var(--bg-card); padding: 11px 16px;
-      font-size: 10px; font-weight: 700; color: var(--text-secondary);
-      text-transform: uppercase; letter-spacing: 0.06em;
-      text-align: left; border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-    tbody td {
-      padding: 11px 16px; font-size: 13px; color: var(--text);
-      border-bottom: 1px solid var(--border);
-    }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr { background: var(--bg); transition: background 0.1s; }
-    tbody tr:hover { background: var(--bg-card); }
-    .badge {
-      display: inline-flex; padding: 2px 8px; border-radius: 5px;
-      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-    }
-    .badge-aporte { color: var(--green); background: var(--green-dim); }
-    .badge-retiro { color: var(--red); background: var(--red-dim); }
-
-    /* ── Admin ── */
-    .admin-lock { max-width: 380px; margin: 72px auto; text-align: center; }
-    .lock-icon { font-size: 40px; margin-bottom: 20px; opacity: 0.5; }
-    .admin-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-    .admin-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 28px; }
-    .input-row { display: flex; gap: 8px; }
-    .input-base {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); color: var(--text);
-      font-family: 'Inter', sans-serif; font-size: 14px; padding: 10px 14px;
-      outline: none; transition: border-color 0.15s;
-    }
-    .input-base:focus { border-color: var(--green); }
-    .input-base.err { border-color: var(--red); }
-    .input-flex { flex: 1; }
-    .err-msg { font-size: 12px; color: var(--red); margin-top: 6px; min-height: 16px; }
-    .btn {
-      padding: 10px 18px; border-radius: var(--radius-sm); border: none;
-      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
-    }
-    .btn:hover { opacity: 0.88; }
-    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-green { background: var(--green); color: #FFFFFF; }
-    .btn-dim { background: var(--border-hover); color: var(--text); }
-    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-
-    /* ── Tipo toggle ── */
-    .tipo-toggle { display: flex; gap: 8px; }
-    .tipo-btn {
-      flex: 1; padding: 10px; border: 2px solid var(--border);
-      border-radius: var(--radius-sm); background: transparent;
-      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
-      cursor: pointer; color: var(--text-secondary); transition: all 0.15s;
-    }
-    .tipo-btn.aporte.sel { background: var(--green-dim); border-color: var(--green); color: var(--green); }
-    .tipo-btn.retiro.sel { background: var(--red-dim);   border-color: var(--red);   color: var(--red); }
-    .admin-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 24px;
-    }
-    .admin-header-title { font-size: 15px; font-weight: 700; }
-    .form-group { margin-bottom: 14px; }
-    .form-label {
-      display: block; font-size: 11px; font-weight: 600;
-      color: var(--text-secondary); margin-bottom: 5px;
-      text-transform: uppercase; letter-spacing: 0.05em;
-    }
-    .form-input {
-      width: 100%;
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); color: var(--text);
-      font-family: 'Inter', sans-serif; font-size: 14px; padding: 10px 14px;
-      outline: none; transition: border-color 0.15s;
-    }
-    .form-input:focus { border-color: var(--green); }
-    .form-hint { font-size: 11px; color: var(--text-secondary); margin-top: 5px; min-height: 14px; }
-    .form-footer { display: flex; align-items: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
-    .form-status { font-size: 12px; }
-    .form-status.ok { color: var(--green); }
-    .form-status.err { color: var(--red); }
-
-    /* ── Skeleton ── */
-    .skeleton {
-      background: linear-gradient(90deg, #F3F4F6 25%, #E5E7EB 50%, #F3F4F6 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
-      border-radius: 6px; display: block;
-    }
-
-    /* ── 2-col chart row ── */
-    .chart-row-2 {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
-    }
-    .chart-row-2 .chart-card { margin-bottom: 0; }
-    @media (max-width: 640px) { .chart-row-2 { grid-template-columns: 1fr; } }
-    @keyframes shimmer {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-
-    /* ── Empty state ── */
-    .empty { text-align: center; padding: 64px 24px; grid-column: 1/-1; }
-    .empty-icon { font-size: 40px; margin-bottom: 14px; opacity: 0.35; }
-    .empty-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-    .empty-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
-
-    /* ── Error banner ── */
-    .error-banner {
-      background: var(--red-dim); border: 1px solid rgba(255,77,109,0.25);
-      border-radius: var(--radius-sm); padding: 12px 16px;
-      color: var(--red); font-size: 13px; margin-bottom: 20px; display: none;
-    }
-
-    /* ── Transitions ── */
-    .cv { transition: opacity 0.2s; }
-    .cv.fade { opacity: 0; }
-
-    /* ── Money input wrapper ── */
-    .money-wrap { position: relative; display: flex; align-items: center; }
-    .money-wrap .currency-pfx {
-      position: absolute; left: 12px; color: var(--text-secondary);
-      font-size: 14px; font-weight: 500; pointer-events: none; user-select: none;
-    }
-    .money-wrap .form-input { padding-left: 26px; }
-
-    /* ── Calculadora ── */
-    .calc-wrap { max-width: 300px; }
-    .calc-expr {
-      font-size: 11px; color: var(--text-secondary); text-align: right;
-      min-height: 16px; margin-bottom: 4px; padding: 0 2px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .calc-display {
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 10px;
-      font-size: 24px; font-weight: 700; text-align: right; color: var(--text);
-      min-height: 52px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    .calc-btn {
-      padding: 15px 0; border: none; border-radius: var(--radius-sm);
-      background: var(--border); color: var(--text);
-      font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 600;
-      cursor: pointer; transition: opacity 0.1s; text-align: center;
-    }
-    .calc-btn:active { opacity: 0.55; }
-    .calc-op   { background: var(--border-hover); color: var(--text-secondary); }
-    .calc-main { background: var(--green); color: #fff; }
-
-    /* ── Participant card layout classes ── */
-    .p-row   { display: flex; align-items: center; gap: 14px; }
-    .p-ident { min-width: 88px; flex-shrink: 0; }
-    .p-val   { flex: 1; min-width: 0; }
-    .p-gains { flex-shrink: 0; text-align: right; }
-
-    /* ── Responsive 640px ── */
-    @media (max-width: 640px) {
-      .header { padding: 0 12px; }
-      .header-title { display: none; }
-      .trm-badge { display: none; }
-      .nav-btn { padding: 6px 10px; font-size: 12px; }
-      .main { padding: 16px 12px; }
-      .admin-grid { grid-template-columns: 1fr; }
-      .tipo-toggle { gap: 6px; }
-      .summary-value { font-size: 22px; }
-      .dash-grid { gap: 12px; margin-bottom: 12px; }
-      .parts-grid {
-        flex-direction: column;
-        height: auto;         /* libera el 420px fijo */
-      }
-      .parts-left .participants-grid {
-        grid-auto-rows: auto; /* tarjetas a altura natural en mobile */
-      }
-      .parts-right .chart-card { min-height: 300px; }
-      .chart-header { flex-wrap: wrap; gap: 8px; }
-      .range-btn { padding: 4px 9px; font-size: 10px; }
-      thead th { font-size: 10px; padding: 8px 10px; }
-      tbody td { font-size: 12px; padding: 8px 10px; }
-      .card { padding: 16px; }
-    }
-
-    /* ── Tabla mobile: filas → cards ── */
-    @media (max-width: 640px) {
-      .table-wrap { overflow-x: visible; border: none; border-radius: 0; background: transparent; }
-      table { min-width: 0 !important; }
-      thead { display: none; }
-      tbody tr {
-        display: flex; flex-direction: column;
-        background: var(--bg-card); border: 1px solid var(--border);
-        border-radius: var(--radius-sm); padding: 10px 14px;
-        margin-bottom: 8px;
-      }
-      tbody tr:hover { background: var(--bg-card); }
-      tbody td {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 3px 0; border: none; font-size: 13px;
-      }
-      tbody td::before {
-        content: attr(data-label);
-        font-size: 10px; font-weight: 700; color: var(--text-secondary);
-        text-transform: uppercase; letter-spacing: 0.05em;
-        flex-shrink: 0; margin-right: 8px;
-      }
-      .td-hide { display: none; }
-    }
-
-    /* ── Responsive 480px — tarjetas de participantes en 2 filas ── */
-    @media (max-width: 480px) {
-      .p-row   { flex-wrap: wrap; column-gap: 10px; row-gap: 5px; }
-      .p-ident { flex: 1; min-width: 0; }   /* fila 1: avatar + nombre ocupa el ancho */
-      .p-val   {
-        order: 3; flex: 0 0 100%;           /* fila 2: ocupa todo el ancho */
-        display: flex; justify-content: space-between; align-items: baseline;
-        gap: 8px;
-      }
-      .p-gains { order: 2; }                /* fila 1: badge a la derecha del nombre */
-      .p-avatar { width: 28px !important; height: 28px !important; font-size: 11px !important; }
-      .participant-card { padding: 10px 12px; }
-      .parts-right .chart-card { min-height: 260px; }
-      .nav-btn { padding: 6px 8px; font-size: 11px; }
-    }
-  </style>
 </head>
 <body>
 
@@ -425,17 +13,22 @@
     <span class="header-title">Ahorro Familiar</span>
   </div>
   <nav class="header-nav">
-    <button class="nav-btn active" data-tab="resumen" onclick="setTab('resumen')">Resumen</button>
-    <button class="nav-btn" data-tab="movimientos" onclick="setTab('movimientos')">Movimientos</button>
-    <button class="nav-btn" data-tab="admin" onclick="setTab('admin')">Admin</button>
+    <button class="nav-btn active" data-tab="resumen">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="12" width="3.5" height="8"/><rect x="10.25" y="7" width="3.5" height="13"/><rect x="16.5" y="4" width="3.5" height="16"/></svg>
+      <span>Resumen</span>
+    </button>
+    <button class="nav-btn" data-tab="movimientos">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg>
+      <span>Movimientos</span>
+    </button>
+    <button class="nav-btn" data-tab="admin">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="4" x2="6" y2="20"/><circle cx="6" cy="9" r="2.2" fill="currentColor" stroke="none"/><line x1="12" y1="4" x2="12" y2="20"/><circle cx="12" cy="15" r="2.2" fill="currentColor" stroke="none"/><line x1="18" y1="4" x2="18" y2="20"/><circle cx="18" cy="7" r="2.2" fill="currentColor" stroke="none"/></svg>
+      <span>Admin</span>
+    </button>
   </nav>
   <div class="header-right">
     <div class="trm-badge" id="trm-badge">TRM: —</div>
-    <button id="refresh-btn" onclick="refreshData()"
-      title="Actualizar datos"
-      style="background:none;border:none;cursor:pointer;color:var(--text-secondary);
-             font-size:18px;line-height:1;padding:4px;border-radius:6px;
-             transition:color .15s,transform .3s">↻</button>
+    <button id="refresh-btn" class="refresh-btn" title="Actualizar datos" aria-label="Actualizar datos">↻</button>
   </div>
 </header>
 
@@ -445,117 +38,95 @@
   <div id="tab-resumen" class="tab-content active">
     <div class="error-banner" id="err-banner"></div>
 
-    <!-- Card + gráfica debajo, en 2 columnas -->
-    <div class="dash-grid">
+    <div class="chart-card">
+      <div class="hero-toggle">
+        <button class="hero-tab active" data-metric="total">Valor total</button>
+        <button class="hero-tab" data-metric="cuota">Precio cuota</button>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-hero"></canvas></div>
+      <div class="range-btns">
+        <button class="range-btn" data-r="1W"><span class="rl-full">1 semana</span><span class="rl-short">1S</span></button>
+        <button class="range-btn" data-r="2W"><span class="rl-full">2 semanas</span><span class="rl-short">2S</span></button>
+        <button class="range-btn" data-r="1M"><span class="rl-full">1 mes</span><span class="rl-short">1M</span></button>
+        <button class="range-btn" data-r="3M"><span class="rl-full">3 meses</span><span class="rl-short">3M</span></button>
+        <button class="range-btn" data-r="6M"><span class="rl-full">6 meses</span><span class="rl-short">6M</span></button>
+        <button class="range-btn" data-r="1A"><span class="rl-full">1 año</span><span class="rl-short">1A</span></button>
+        <button class="range-btn active" data-r="todo">Todo</button>
+      </div>
+    </div>
 
-      <!-- Valor total -->
-      <div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="summary-label">Valor total del fondo</div>
-          <div class="summary-value" id="s-total"><span class="skeleton" style="width:160px;height:32px"></span></div>
-          <div class="summary-sub cv" id="s-total-sub"></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-header">
-            <div style="display:flex;align-items:center;gap:10px">
-              <div class="chart-title">Valor total</div>
-              <span class="chg-badge" id="chg-total"></span>
-            </div>
-            <div class="range-btns">
-              <button class="range-btn" data-r="1W"   onclick="setRange('1W')">1S</button>
-              <button class="range-btn" data-r="2W"   onclick="setRange('2W')">2S</button>
-              <button class="range-btn" data-r="1M"   onclick="setRange('1M')">1M</button>
-              <button class="range-btn" data-r="2M"   onclick="setRange('2M')">2M</button>
-              <button class="range-btn" data-r="3M"   onclick="setRange('3M')">3M</button>
-              <button class="range-btn" data-r="6M"   onclick="setRange('6M')">6M</button>
-              <button class="range-btn" data-r="1A"   onclick="setRange('1A')">1A</button>
-              <button class="range-btn active" data-r="todo" onclick="setRange('todo')">Todo</button>
-            </div>
+    <div class="stat-rail">
+      <div class="stat">
+        <div class="stat-label">Valor del fondo</div>
+        <div class="stat-value" id="stat-fondo-value">—</div>
+        <div class="stat-chg" id="stat-fondo-chg"></div>
+        <div class="stat-sub">
+          <div class="stat-sub-item">
+            <span>Aportado</span>
+            <b id="stat-aportado-value">—</b>
           </div>
-          <div class="chart-wrap"><canvas id="chart-total"></canvas></div>
+          <div class="stat-sub-item">
+            <span>Ganancia acumulada</span>
+            <b id="stat-ganancia-value">—</b>
+          </div>
         </div>
       </div>
-
-      <!-- Precio cuota -->
-      <div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="summary-label">Precio de la cuota</div>
-          <div class="summary-value" id="s-cuota"><span class="skeleton" style="width:120px;height:32px"></span></div>
-          <div class="summary-sub" id="s-cuotas-circ"></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-header">
-            <div class="chart-title">Precio cuota</div>
-            <div class="range-btns">
-              <button class="range-btn" data-r="1W"   onclick="setRange('1W')">1S</button>
-              <button class="range-btn" data-r="2W"   onclick="setRange('2W')">2S</button>
-              <button class="range-btn" data-r="1M"   onclick="setRange('1M')">1M</button>
-              <button class="range-btn" data-r="2M"   onclick="setRange('2M')">2M</button>
-              <button class="range-btn" data-r="3M"   onclick="setRange('3M')">3M</button>
-              <button class="range-btn" data-r="6M"   onclick="setRange('6M')">6M</button>
-              <button class="range-btn" data-r="1A"   onclick="setRange('1A')">1A</button>
-              <button class="range-btn active" data-r="todo" onclick="setRange('todo')">Todo</button>
-            </div>
+      <div class="stat">
+        <div class="stat-label">Precio de cuota</div>
+        <div class="stat-value" id="stat-cuota-value">—</div>
+        <div class="stat-chg" id="stat-cuota-chg"></div>
+        <div class="stat-sub">
+          <div class="stat-sub-item">
+            <span>Cuotas en circulación</span>
+            <b id="stat-cuotas-value">—</b>
           </div>
-          <div class="chart-wrap"><canvas id="chart-cuota"></canvas></div>
+          <div class="stat-sub-item">
+            <span>Valor en COP</span>
+            <b id="stat-cuota-cop-value">—</b>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Participantes (60%) + pie (40%) -->
-    <div class="parts-grid">
-      <div class="parts-left">
-        <div class="participants-grid" id="participants-grid">
-          <div class="participant-card" style="display:flex;align-items:center;gap:10px"><span class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></span><span class="skeleton" style="width:70px;height:13px"></span><span class="skeleton" style="width:100px;height:18px;margin-left:auto"></span><span class="skeleton" style="width:70px;height:18px"></span></div>
-          <div class="participant-card" style="display:flex;align-items:center;gap:10px"><span class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></span><span class="skeleton" style="width:70px;height:13px"></span><span class="skeleton" style="width:100px;height:18px;margin-left:auto"></span><span class="skeleton" style="width:70px;height:18px"></span></div>
-          <div class="participant-card" style="display:flex;align-items:center;gap:10px"><span class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></span><span class="skeleton" style="width:70px;height:13px"></span><span class="skeleton" style="width:100px;height:18px;margin-left:auto"></span><span class="skeleton" style="width:70px;height:18px"></span></div>
-          <div class="participant-card" style="display:flex;align-items:center;gap:10px"><span class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></span><span class="skeleton" style="width:70px;height:13px"></span><span class="skeleton" style="width:100px;height:18px;margin-left:auto"></span><span class="skeleton" style="width:70px;height:18px"></span></div>
-        </div>
-      </div>
-      <div class="parts-right">
-        <div class="chart-card" style="flex:1;display:flex;flex-direction:column;margin-bottom:0">
-          <div class="chart-header" style="flex-shrink:0"><div class="chart-title">Participación</div></div>
-          <div class="chart-wrap" style="flex:1;min-height:0"><canvas id="chart-donut"></canvas></div>
-        </div>
-      </div>
+    <div class="section-label">Participantes · <span id="participantes-count">—</span> activos</div>
+    <div class="participants-grid" id="participants-grid">
+      <div class="p-row"><span class="skeleton" style="width:36px;height:36px;border-radius:11px;flex-shrink:0"></span><span class="skeleton" style="width:90px;height:13px"></span><span class="skeleton" style="width:70px;height:18px;margin-left:auto"></span></div>
+      <div class="p-row"><span class="skeleton" style="width:36px;height:36px;border-radius:11px;flex-shrink:0"></span><span class="skeleton" style="width:90px;height:13px"></span><span class="skeleton" style="width:70px;height:18px;margin-left:auto"></span></div>
+      <div class="p-row"><span class="skeleton" style="width:36px;height:36px;border-radius:11px;flex-shrink:0"></span><span class="skeleton" style="width:90px;height:13px"></span><span class="skeleton" style="width:70px;height:18px;margin-left:auto"></span></div>
+      <div class="p-row"><span class="skeleton" style="width:36px;height:36px;border-radius:11px;flex-shrink:0"></span><span class="skeleton" style="width:90px;height:13px"></span><span class="skeleton" style="width:70px;height:18px;margin-left:auto"></span></div>
     </div>
   </div>
 
   <!-- ── MOVIMIENTOS ── -->
   <div id="tab-movimientos" class="tab-content">
     <div class="table-filters">
-      <select class="select-styled" id="filter-persona" onchange="renderMovimientos()">
+      <select class="select-styled" id="filter-persona">
         <option value="">Todos los participantes</option>
-        <option>Patico</option><option>Mariana</option>
-        <option>Juancho</option><option>Juan Carlos</option>
       </select>
     </div>
-    <div class="table-wrap">
-      <table style="min-width:700px">
-        <thead>
-          <tr>
-            <th>Fecha</th><th>Persona</th><th>Tipo</th>
-            <th>USD</th><th>COP</th><th>TRM</th><th>Cuotas</th>
-          </tr>
-        </thead>
-        <tbody id="mov-tbody">
-          <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:40px">Cargando...</td></tr>
-        </tbody>
-      </table>
+
+    <div id="mov-persona-panel" style="display:none">
+      <div class="card" id="mov-persona-summary" style="margin-bottom:16px"></div>
+      <div class="chart-card">
+        <div class="chart-header"><div class="chart-title">Evolución de tu inversión</div></div>
+        <div class="chart-wrap"><canvas id="chart-persona"></canvas></div>
+      </div>
     </div>
+
+    <ul class="mov-list" id="mov-list">
+      <li style="text-align:center;color:var(--text-secondary);padding:40px">Cargando...</li>
+    </ul>
   </div>
 
   <!-- ── ADMIN ── -->
   <div id="tab-admin" class="tab-content">
     <div id="admin-lock" class="admin-lock">
-      <div class="lock-icon">🔒</div>
       <div class="admin-title">Panel de administración</div>
       <div class="admin-sub">Ingresa la clave para continuar</div>
-      <div class="input-row">
+      <div class="input-row input-row-stack">
         <input class="input-base input-flex" type="password" id="admin-key"
-          placeholder="Clave de acceso"
-          onkeydown="if(event.key==='Enter')unlockAdmin()" />
-        <button class="btn btn-green" onclick="unlockAdmin()">Entrar</button>
+          placeholder="Clave de acceso" />
+        <button class="btn btn-green" id="unlock-btn">Entrar</button>
       </div>
       <div class="err-msg" id="key-err"></div>
     </div>
@@ -571,16 +142,13 @@
           <div class="section-title" style="margin-bottom:18px">Registrar movimiento</div>
           <div class="form-group">
             <label class="form-label">Participante</label>
-            <select class="form-input" id="f-persona">
-              <option>Patico</option><option>Mariana</option>
-              <option>Juancho</option><option>Juan Carlos</option>
-            </select>
+            <select class="form-input" id="f-persona"></select>
           </div>
           <div class="form-group">
             <label class="form-label">Tipo</label>
             <div class="tipo-toggle">
-              <button type="button" class="tipo-btn aporte sel" onclick="setTipo('aporte')">Aporte</button>
-              <button type="button" class="tipo-btn retiro"     onclick="setTipo('retiro')">Retiro</button>
+              <button type="button" class="tipo-btn aporte sel" data-tipo="aporte">Aporte</button>
+              <button type="button" class="tipo-btn retiro" data-tipo="retiro">Retiro</button>
             </div>
             <input type="hidden" id="f-tipo" value="aporte" />
           </div>
@@ -588,32 +156,32 @@
             <label class="form-label">Monto (COP)</label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
-              <input class="form-input" type="text" inputmode="numeric" id="f-monto-cop" placeholder="0" oninput="fmtMoneyInput(this,0)" />
+              <input class="form-input" type="text" inputmode="numeric" id="f-monto-cop" placeholder="0" />
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Monto (USD)</label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
-              <input class="form-input" type="text" inputmode="decimal" id="f-monto" placeholder="0,00" oninput="fmtMoneyInput(this,2)" />
+              <input class="form-input" type="text" inputmode="decimal" id="f-monto" placeholder="0,00" />
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Valor del fondo después (USD) <span style="color:var(--red)">*</span></label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
-              <input class="form-input" type="text" inputmode="decimal" id="f-valor-mov" placeholder="0,00" oninput="fmtMoneyInput(this,2)" />
+              <input class="form-input" type="text" inputmode="decimal" id="f-valor-mov" placeholder="0,00" />
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Fecha y hora</label>
             <div style="display:flex;gap:8px">
               <input class="form-input" type="date" id="f-fecha" style="flex:1" />
-              <input class="form-input" type="time" id="f-hora" style="width:110px" />
+              <input class="form-input" type="time" id="f-hora" style="flex:1" />
             </div>
           </div>
           <div class="form-footer">
-            <button class="btn btn-green" id="btn-mov" onclick="submitMov()">Guardar</button>
+            <button class="btn btn-green" id="btn-mov">Guardar</button>
             <span class="form-status" id="st-mov"></span>
           </div>
         </div>
@@ -626,20 +194,36 @@
             <label class="form-label">Valor total del portafolio (USD)</label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
-              <input class="form-input" type="text" inputmode="decimal" id="f-valor" placeholder="0,00" oninput="fmtMoneyInput(this,2);previewFondo()" />
+              <input class="form-input" type="text" inputmode="decimal" id="f-valor" placeholder="0,00" />
             </div>
             <div class="form-hint" id="hint-fondo"></div>
           </div>
           <div class="form-group">
             <label class="form-label">Fecha y hora</label>
             <div style="display:flex;gap:8px">
-              <input class="form-input" type="date" id="f-fecha-fondo" style="flex:1" oninput="previewFondo()" />
-              <input class="form-input" type="time" id="f-hora-fondo" style="width:110px" />
+              <input class="form-input" type="date" id="f-fecha-fondo" style="flex:1" />
+              <input class="form-input" type="time" id="f-hora-fondo" style="flex:1" />
             </div>
           </div>
           <div class="form-footer">
-            <button class="btn btn-green" id="btn-fondo" onclick="submitFondo()">Guardar valuación</button>
+            <button class="btn btn-green" id="btn-fondo">Guardar valuación</button>
             <span class="form-status" id="st-fondo"></span>
+          </div>
+        </div>
+
+        <!-- Gestionar participantes -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom:18px">Gestionar participantes</div>
+          <div id="participants-manage-list" style="margin-bottom:14px"></div>
+          <div class="form-group">
+            <label class="form-label">Nuevo participante</label>
+            <div class="input-row">
+              <input class="input-base input-flex" type="text" id="f-nuevo-participante" placeholder="Nombre" />
+              <button class="btn btn-green" id="btn-add-participante">Agregar</button>
+            </div>
+          </div>
+          <div class="form-footer">
+            <span class="form-status" id="st-participantes"></span>
           </div>
         </div>
 
@@ -648,984 +232,6 @@
 
 </main>
 
-<script>
-// ── Config ──────────────────────────────────────────────────────────────────
-const SHEET_ID = '1rrXkw6N9oSepkaHE08sZHnJ1p3a1EdUmZd-RuhLVqQs';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyxGyOpyBZmfXcuA369eP0obpUbkeM5KTlnxoZoom8IxqUEChf_o2vZpLdNO8t0fA79/exec';
-const ADMIN_KEY = '110411';
-const PARTICIPANTS = ['Patico', 'Mariana', 'Juancho', 'Juan Carlos'];
-
-// ── Mock data — cambiar a false cuando el Sheet y el Apps Script estén listos ─
-const MOCK_MODE = false;
-
-const MOCK_HISTORIAL = [
-  // fecha        valor_total   precio_cuota  cuotas_circ    trm
-  ['2026-01-10', '400.000000', '1.000000',  '400.000000', '3300'],
-  ['2026-01-31', '402.000000', '1.005000',  '400.000000', '3315'],
-  ['2026-02-20', '457.820000', '1.020000',  '449.019608', '3350'],
-  ['2026-02-28', '454.610000', '1.012000',  '449.019608', '3360'],
-  ['2026-03-31', '471.470000', '1.050000',  '449.019608', '3400'],
-  ['2026-04-30', '452.700000', '1.075000',  '421.112631', '3420'],
-  ['2026-05-31', '471.647000', '1.120000',  '421.112631', '3450'],
-  ['2026-06-10', '483.860000', '1.149000',  '421.112631', '3475'],
-];
-
-const MOCK_MOVIMIENTOS = [
-  //  fecha        persona        tipo      usd     precio     cuotas        cop      trm
-  ['2026-01-10', 'Patico',      'aporte', '100', '1.000000',  '100.000000', '330000', '3300'],
-  ['2026-01-10', 'Mariana',     'aporte', '100', '1.000000',  '100.000000', '330000', '3300'],
-  ['2026-01-10', 'Juancho',     'aporte', '80',  '1.000000',  '80.000000',  '264000', '3300'],
-  ['2026-01-10', 'Juan Carlos', 'aporte', '120', '1.000000',  '120.000000', '396000', '3300'],
-  ['2026-02-20', 'Patico',      'aporte', '50',  '1.020000',  '49.019608',  '167500', '3350'],
-  ['2026-04-30', 'Mariana',     'retiro', '30',  '1.075000',  '-27.906977', '102000', '3400'],
-];
-
-// ── State ────────────────────────────────────────────────────────────────────
-const S = {
-  trm: null,
-  historial: [],
-  movimientos: [],
-  range: 'todo',
-};
-
-
-let chartCuota = null;
-let chartTotal = null;
-let chartDonut = null;
-
-// ── Formatters ───────────────────────────────────────────────────────────────
-function fmt(usd, dec = 2) {
-  return '$' + new Intl.NumberFormat('es-CO', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(usd);
-}
-
-// Normaliza cualquier formato de fecha del Sheet → YYYY-MM-DD o YYYY-MM-DDTHH:MM
-function normDate(s) {
-  if (!s) return '';
-  s = String(s).trim();
-  // ISO con T o espacio: "2026-06-14T17:56" / "2026-06-14 17:56:00"
-  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(s)) {
-    return s.slice(0, 10) + 'T' + s.slice(11, 16);  // → "2026-06-14T17:56"
-  }
-  // ISO solo fecha: "2026-06-14"
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  // DD/MM/YYYY o DD-MM-YYYY con hora opcional
-  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[\s,]+(\d{1,2}:\d{2}))?/);
-  if (m) {
-    const iso = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-    return m[4] ? `${iso}T${m[4].padStart(5,'0')}` : iso;
-  }
-  return s;
-}
-
-function fmtDate(s) {
-  if (!s) return '—';
-  const norm = normDate(s);
-  const [datePart, timePart] = norm.split('T');
-  const d = new Date(datePart + 'T12:00:00');
-  if (isNaN(d)) return s;
-  const dateStr = d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  return timePart ? `${dateStr} ${timePart.slice(0, 5)}` : dateStr;
-}
-
-function fmtDateShort(s) {
-  if (!s) return '—';
-  const iso = normDate(s).split('T')[0];
-  const d = new Date(iso + 'T12:00:00');
-  if (isNaN(d)) return '—';
-  return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' });
-}
-
-function fmtN(n, d = 2) {
-  return new Intl.NumberFormat('es-CO', { minimumFractionDigits: d, maximumFractionDigits: d }).format(Number(n || 0));
-}
-
-// ── Fetch ────────────────────────────────────────────────────────────────────
-function parseCSV(text) {
-  const rows = [];
-  for (const line of text.split('\n')) {
-    if (!line.trim()) continue;
-    const row = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') {
-        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
-      } else if (c === ',' && !inQ) {
-        row.push(cur); cur = '';
-      } else {
-        cur += c;
-      }
-    }
-    row.push(cur);
-    rows.push(row);
-  }
-  return rows;
-}
-
-async function fetchCSV(sheetName) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`Error ${r.status} leyendo ${sheetName}`);
-  const rows = parseCSV(await r.text());
-  return rows.slice(1); // omitir encabezado
-}
-
-async function postScript(payload) {
-  // Apps Script no envía headers CORS en ContentService; se usa text/plain para evitar preflight.
-  // La escritura ocurre en el servidor; re-fetch posterior confirma el resultado.
-  await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(payload),
-  });
-}
-
-async function fetchTRM() {
-  try {
-    // TRM oficial Colombia — Superfinanciera vía datos.gov.co
-    const r = await fetch('https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciadesde+DESC');
-    const d = await r.json();
-    S.trm = parseFloat(d[0]?.valor) || 4000;
-    document.getElementById('trm-badge').textContent =
-      `TRM $${S.trm.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  } catch {
-    S.trm = 4000;
-    document.getElementById('trm-badge').textContent = 'TRM ~$4.000';
-  }
-}
-
-async function fetchAll() {
-  try {
-    await fetchTRM();
-    const histRows = MOCK_MODE ? MOCK_HISTORIAL : await fetchCSV('historial_fondo');
-    const movRows  = MOCK_MODE ? MOCK_MOVIMIENTOS : await fetchCSV('movimientos');
-
-    // Parsea números en formato CO (1.300,00 → 1300 / 11,23 → 11.23 / 1.3 → 1.3)
-    const n = s => {
-      let str = String(s ?? '').trim();
-      if (!str) return 0;
-      if (str.includes(',') && str.includes('.')) {
-        // Ambos: punto=miles, coma=decimal → "1.300,00"
-        str = str.replace(/\./g, '').replace(',', '.');
-      } else if (str.includes(',')) {
-        // Solo coma: decimal → "11,23"
-        str = str.replace(',', '.');
-      } else if (str.includes('.')) {
-        // Solo punto: miles si la parte final tiene 3 dígitos → "1.300"
-        const last = str.split('.').pop();
-        if (last.length === 3) str = str.replace(/\./g, '');
-        // si no (ej "11.23"), lo deja como decimal ISO
-      }
-      return parseFloat(str) || 0;
-    };
-
-
-    S.historial = histRows
-      .filter(r => r[0])
-      .map(r => ({
-        fecha: normDate(r[0]),
-        valor_total: n(r[1]),
-        precio_cuota: n(r[2]),
-        cuotas_circ:  n(r[3]),
-        trm:          n(r[4]),
-      }));
-
-    S.movimientos = movRows
-      .filter(r => r[0])
-      .map(r => ({
-        fecha:           normDate(r[0]),
-        persona:         r[1] || '',
-        tipo:            (r[2] || '').toLowerCase(),
-        monto:           n(r[3]),
-        precio_cuota_dia: n(r[4]),
-        cuotas:          n(r[5]),
-        monto_cop:       n(r[6]),
-        trm_dia:         n(r[7]),
-      }));
-
-    hideBanner();
-    renderAll();
-  } catch (err) {
-    showBanner(err.message);
-    renderAll();
-  }
-}
-
-// ── Computed ─────────────────────────────────────────────────────────────────
-function latest() {
-  return S.historial.length ? S.historial[S.historial.length - 1] : null;
-}
-
-function precioCuota() {
-  return latest()?.precio_cuota || 1;
-}
-
-function cuotasCirc() {
-  return S.movimientos.reduce((s, m) => s + m.cuotas, 0);
-}
-
-function calcParticipante(nombre) {
-  const movs          = S.movimientos.filter(m => m.persona === nombre);
-  const cuotas        = movs.reduce((s, m) => s + m.cuotas, 0);
-  const aportes       = movs.filter(m => m.tipo === 'aporte');
-  const retiros       = movs.filter(m => m.tipo === 'retiro');
-  const aportes_monto = aportes.reduce((s, m) => s + m.monto, 0);
-  const aportes_cuotas= aportes.reduce((s, m) => s + m.cuotas, 0);
-  const retiros_monto = retiros.reduce((s, m) => s + m.monto, 0);
-  const pc            = precioCuota();
-  const valor_actual  = cuotas * pc;
-  const neto_invertido= aportes_monto - retiros_monto;
-  const precio_prom   = aportes_cuotas > 0 ? aportes_monto / aportes_cuotas : 0;
-  const ganancia_pct  = precio_prom > 0 ? (pc - precio_prom) / precio_prom * 100 : 0;
-  const ganancia_monto= valor_actual + retiros_monto - aportes_monto;
-
-  // ── COP ──────────────────────────────────────────────────────────────────
-  const cop_invertido  = aportes.reduce((s, m) => s + (m.monto_cop || 0), 0);
-  const cop_retirado   = retiros.reduce((s, m) => s + (m.monto_cop || 0), 0);
-  const has_cop        = cop_invertido > 0;
-  const trm_actual     = S.trm || 1;
-  const valor_cop      = valor_actual * trm_actual;
-  const ganancia_cop   = valor_cop + cop_retirado - cop_invertido;
-  const ganancia_cop_pct = has_cop ? ganancia_cop / cop_invertido * 100 : 0;
-  // TRM promedio de entrada (COP invertido / USD invertido)
-  const trm_avg_entrada = aportes_monto > 0 ? cop_invertido / aportes_monto : 0;
-  // Desglose: cuánto ganó por fondo vs por TRM
-  const ganancia_fondo_cop = ganancia_monto * trm_actual;
-  const ganancia_trm_cop   = ganancia_cop - ganancia_fondo_cop;
-
-  return {
-    nombre, cuotas, valor_actual, aportes_monto, retiros_monto, neto_invertido,
-    precio_prom, ganancia_pct, ganancia_monto,
-    cop_invertido, cop_retirado, has_cop, valor_cop,
-    ganancia_cop, ganancia_cop_pct, trm_avg_entrada,
-    ganancia_fondo_cop, ganancia_trm_cop,
-  };
-}
-
-// ── Render: Resumen ──────────────────────────────────────────────────────────
-const COP = n => '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(n);
-const signStr = n => n >= 0 ? '+' : '−';
-
-function renderResumen() {
-  const l   = latest();
-  const trm = S.trm || 1;
-
-  if (!l) {
-    document.getElementById('s-total').innerHTML =
-      '<span style="font-size:16px;color:var(--text-secondary)">Sin datos</span>';
-    document.getElementById('s-cuota').innerHTML =
-      '<span style="font-size:16px;color:var(--text-secondary)">Sin datos</span>';
-    document.getElementById('s-total-sub').textContent = '';
-    document.getElementById('s-cuotas-circ').textContent = '';
-    document.getElementById('participants-grid').innerHTML =
-      `<div class="empty">
-        <div class="empty-icon">📊</div>
-        <div class="empty-title">Fondo vacío</div>
-        <div class="empty-text">El admin puede registrar aportes y el primer valor del fondo en el panel Admin.</div>
-      </div>`;
-    return;
-  }
-
-  // ── Cards de resumen ──
-  document.getElementById('s-total').innerHTML =
-    `<span style="color:#059669">${fmt(l.valor_total)}</span><span class="summary-unit">USD</span>`;
-  document.getElementById('s-total-sub').textContent =
-    `${COP(Math.round(l.valor_total * trm))} COP`;
-
-  document.getElementById('s-cuota').innerHTML =
-    `<span style="color:#059669">${fmt(l.precio_cuota)}</span><span class="summary-unit">USD</span>`;
-  document.getElementById('s-cuotas-circ').innerHTML =
-    `${COP(Math.round(l.precio_cuota * trm))} COP &nbsp;·&nbsp; ${fmtN(cuotasCirc())} cuotas`;
-
-  // ── Tarjetas de participantes ──
-  const GREEN_SHADES = ['#064E3B', '#059669', '#6EE7B7', '#D1FAE5'];
-  const sorted = PARTICIPANTS
-    .map(n => calcParticipante(n))
-    .sort((a, b) => b.cuotas - a.cuotas);
-
-  document.getElementById('participants-grid').innerHTML = sorted.map((p, idx) => {
-    const clsUSD = p.ganancia_pct     > 0 ? 'pos' : p.ganancia_pct     < 0 ? 'neg' : 'zero';
-    const clsCOP = p.ganancia_cop_pct > 0 ? 'pos' : p.ganancia_cop_pct < 0 ? 'neg' : 'zero';
-
-    const avatarBg = GREEN_SHADES[idx] || '#059669';
-    const avatarFg = idx < 2 ? '#fff' : '#064E3B';
-    const inicial  = p.nombre.charAt(0).toUpperCase();
-
-    const copGains = p.has_cop ? `
-      <div style="display:flex;align-items:center;gap:7px;justify-content:flex-end;margin-top:4px">
-        <span style="font-size:11px;font-weight:500;color:var(--text-secondary);white-space:nowrap">${signStr(p.ganancia_cop)}${COP(Math.abs(p.ganancia_cop))} COP</span>
-        <span class="gain-badge ${clsCOP}">${signStr(p.ganancia_cop_pct)}${fmtPct(Math.abs(p.ganancia_cop_pct))}%</span>
-      </div>` : '';
-
-    return `
-    <div class="participant-card">
-      <div class="p-row">
-
-        <div class="p-avatar" style="width:36px;height:36px;border-radius:50%;background:${avatarBg};color:${avatarFg};
-             display:flex;align-items:center;justify-content:center;
-             font-size:14px;font-weight:700;flex-shrink:0;letter-spacing:-0.5px">
-          ${inicial}
-        </div>
-
-        <div class="p-ident">
-          <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.2">${p.nombre}</div>
-          <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${fmtN(p.cuotas)} cuotas</div>
-        </div>
-
-        <div class="p-val">
-          <div style="font-size:17px;font-weight:700;color:var(--text);line-height:1.1">
-            ${fmt(p.valor_actual)}<span style="font-size:11px;font-weight:500;color:var(--text-secondary);margin-left:3px">USD</span>
-          </div>
-          ${p.has_cop ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:3px">${COP(Math.round(p.valor_cop))} COP</div>` : ''}
-        </div>
-
-        <div class="p-gains">
-          <div style="display:flex;align-items:center;gap:7px;justify-content:flex-end">
-            <span style="font-size:11px;font-weight:500;color:var(--text-secondary);white-space:nowrap">${signStr(p.ganancia_monto)}${fmt(Math.abs(p.ganancia_monto))} USD</span>
-            <span class="gain-badge ${clsUSD}">${signStr(p.ganancia_pct)}${fmtPct(Math.abs(p.ganancia_pct))}%</span>
-          </div>
-          ${copGains}
-        </div>
-
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ── Render: Movimientos ──────────────────────────────────────────────────────
-function renderMovimientos() {
-  const filtro = document.getElementById('filter-persona').value;
-  const tbody = document.getElementById('mov-tbody');
-
-  let movs = [...S.movimientos].sort((a, b) => b.fecha.localeCompare(a.fecha));
-  if (filtro) movs = movs.filter(m => m.persona === filtro);
-
-  if (!movs.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:40px">Sin movimientos</td></tr>`;
-    return;
-  }
-
-  const fmtCOP = n => n ? '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(n) : '—';
-  tbody.innerHTML = movs.map(m => `
-    <tr>
-      <td data-label="Fecha">${fmtDate(m.fecha)}</td>
-      <td data-label="Persona">${m.persona}</td>
-      <td data-label="Tipo"><span class="badge badge-${m.tipo}">${m.tipo}</span></td>
-      <td data-label="USD">${fmt(m.monto)}</td>
-      <td data-label="COP">${fmtCOP(m.monto_cop)}</td>
-      <td data-label="TRM" class="td-hide">${m.trm_dia ? '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(m.trm_dia) : '—'}</td>
-      <td data-label="Cuotas" class="td-hide">${fmtN(m.cuotas)}</td>
-    </tr>`).join('');
-}
-
-// ── Render: Charts ───────────────────────────────────────────────────────────
-function filteredHistorial() {
-  const now = new Date();
-  const d = (days) => new Date(now - days * 86400000);
-  const m = (months) => new Date(now.getFullYear(), now.getMonth() - months, now.getDate());
-  const cutoffs = {
-    '1W': d(7),  '2W': d(14),
-    '1M': m(1),  '2M': m(2),  '3M': m(3),  '6M': m(6),
-    '1A': new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()),
-    'todo': null,
-  };
-  const cut = cutoffs[S.range];
-  if (!cut) return S.historial;
-  return S.historial.filter(h => new Date(h.fecha.split('T')[0] + 'T12:00:00') >= cut);
-}
-
-function filteredHistorialWithFill() {
-  const raw = filteredHistorial();
-  const all = S.historial;
-  if (!all.length) return [];
-
-  let result = [...raw];
-
-  // Backward fill: prepend el último punto conocido antes del rango
-  // así el período empieza con el valor anterior aunque no haya entrada exacta en esa fecha
-  const firstIdx = raw.length > 0
-    ? all.findIndex(h => h === raw[0])
-    : all.length;
-  if (firstIdx > 0) {
-    result = [all[firstIdx - 1], ...result];
-  } else if (raw.length === 0) {
-    result = [all[all.length - 1]];
-  }
-
-  // Forward fill: extender hasta hoy con el último valor conocido (línea plana)
-  const today = new Date().toISOString().split('T')[0];
-  const last = result[result.length - 1];
-  if (last && last.fecha.split('T')[0] < today) {
-    result.push({ ...last, fecha: today });
-  }
-
-  return result;
-}
-
-function fmtPct(n, d = 2) {
-  return new Intl.NumberFormat('es-CO', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
-}
-
-function makeGradient(chart, hex) {
-  const { ctx, chartArea } = chart;
-  if (!chartArea) return hex + '22';
-  const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-  g.addColorStop(0, hex + '44');
-  g.addColorStop(1, hex + '00');
-  return g;
-}
-
-const TT_BASE = {
-  backgroundColor: '#FFFFFF',
-  borderColor: '#E5E7EB',
-  borderWidth: 1,
-  titleColor: '#6B7280',
-  bodyColor: '#111827',
-  padding: 10,
-};
-
-function chartOpts(color) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        ...TT_BASE,
-        callbacks: {
-          label: ctx => ` $${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(ctx.parsed.y)} USD`
-        }
-      }
-    },
-    scales: {
-      x: {
-        ticks: { color: '#6B7280', font: { size: 10, family: 'Inter' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
-        grid: { display: false },
-        border: { display: false },
-      },
-      y: {
-        position: 'right',
-        ticks: {
-          color: '#6B7280',
-          font: { size: 10, family: 'Inter' },
-          callback: v => '$' + new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v),
-        },
-        grid: { color: '#F3F4F6' },
-        border: { display: false },
-      }
-    }
-  };
-}
-
-function makeDataset(data, color) {
-  return {
-    data,
-    borderColor: color,
-    backgroundColor: ctx => makeGradient(ctx.chart, color),
-    fill: true, borderWidth: 2,
-    pointRadius: 0, pointHoverRadius: 4,
-    pointHoverBackgroundColor: color,
-    tension: 0.35,
-  };
-}
-
-function renderCharts() {
-  const data = filteredHistorialWithFill();
-  if (!data.length) return;
-
-  const labels = data.map(h => fmtDateShort(h.fecha));
-  const cuotaVals = data.map(h => h.precio_cuota);
-  const totalVals = data.map(h => h.valor_total);
-
-  // ── Línea: % de cambio del precio cuota — USD y COP en el mismo eje ──
-  // Normalizar desde 0% en el primer punto: ambas líneas comparables sin doble eje
-  const base0    = data[0]?.precio_cuota || 1;
-  const baseCOP0 = data[0] ? data[0].precio_cuota * (data[0].trm || S.trm || 1) : 1;
-  const pctUSD = data.map(h => (h.precio_cuota / base0 - 1) * 100);
-  const pctCOP = data.map(h => (h.precio_cuota * (h.trm || S.trm || 1) / baseCOP0 - 1) * 100);
-
-  const cuotaChartOpts = {
-    responsive: true, maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: {
-        display: true, position: 'bottom',
-        labels: { color: '#6B7280', font: { size: 11, family: 'Inter' }, padding: 12, usePointStyle: true },
-      },
-      tooltip: {
-        ...TT_BASE,
-        callbacks: {
-          label: ctx => {
-            const v = ctx.parsed.y;
-            const sign = v >= 0 ? '+' : '';
-            const label = ctx.datasetIndex === 0 ? 'USD' : 'COP';
-            return ` ${sign}${fmtPct(v)}% ${label}`;
-          }
-        }
-      }
-    },
-    scales: {
-      x: {
-        ticks: { color: '#6B7280', font: { size: 10, family: 'Inter' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
-        grid: { display: false }, border: { display: false },
-      },
-      y: {
-        position: 'right',
-        ticks: {
-          color: '#6B7280', font: { size: 10, family: 'Inter' },
-          callback: v => (v >= 0 ? '+' : '') + fmtPct(v) + '%',
-        },
-        grid: { color: '#F3F4F6' }, border: { display: false },
-      },
-    }
-  };
-
-  const dsPctUSD = { ...makeDataset(pctUSD, '#059669'), label: 'USD', fill: false };
-  const dsPctCOP = { ...makeDataset(pctCOP, '#6366F1'), label: 'COP', fill: false };
-
-  if (chartCuota) {
-    chartCuota.data.labels = labels;
-    chartCuota.data.datasets[0].data = pctUSD;
-    chartCuota.data.datasets[1].data = pctCOP;
-    chartCuota.update('none');
-  } else {
-    chartCuota = new Chart(document.getElementById('chart-cuota'), {
-      type: 'line',
-      data: { labels, datasets: [dsPctUSD, dsPctCOP] },
-      options: cuotaChartOpts,
-    });
-  }
-
-  // ── Línea: valor total ──
-  if (chartTotal) {
-    chartTotal.data.labels = labels;
-    chartTotal.data.datasets[0].data = totalVals;
-    chartTotal.update('none');
-  } else {
-    chartTotal = new Chart(document.getElementById('chart-total'), {
-      type: 'line',
-      data: { labels, datasets: [makeDataset(totalVals, '#059669')] },
-      options: chartOpts('#059669'),
-    });
-  }
-
-
-  // ── Donut: distribución — ordenado desc por cuotas, gradiente verde oscuro→claro ──
-  const GREEN_SHADES = ['#064E3B', '#059669', '#6EE7B7', '#D1FAE5'];
-  const cuotasRaw = PARTICIPANTS.map(n => Math.max(0, calcParticipante(n).cuotas));
-  // Ordenar participantes de mayor a menor cuotas
-  const donutOrder = PARTICIPANTS
-    .map((n, i) => ({ n, q: cuotasRaw[i] }))
-    .sort((a, b) => b.q - a.q);
-  const donutLabels = donutOrder.map(x => x.n);
-  const donutData   = donutOrder.map(x => x.q);
-  const donutColors = GREEN_SHADES.slice(0, donutOrder.length);
-
-  if (chartDonut) {
-    chartDonut.data.labels = donutLabels;
-    chartDonut.data.datasets[0].data = donutData;
-    chartDonut.data.datasets[0].backgroundColor = donutColors;
-    chartDonut.update('none');
-  } else {
-    chartDonut = new Chart(document.getElementById('chart-donut'), {
-      type: 'doughnut',
-      data: {
-        labels: donutLabels,
-        datasets: [{
-          data: donutData,
-          backgroundColor: donutColors,
-          borderColor: '#FFFFFF',
-          borderWidth: 3,
-          hoverOffset: 8,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-          legend: {
-            display: true,
-            position: 'bottom',
-            labels: { color: '#6B7280', font: { size: 11, family: 'Inter' }, padding: 16, usePointStyle: true },
-          },
-          tooltip: {
-            ...TT_BASE,
-            callbacks: {
-              label: ctx => {
-                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                const pct = total > 0 ? (ctx.parsed / total * 100).toFixed(2) : 0;
-                return ` ${ctx.label}: ${pct}% (${fmtN(ctx.parsed)} cuotas)`;
-              }
-            }
-          }
-        }
-      }
-    });
-  }
-  // Resize tras layout flex para que el canvas mida el contenedor real
-  requestAnimationFrame(() => { if (chartDonut) chartDonut.resize(); });
-
-  // ── % de período en headers de cada gráfica ──
-  const fd = data; // reutiliza el historial con fill ya calculado
-  const setBadge = (id, key) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (fd.length < 2) { el.textContent = ''; return; }
-    const s = fd[0][key], e = fd[fd.length - 1][key];
-    const pct = s > 0 ? (e - s) / s * 100 : null;
-    if (pct === null) { el.textContent = ''; return; }
-    const sign = pct >= 0 ? '+' : '';
-    el.textContent = `${sign}${fmtPct(pct)}%`;
-    el.className = 'chg-badge ' + (pct >= 0 ? 'pos' : 'neg');
-  };
-  setBadge('chg-total', 'valor_total');
-}
-
-// ── Render: all ──────────────────────────────────────────────────────────────
-function renderAll() {
-  renderResumen();
-  renderMovimientos();
-  renderCharts();
-}
-
-// ── UI helpers ────────────────────────────────────────────────────────────────
-
-function setTab(tab) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-}
-
-function setRange(r) {
-  S.range = r;
-  document.querySelectorAll('.range-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.r === r));
-  // destruir las 3 líneas (afectadas por rango) pero mantener donut y bar
-  if (chartCuota) { chartCuota.destroy(); chartCuota = null; }
-  if (chartTotal) { chartTotal.destroy(); chartTotal = null; }
-  renderResumen();
-  renderCharts();
-}
-
-function showBanner(msg) {
-  const el = document.getElementById('err-banner');
-  el.textContent = '⚠ Error cargando datos: ' + msg;
-  el.style.display = 'block';
-}
-
-function hideBanner() {
-  document.getElementById('err-banner').style.display = 'none';
-}
-
-// ── Admin ────────────────────────────────────────────────────────────────────
-// ── Money input formatting ────────────────────────────────────────────────────
-function fmtMoneyInput(el, decimals) {
-  let raw = el.value.replace(/[^\d,]/g, '');
-  const parts = raw.split(',');
-  if (parts.length > 2) raw = parts[0] + ',' + parts.slice(1).join('');
-  const intStr = (raw.split(',')[0] || '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  const decStr = raw.includes(',') ? ',' + (raw.split(',')[1] || '').slice(0, decimals) : '';
-  el.value = intStr + decStr;
-  // Cursor siempre al final
-  const len = el.value.length;
-  el.setSelectionRange(len, len);
-}
-
-function parseMoneyInput(el) {
-  const raw = el.value.replace(/\./g, '').replace(',', '.');
-  return parseFloat(raw) || 0;
-}
-
-// ── Tipo toggle ───────────────────────────────────────────────────────────────
-function setTipo(tipo) {
-  document.getElementById('f-tipo').value = tipo;
-  document.querySelector('.tipo-btn.aporte').classList.toggle('sel', tipo === 'aporte');
-  document.querySelector('.tipo-btn.retiro').classList.toggle('sel', tipo === 'retiro');
-}
-
-// ── Calculadora ───────────────────────────────────────────────────────────────
-const CS = { raw: '0', expr: '', prev: null, op: null, rst: false };
-
-function calcDispFmt(raw) {
-  // Formatea el número que se está digitando con separador de miles
-  const parts = raw.split(',');
-  const intPart = (parts[0] || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return parts.length > 1 ? intPart + ',' + parts[1] : intPart;
-}
-
-function calcInput(k) {
-  const s = CS;
-  if (k === 'C') {
-    s.raw = '0'; s.expr = ''; s.prev = null; s.op = null; s.rst = false;
-  } else if (k === '←') {
-    s.raw = s.raw.length > 1 ? s.raw.slice(0, -1) : '0';
-  } else if ('0123456789'.includes(k)) {
-    if (s.rst) { s.raw = k; s.rst = false; }
-    else s.raw = s.raw === '0' ? k : s.raw + k;
-  } else if (k === ',') {
-    if (s.rst) { s.raw = '0,'; s.rst = false; }
-    else if (!s.raw.includes(',')) s.raw += ',';
-  } else if (k === '%') {
-    const n = calcParse(s.raw);
-    s.raw = String(n / 100).replace('.', ',');
-  } else if (['+', '−', '×', '÷'].includes(k)) {
-    const cur = calcParse(s.raw);
-    if (s.op && !s.rst) {
-      const res = calcEval(s.prev, cur, s.op);
-      s.raw = calcFmt(res).replace(/\./g, '');
-      s.prev = res;
-    } else {
-      s.prev = cur;
-    }
-    s.op = k; s.rst = true;
-    s.expr = calcFmt(s.prev) + ' ' + k;
-  } else if (k === '=') {
-    if (s.op !== null && s.prev !== null) {
-      const res = calcEval(s.prev, calcParse(s.raw), s.op);
-      s.expr = calcFmt(s.prev) + ' ' + s.op + ' ' + calcDispFmt(s.raw) + ' =';
-      s.raw = calcFmt(res).replace(/\./g, '');
-      s.prev = null; s.op = null; s.rst = true;
-    }
-  }
-  document.getElementById('calc-disp').textContent = calcDispFmt(s.raw);
-  document.getElementById('calc-expr').textContent = s.expr;
-}
-
-function calcCopy() {
-  navigator.clipboard.writeText(calcDispFmt(CS.raw)).catch(() => {});
-}
-
-function calcParse(s) {
-  return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
-}
-function calcFmt(n) {
-  if (isNaN(n) || !isFinite(n)) return 'Error';
-  return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 8 }).format(n);
-}
-function calcEval(a, b, op) {
-  switch(op) {
-    case '+': return a + b;
-    case '−': return a - b;
-    case '×': return a * b;
-    case '÷': return b !== 0 ? a / b : NaN;
-    default:  return b;
-  }
-}
-
-function unlockAdmin() {
-  const val = document.getElementById('admin-key').value;
-  const errEl = document.getElementById('key-err');
-  if (val === ADMIN_KEY) {
-    document.getElementById('admin-lock').style.display = 'none';
-    document.getElementById('admin-panel').style.display = 'block';
-    initAdminForms();
-  } else {
-    document.getElementById('admin-key').classList.add('err');
-    errEl.textContent = 'Clave incorrecta';
-    setTimeout(() => {
-      document.getElementById('admin-key').classList.remove('err');
-    }, 1500);
-  }
-}
-
-function lockAdmin() {
-  document.getElementById('admin-lock').style.display = 'block';
-  document.getElementById('admin-panel').style.display = 'none';
-  document.getElementById('admin-key').value = '';
-  document.getElementById('key-err').textContent = '';
-}
-
-function initAdminForms() {
-  const now   = new Date();
-  const today = now.toISOString().split('T')[0];
-  const hh    = String(now.getHours()).padStart(2, '0');
-  const mm    = String(now.getMinutes()).padStart(2, '0');
-  const time  = `${hh}:${mm}`;
-  document.getElementById('f-fecha').value        = today;
-  document.getElementById('f-hora').value         = time;
-  document.getElementById('f-fecha-fondo').value  = today;
-  document.getElementById('f-hora-fondo').value   = time;
-  previewFondo();
-}
-
-function previewFondo() {
-  const val  = parseMoneyInput(document.getElementById('f-valor'));
-  const circ = cuotasCirc();
-  const el    = document.getElementById('hint-fondo');
-
-  if (!val) { el.textContent = ''; return; }
-  if (!circ) {
-    el.textContent = `Primer registro — cuota inicial = $${val.toFixed(2)} USD`;
-    return;
-  }
-
-  const nuevo  = val / circ;
-  const actual = precioCuota();
-  const diff   = actual ? (nuevo - actual) / actual * 100 : 0;
-  const sign   = diff >= 0 ? '+' : '';
-
-  el.textContent = `Nueva cuota → $${nuevo.toFixed(2)} (${sign}${diff.toFixed(2)}%)`;
-}
-
-async function submitMov() {
-  const persona    = document.getElementById('f-persona').value;
-  const tipo       = document.getElementById('f-tipo').value;
-  const monto_cop  = parseMoneyInput(document.getElementById('f-monto-cop'));
-  const monto_usd  = parseMoneyInput(document.getElementById('f-monto'));
-  const valorFondo = parseMoneyInput(document.getElementById('f-valor-mov'));
-  const fecha      = document.getElementById('f-fecha').value + 'T' + (document.getElementById('f-hora').value || '00:00');
-  const st         = document.getElementById('st-mov');
-  const btn        = document.getElementById('btn-mov');
-
-  if (!monto_cop || monto_cop <= 0)  { setStatus(st, 'err', 'Ingresa el monto en COP'); return; }
-  if (!monto_usd || monto_usd <= 0)  { setStatus(st, 'err', 'Ingresa el monto en USD'); return; }
-  if (!valorFondo || valorFondo <= 0) { setStatus(st, 'err', 'Ingresa el valor del fondo después'); return; }
-  if (!fecha)                         { setStatus(st, 'err', 'Fecha requerida'); return; }
-
-  const trm_dia        = monto_cop / monto_usd;   // TRM calculada internamente
-  const pc             = precioCuota();
-  const cuotas         = tipo === 'retiro' ? -Math.abs(monto_usd / pc) : Math.abs(monto_usd / pc);
-  const cuotasNuevas   = cuotasCirc() + cuotas;
-  const pcNuevo        = cuotasNuevas > 0 ? valorFondo / cuotasNuevas : 1;
-
-  btn.disabled = true;
-  setStatus(st, '', 'Guardando...');
-  try {
-    await postScript({ action: 'movimiento', fecha, persona, tipo, monto_usd, precio_cuota_dia: pc, cuotas, monto_cop, trm_dia });
-    await postScript({ action: 'actualizar_fondo', fecha, valor_total_usd: valorFondo, precio_cuota_usd: pcNuevo, cuotas_en_circulacion: cuotasNuevas, trm: S.trm || 0 });
-    setStatus(st, 'ok', '✅ Guardado');
-    document.getElementById('f-monto-cop').value  = '';
-    document.getElementById('f-monto').value      = '';
-    document.getElementById('f-valor-mov').value  = '';
-    await fetchAll();
-  } catch (err) {
-    setStatus(st, 'err', '❌ ' + err.message);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-async function submitFondo() {
-  const val   = parseMoneyInput(document.getElementById('f-valor'));
-  const fecha = document.getElementById('f-fecha-fondo').value + 'T' + (document.getElementById('f-hora-fondo').value || '00:00');
-  const st = document.getElementById('st-fondo');
-  const btn = document.getElementById('btn-fondo');
-
-  if (!val || val <= 0) { setStatus(st, 'err', 'Valor inválido'); return; }
-  if (!fecha) { setStatus(st, 'err', 'Fecha requerida'); return; }
-
-  let circ = cuotasCirc();
-  if (!circ) circ = val; // primer registro: $1 por cuota → cuotas = valor total
-
-  const pc = val / circ;
-
-  btn.disabled = true;
-  setStatus(st, '', 'Guardando...');
-  try {
-    await postScript({ action: 'actualizar_fondo', fecha, valor_total_usd: val, precio_cuota_usd: pc, cuotas_en_circulacion: circ, trm: S.trm || 0 });
-    setStatus(st, 'ok', '✅ Actualizado');
-    document.getElementById('f-valor').value = '';
-    await fetchAll();
-  } catch (err) {
-    setStatus(st, 'err', '❌ ' + err.message);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-function setStatus(el, cls, msg) {
-  el.className = 'form-status' + (cls ? ' ' + cls : '');
-  el.textContent = msg;
-}
-
-// ── Init ─────────────────────────────────────────────────────────────────────
-async function refreshData() {
-  const btn = document.getElementById('refresh-btn');
-  btn.style.transform = 'rotate(360deg)';
-  btn.style.color = 'var(--green)';
-  await fetchAll();
-  setTimeout(() => {
-    btn.style.transform = '';
-    btn.style.color = '';
-  }, 600);
-}
-
-fetchAll();
-
-/*
- * ════════════════════════════════════════════════════════════════════════════
- *  CONFIGURACIÓN DEL APPS SCRIPT (escribir en el Google Sheet)
- * ════════════════════════════════════════════════════════════════════════════
- *
- *  1. Abrir el Google Sheet → Extensiones → Apps Script
- *
- *  2. Reemplazar todo el contenido con este código:
- *
- * ─────────────────────────────────────────────────────────────────────────────
- * function doPost(e) {
- *   const data = JSON.parse(e.postData.contents);
- *   const ss = SpreadsheetApp.getActiveSpreadsheet();
- *
- *   if (data.action === 'movimiento') {
- *     ss.getSheetByName('movimientos').appendRow([
- *       data.fecha,
- *       data.persona,
- *       data.tipo,
- *       data.monto_usd,
- *       data.precio_cuota_dia,
- *       data.cuotas,
- *       data.monto_cop,
- *       data.trm_dia
- *     ]);
- *     return ContentService
- *       .createTextOutput(JSON.stringify({ ok: true }))
- *       .setMimeType(ContentService.MimeType.JSON);
- *   }
- *
- *   if (data.action === 'actualizar_fondo') {
- *     ss.getSheetByName('historial_fondo').appendRow([
- *       data.fecha,
- *       data.valor_total_usd,
- *       data.precio_cuota_usd,
- *       data.cuotas_en_circulacion,
- *       data.trm
- *     ]);
- *     return ContentService
- *       .createTextOutput(JSON.stringify({ ok: true }))
- *       .setMimeType(ContentService.MimeType.JSON);
- *   }
- *
- *   return ContentService
- *     .createTextOutput(JSON.stringify({ error: 'Acción desconocida' }))
- *     .setMimeType(ContentService.MimeType.JSON);
- * }
- * ─────────────────────────────────────────────────────────────────────────────
- *
- *  3. Guardar (Ctrl+S) y nombrar el proyecto como quieras.
- *
- *  4. Clic en "Desplegar" → "Nueva implementación":
- *     - Tipo: Web App
- *     - Ejecutar como: Yo (tu cuenta de Google)
- *     - Quién tiene acceso: Cualquier persona
- *     → Clic en "Desplegar" y autorizar los permisos solicitados.
- *
- *  5. Copiar la URL de la Web App (formato: https://script.google.com/macros/s/…/exec)
- *
- *  6. En este archivo reemplazar 'TU_URL_DE_WEB_APP_AQUI' con esa URL.
- *
- *  NOTA: Cada vez que modifiques el Apps Script debes crear una "Nueva
- *  implementación" — las ediciones sin redeploy no afectan la URL de producción.
- *
- *  NOTA CORS: El fetch usa mode:'no-cors' + Content-Type:text/plain para evitar
- *  el preflight que Apps Script no maneja. La escritura ocurre igual en el servidor;
- *  el re-fetch del CSV posterior sirve de confirmación visual.
- * ════════════════════════════════════════════════════════════════════════════
- */
-</script>
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>
