@@ -7,6 +7,7 @@ Dashboard web para gestionar un fondo de inversión familiar. Muestra valor del 
 ## Requisitos previos
 
 - Google Account
+- Node.js 20+ (solo para desarrollo local — el contenedor de producción no lo necesita)
 - Cuenta GitHub con acceso a GitHub Container Registry
 - Servidor con Docker + Portainer (o cualquier host con Docker)
 
@@ -22,13 +23,16 @@ Dashboard web para gestionar un fondo de inversión familiar. Muestra valor del 
    https://docs.google.com/spreadsheets/d/**SHEET_ID**/edit
    ```
 
-### Crear las tres pestañas con exactamente estos nombres
+### Crear las pestañas con exactamente estos nombres
 
 | Pestaña | Columnas (en orden) |
 |---|---|
 | `historial_fondo` | `fecha` · `valor_total_usd` · `precio_cuota_usd` · `cuotas_en_circulacion` · `trm` |
 | `movimientos` | `fecha` · `persona` · `tipo` · `monto_usd` · `precio_cuota_dia` · `cuotas` · `monto_cop` · `trm_dia` |
+| `participantes_config` | `fecha` · `nombre` · `accion` |
 | `participantes` | `nombre` · `cuotas_totales` |
+
+> `participantes_config` es un log append-only (igual que las demás): cada fila es un evento `agregar` o `quitar`. La app calcula la lista activa tomando, por nombre, la última acción registrada — nunca se edita ni borra una fila a mano.
 
 > La primera fila de cada pestaña debe ser el encabezado. Los datos empiezan en la fila 2.
 
@@ -82,6 +86,17 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (data.action === 'participante') {
+    ss.getSheetByName('participantes_config').appendRow([
+      data.fecha,
+      data.nombre,
+      data.accion
+    ]);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ error: 'Acción desconocida' }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -102,13 +117,12 @@ function doPost(e) {
 
 ## 3. Configurar la app
 
-Abrir `index.html` y editar las constantes al inicio del `<script>`:
+Abrir `src/config.js` y editar las constantes:
 
 ```javascript
-const SHEET_ID       = 'TU_SHEET_ID_AQUI';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/.../exec';
-const ADMIN_KEY      = 'TU_CLAVE_SECRETA';
-const PARTICIPANTS   = ['Nombre1', 'Nombre2', 'Nombre3', 'Nombre4'];
+export const SHEET_ID       = 'TU_SHEET_ID_AQUI';
+export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/.../exec';
+export const ADMIN_KEY      = 'TU_CLAVE_SECRETA';
 ```
 
 | Variable | Descripción |
@@ -116,17 +130,40 @@ const PARTICIPANTS   = ['Nombre1', 'Nombre2', 'Nombre3', 'Nombre4'];
 | `SHEET_ID` | ID del Google Sheet (de la URL) |
 | `APPS_SCRIPT_URL` | URL de la Web App del Apps Script |
 | `ADMIN_KEY` | Clave para acceder al panel admin |
-| `PARTICIPANTS` | Nombres exactos de los participantes del fondo |
 | `MOCK_MODE` | `true` para datos de prueba, `false` para usar el Sheet real |
+
+Los participantes ya no se configuran acá: se agregan y quitan desde el panel Admin → "Gestionar participantes", y quedan guardados en la pestaña `participantes_config` del Sheet.
 
 ---
 
 ## 4. Correr localmente
 
 ```bash
-python3 -m http.server 8080
+npm install
+npm run dev
 # Abrir http://localhost:8080
 ```
+
+`npm run build` genera el sitio estático en `dist/` (lo que corre `docker build`); `npm run preview` lo sirve para verificarlo antes de deployar.
+
+### Estructura
+
+```
+index.html          Markup, sin lógica ni estilos inline
+src/
+  main.js            Entry point — wiring de event listeners y arranque
+  config.js           Constantes de deployment (Sheet, Apps Script, admin key)
+  state.js             Estado en memoria (S) e instancias de Chart.js
+  computed.js            Derivados del estado (precio de cuota, cuotas por participante, ...)
+  admin.js                 Panel admin: auth, formularios, submit de movimiento/valuación
+  style.css
+  api/sheets.js        Lectura del Sheet (CSV) y escritura vía Apps Script
+  utils/                Formatters, parser CSV/números CO, fechas, inputs de dinero
+  render/               Un módulo por sección de UI (resumen, movimientos, charts)
+  ui/                   Tabs, rango de fechas de las gráficas, banner de error, refresh
+```
+
+Sin framework — DOM directo, como en la versión de un solo archivo, solo que separado por dominio y con Vite como bundler.
 
 ---
 
@@ -138,6 +175,15 @@ python3 -m http.server 8080
 docker build -t fondo-familiar .
 docker run -p 8080:80 fondo-familiar
 ```
+
+### Docker Compose (local)
+
+```bash
+docker compose up -d --build
+# Abrir http://localhost:8080
+```
+
+Usa `docker-compose.yml` en la raíz del repo (build local, sin depender de GHCR). Para reconstruir tras un cambio: `docker compose up -d --build` de nuevo; para bajarlo, `docker compose down`.
 
 ### GitHub Container Registry (GHCR)
 
@@ -194,11 +240,11 @@ networks:
 ## 7. Flujo para actualizar la app
 
 ```bash
-# Editar index.html
-git add index.html
+# Editar código en src/
+git add src/ index.html
 git commit -m "feat: descripción del cambio"
 git push
-# El workflow de GitHub Actions rebuilda la imagen automáticamente
+# El workflow de GitHub Actions rebuilda la imagen (npm run build dentro del Dockerfile)
 # Luego en Portainer: pull + recreate del contenedor
 ```
 
