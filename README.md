@@ -1,4 +1,4 @@
-# Ahorro Familiar
+# Fondi
 
 Dashboard web para gestionar un fondo de inversión familiar. Muestra valor del fondo, precio de cuota, participación individual y rendimiento en USD y COP.
 
@@ -172,8 +172,8 @@ Sin framework — DOM directo, como en la versión de un solo archivo, solo que 
 ### Build manual
 
 ```bash
-docker build -t fondo-familiar .
-docker run -p 8080:80 fondo-familiar
+docker build -t fondi .
+docker run -p 8080:80 fondi
 ```
 
 ### Docker Compose (local)
@@ -193,16 +193,16 @@ El repositorio incluye un workflow en `.github/workflows/docker.yml` que constru
 
 ```bash
 # 1. Crear el repo en GitHub
-gh repo create <usuario>/fondo-familiar --private --source=. --push
+gh repo create <usuario>/fondi --private --source=. --push
 
 # 2. Si el remote quedó en SSH y no tenés key configurada:
-git remote set-url origin https://github.com/<usuario>/fondo-familiar.git
+git remote set-url origin https://github.com/<usuario>/fondi.git
 git push -u origin main
 ```
 
 El workflow se dispara solo. En ~2 minutos la imagen queda en:
 ```
-ghcr.io/<usuario>/fondo-familiar:latest
+ghcr.io/<usuario>/fondi:latest
 ```
 
 #### Autenticación para pull desde el servidor
@@ -221,9 +221,9 @@ GitHub → Settings → Developer settings → Personal access tokens
 
 ```yaml
 services:
-  fondo-familiar:
-    image: ghcr.io/<usuario>/fondo-familiar:latest
-    container_name: fondo-familiar
+  fondi:
+    image: ghcr.io/<usuario>/fondi:latest
+    container_name: fondi
     restart: unless-stopped
     networks:
       - proxy

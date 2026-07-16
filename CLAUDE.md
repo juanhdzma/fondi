@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-"Ahorro Familiar" — dashboard para gestionar un fondo de inversión familiar tipo fondo mutuo: varios participantes aportan/retiran USD en momentos distintos, y cada quien es dueño de una fracción del fondo medida en "cuotas" (como un fondo de inversión colectiva). Muestra valor del fondo, precio de cuota, participación individual y rendimiento en USD y COP.
+"Fondi" — dashboard para gestionar un fondo de inversión familiar tipo fondo mutuo: varios participantes aportan/retiran USD en momentos distintos, y cada quien es dueño de una fracción del fondo medida en "cuotas" (como un fondo de inversión colectiva). Muestra valor del fondo, precio de cuota, participación individual y rendimiento en USD y COP.
 
 Vanilla JS + Chart.js, sin framework — el DOM se manipula directo (`innerHTML`, `render*()` functions), no hay estado reactivo. Bundlea con Vite; `index.html` es solo markup, la lógica vive en `src/` como ES modules.
 
@@ -17,11 +17,11 @@ npm run build     # genera dist/ (lo que corre el Dockerfile)
 npm run preview   # sirve dist/ para verificar antes de deployar
 
 # Docker (build multi-stage: node build → nginx serve)
-docker build -t fondo-familiar .
-docker run -p 8080:80 fondo-familiar
+docker build -t fondi .
+docker run -p 8080:80 fondi
 ```
 
-No hay linter ni test runner configurado. El único "CI" es `.github/workflows/docker.yml`, que en cada push a `main` que toque `index.html`, `src/**`, `package.json` o `Dockerfile` construye y publica la imagen a `ghcr.io/<usuario>/fondo-familiar:latest`.
+No hay linter ni test runner configurado. El único "CI" es `.github/workflows/docker.yml`, que en cada push a `main` que toque `index.html`, `src/**`, `package.json` o `Dockerfile` construye y publica la imagen a `ghcr.io/<usuario>/fondi:latest`.
 
 Para probar cambios sin arriesgar el Sheet real, poner `MOCK_MODE = true` en `src/config.js` — usa `MOCK_HISTORIAL`/`MOCK_MOVIMIENTOS` en vez de golpear Google Sheets.
 

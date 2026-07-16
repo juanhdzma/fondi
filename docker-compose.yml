@@ -1,7 +1,7 @@
 services:
-  fondo-familiar:
+  fondi:
     build: .
-    container_name: fondo-familiar
+    container_name: fondi
     ports:
       - "8080:80"
     restart: unless-stopped
