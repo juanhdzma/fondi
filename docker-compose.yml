@@ -1,0 +1,7 @@
+services:
+  fondo-familiar:
+    build: .
+    container_name: fondo-familiar
+    ports:
+      - "8080:80"
+    restart: unless-stopped

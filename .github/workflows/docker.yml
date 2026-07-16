@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - index.html
+      - src/**
+      - package.json
+      - package-lock.json
+      - vite.config.js
       - Dockerfile
 
 env:
