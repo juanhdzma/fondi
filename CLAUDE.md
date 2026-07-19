@@ -4,104 +4,104 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-"Fondi" — dashboard para gestionar un fondo de inversión familiar tipo fondo mutuo: varios participantes aportan/retiran USD en momentos distintos, y cada quien es dueño de una fracción del fondo medida en "cuotas" (como un fondo de inversión colectiva). Muestra valor del fondo, precio de cuota, participación individual y rendimiento en USD y COP.
+"Fondi" — dashboard for managing a mutual-fund-style investment pool: several participants contribute/withdraw USD at different times, and each one owns a fraction of the fund measured in "shares" (like a collective investment fund). Shows fund value, share price, individual ownership, and returns in USD and COP.
 
-Vanilla JS + Chart.js, sin framework — el DOM se manipula directo (`innerHTML`, `render*()` functions), no hay estado reactivo. Bundlea con Vite; `index.html` es solo markup, la lógica vive en `src/` como ES modules.
+Vanilla JS + Chart.js, no framework — the DOM is manipulated directly (`innerHTML`, `render*()` functions), there's no reactive state. Bundled with Vite; `index.html` is markup only, the logic lives in `src/` as ES modules.
 
-## Comandos
+## Commands
 
 ```bash
 npm install
 npm run dev       # http://localhost:8080
-npm run build     # genera dist/ (lo que corre el Dockerfile)
-npm run preview   # sirve dist/ para verificar antes de deployar
+npm run build     # generates dist/ (what the Dockerfile runs)
+npm run preview   # serves dist/ to verify before deploying
 
-# Docker (build multi-stage: node build → nginx serve)
+# Docker (multi-stage build: node build → nginx serve)
 docker build -t fondi .
 docker run -p 8080:80 fondi
 ```
 
-No hay linter ni test runner configurado. El único "CI" es `.github/workflows/docker.yml`, que en cada push a `main` que toque `index.html`, `src/**`, `package.json` o `Dockerfile` construye y publica la imagen a `ghcr.io/<usuario>/fondi:latest`.
+There's no linter or test runner configured. The only "CI" is `.github/workflows/docker.yml`, which on every push to `main` that touches `index.html`, `src/**`, `package.json`, or `Dockerfile` builds and publishes the image to `ghcr.io/<user>/fondi:latest`.
 
-Para probar cambios sin arriesgar el Sheet real, poner `MOCK_MODE = true` en `src/config.js` — usa `MOCK_HISTORIAL`/`MOCK_MOVIMIENTOS` en vez de golpear Google Sheets.
+To test changes without risking the real Sheet, set `MOCK_MODE = true` in `src/config.js` — it uses `MOCK_HISTORIAL`/`MOCK_MOVIMIENTOS` instead of hitting Google Sheets.
 
-## Estructura de `src/`
+## `src/` structure
 
 ```
-main.js          Entry point — arma los event listeners (no hay onclick inline en el HTML) y llama fetchAll()
-config.js        Constantes de deployment: SHEET_ID, APPS_SCRIPT_URL, ADMIN_KEY, MOCK_MODE/MOCK_*
-state.js         S (estado en memoria: trm, historial, movimientos, participantesLog, range) + charts (instancias de Chart.js)
-computed.js      latest(), precioCuota(), cuotasCirc(), calcParticipante(), participantesActivos(), participantesTodos() — todo deriva de S
-admin.js         Panel admin completo: unlock, tipo toggle, previewFondo, submitMov, submitFondo, agregar/quitar participante
-api/sheets.js    fetchCSV/postScript/fetchTRM/fetchAll — todo el I/O contra Google
-utils/           csv.js (parser CSV + números formato CO), dates.js, format.js, money-input.js
-render/          resumen.js, movimientos.js, charts.js — un módulo por sección de UI; index.js expone renderAll()
-ui/              tabs.js (setTab/setRange), banner.js (error banner), toast.js (popup de confirmación), refresh.js
+main.js          Entry point — wires up event listeners (no inline onclick in the HTML) and calls fetchAll()
+config.js        Deployment constants: SHEET_ID, APPS_SCRIPT_URL, ADMIN_KEY, MOCK_MODE/MOCK_*
+state.js         S (in-memory state: trm, historial, movimientos, participantesLog, range) + charts (Chart.js instances)
+computed.js      latest(), precioCuota(), cuotasCirc(), calcParticipante(), participantesActivos(), participantesTodos() — everything derives from S
+admin.js         Full admin panel: unlock, tipo toggle, previewFondo, submitMov, submitFondo, add/remove participant
+api/sheets.js    fetchCSV/postScript/fetchTRM/fetchAll — all I/O against Google
+utils/           csv.js (CSV parser + CO number format), dates.js, format.js, money-input.js
+render/          resumen.js, movimientos.js, charts.js — one module per UI section; index.js exposes renderAll()
+ui/              tabs.js (setTab/setRange), banner.js (error banner), toast.js (confirmation popup), refresh.js
 ```
 
-`state.js` (`S` y `charts`) es la única fuente de verdad en memoria — si el browser no ha hecho `fetchAll()` reciente, todo lo que deriva de `computed.js` queda stale.
+`state.js` (`S` and `charts`) is the single source of truth in memory — if the browser hasn't done a recent `fetchAll()`, everything derived from `computed.js` is stale.
 
-## Arquitectura
+## Architecture
 
-**No hay backend propio.** El "servidor" es un Google Sheet público (solo lectura) + un Google Apps Script desplegado como Web App (solo escritura). El browser lee y escribe directo contra Google, sin intermediarios:
+**There's no backend of its own.** The "server" is a public (read-only) Google Sheet + a Google Apps Script deployed as a Web App (write-only). The browser reads and writes directly against Google, with no intermediary:
 
-- **Lectura**: `fetchCSV()` (`src/api/sheets.js`) pega contra el endpoint público `gviz/tq?tqx=out:csv` del Sheet (no requiere auth, el Sheet debe estar compartido como "Cualquiera con el enlace — Visualizador").
-- **Escritura**: `postScript()` (`src/api/sheets.js`) hace `POST` al Apps Script con `mode: 'no-cors'` — no se puede leer la respuesta HTTP (limitación de CORS de Apps Script), así que la confirmación de que algo se guardó es implícita: se asume éxito y luego se hace un re-fetch (`fetchAll()`) para reflejar el estado real.
-- El Apps Script (documentado completo en `README.md`, sección 2) es un `doPost` con tres acciones (`movimiento`, `actualizar_fondo`, `participante`) que solo hacen `appendRow` — **es un log append-only, no hay UPDATE/DELETE ni validación del lado servidor.**
+- **Read**: `fetchCSV()` (`src/api/sheets.js`) hits the Sheet's public `gviz/tq?tqx=out:csv` endpoint (no auth required, the Sheet must be shared as "Anyone with the link — Viewer").
+- **Write**: `postScript()` (`src/api/sheets.js`) does a `POST` to the Apps Script with `mode: 'no-cors'` — the HTTP response can't be read (a CORS limitation of Apps Script), so confirmation that something was saved is implicit: success is assumed and then a re-fetch (`fetchAll()`) happens to reflect the real state.
+- The Apps Script (fully documented in `README.md`, section 2) is a `doPost` with three actions (`movimiento`, `actualizar_fondo`, `participante`) that only do `appendRow` — **it's an append-only log, there's no UPDATE/DELETE nor server-side validation.**
 
-### Modelo de datos (pestañas del Sheet)
+### Data model (Sheet tabs)
 
-| Pestaña | Columnas | Quién la llena |
+| Tab | Columns | Who fills it |
 |---|---|---|
-| `historial_fondo` | `fecha, valor_total_usd, precio_cuota_usd, cuotas_en_circulacion, trm` | Snapshots — un valor total del fondo confirmado por el admin en cada punto del tiempo. Puede tener varias filas el mismo día (valuaciones intradía); el frontend las dedupea (ver abajo) |
-| `movimientos` | `fecha, persona, tipo, monto_usd, precio_cuota_dia, cuotas, monto_cop, trm_dia` | Un aporte/retiro individual por fila |
-| `participantes_config` | `fecha, nombre, accion` | Log append-only de `agregar`/`quitar` — panel Admin → "Gestionar participantes". `participantesActivos()` (`src/computed.js`) toma la última acción por nombre |
-| `participantes` | `nombre, cuotas_totales` | **Fórmula**, no dato: `=SUMIF(movimientos!B:B,"<nombre>",movimientos!F:F)` — se recalcula sola. No la lee el frontend (solo referencia visual dentro del Sheet) |
+| `historial_fondo` | `fecha, valor_total_usd, precio_cuota_usd, cuotas_en_circulacion, trm` | Snapshots — a total fund value confirmed by the admin at each point in time. Can have several rows on the same day (intraday valuations); the frontend dedupes them (see below) |
+| `movimientos` | `fecha, persona, tipo, monto_usd, precio_cuota_dia, cuotas, monto_cop, trm_dia` | One individual contribution/withdrawal per row |
+| `participantes_config` | `fecha, nombre, accion` | Append-only log of `agregar`/`quitar` (add/remove) — Admin panel → "Manage participants". `participantesActivos()` (`src/computed.js`) takes the latest action per name |
+| `participantes` | `nombre, cuotas_totales` | **A formula**, not data: `=SUMIF(movimientos!B:B,"<nombre>",movimientos!F:F)` — recalculates itself. Not read by the frontend (visual reference within the Sheet only) |
 
-### Participantes dinámicos
+### Dynamic participants
 
-`PARTICIPANTS` ya no existe como constante estática en `config.js`. La lista sale de `participantesLog` (`src/state.js`), poblada desde la pestaña `participantes_config`:
+`PARTICIPANTS` no longer exists as a static constant in `config.js`. The list comes from `participantesLog` (`src/state.js`), populated from the `participantes_config` tab:
 
-- `participantesActivos()` — última acción `agregar`/`quitar` por nombre gana. Se usa para el `<select>` de "Registrar movimiento" (solo se puede aportar/retirar a alguien activo).
-- `participantesTodos()` — activos ∪ cualquier `persona` que aparezca en `movimientos`, aunque haya sido quitado después. Se usa en `resumen.js`/`charts.js` para que alguien con cuotas reales nunca desaparezca de su tarjeta o del donut solo por salir de la lista activa.
+- `participantesActivos()` — the latest `agregar`/`quitar` action per name wins. Used for the "Register movement" `<select>` (you can only contribute/withdraw for someone active).
+- `participantesTodos()` — active ∪ any `persona` that appears in `movimientos`, even if removed afterward. Used in `resumen.js`/`charts.js` so someone with real shares never disappears from their card or the donut chart just for leaving the active list.
 
-"Quitar" un participante nunca borra su historial ni sus cuotas — solo lo saca de la lista de selección para movimientos nuevos.
+Removing a participant never deletes their history or shares — it just takes them out of the selection list for new movements.
 
-### El modelo de "cuotas" — la parte no obvia
+### The "shares" model — the non-obvious part
 
-El fondo funciona como un fondo mutuo: cada aporte/retiro se convierte a "cuotas" al precio de cuota vigente en ese momento, y `precio_cuota = valor_total_fondo / cuotas_en_circulacion`. Esto significa que **el precio de cuota usado para convertir un aporte en cuotas debe reflejar el valor REAL del fondo justo antes de ese aporte** — si se usa un precio de cuota desactualizado (de un checkpoint viejo, sin capturar ganancias/pérdidas posteriores), el nuevo aportante compra cuotas "baratas" y se lleva gratis parte de la ganancia que le correspondía a los aportantes anteriores (dilución).
+The fund works like a mutual fund: each contribution/withdrawal is converted to "shares" at the share price in effect at that moment, and `share_price = total_fund_value / shares_outstanding`. This means **the share price used to convert a contribution into shares must reflect the REAL fund value right before that contribution** — if a stale share price is used (from an old checkpoint, without capturing later gains/losses), the new contributor buys shares "cheap" and gets a free ride on gains that belonged to earlier contributors (dilution).
 
-`submitMov()` (`src/admin.js`) resuelve esto derivando el precio de cuota "justo antes" a partir del `valor del fondo después` (que el admin escribe a mano y se asume correcto) y el monto del movimiento — **no** lee el precio de cuota del último checkpoint guardado (eso fue un bug real, corregido; ver commit history). La fórmula:
+`submitMov()` (`src/admin.js`) resolves this by deriving the "just before" share price from the `fund value after` (which the admin types in by hand and is assumed correct) and the movement amount — it does **not** read the share price from the last saved checkpoint (that was a real bug, fixed; see commit history). The formula:
 
 ```js
 valorAntes = tipo === 'retiro' ? valorFondo + monto_usd : valorFondo - monto_usd;
 pc         = cuotasActuales > 0 ? valorAntes / cuotasActuales : 1;
 ```
 
-Si tocás esta función, no vuelvas a usar `precioCuota()` (el checkpoint cacheado) para calcular las cuotas de un movimiento nuevo — es exactamente la regresión que ya se corrigió.
+If you touch this function, don't go back to using `precioCuota()` (the cached checkpoint) to compute the shares of a new movement — that's exactly the regression that was already fixed.
 
-`submitFondo()` (`src/admin.js`) es distinto: registra una "valuación" (cambio de valor sin aporte/retiro, ej. cierre de semana) — ahí sí es correcto usar `cuotasCirc()` porque las cuotas circulantes no cambian, solo el precio.
+`submitFondo()` (`src/admin.js`) is different: it records a "valuation" (a value change with no contribution/withdrawal, e.g. weekly close) — there it's correct to use `cuotasCirc()` because shares outstanding don't change, only the price.
 
-### El eje x de las gráficas — proporcional al tiempo, no por índice
+### The chart x-axis — proportional to time, not by index
 
-`src/render/charts.js` grafica con `type: 'linear'` en el eje x usando timestamps reales (`{x: ms, y: valor}` por punto), no un eje `category` con un array de labels — así un hueco de 6 días ocupa 6x más ancho que uno de 1 día. Si volvés a un eje por índice/label, se pierde esa proporcionalidad (fue exactamente el bug reportado y corregido).
+`src/render/charts.js` plots with `type: 'linear'` on the x-axis using real timestamps (`{x: ms, y: valor}` per point), not a `category` axis with an array of labels — so a 6-day gap takes up 6x the width of a 1-day gap. If you go back to an index/label-based axis, that proportionality is lost (this was exactly the reported and fixed bug).
 
-- **Ticks alineados a calendario**: `computeCalendarTicks()` decide la granularidad según el span visible (mes si es >150 días, semana si es >20, cada 4 días si es >8, si no todos los días) y devuelve timestamps exactos (inicio de mes/semana), no índices de datos — se inyectan pisando el array de ticks vía `afterBuildTicks`, independiente de si existe un dato real justo ahí.
-- **Gotcha de Chart.js**: el eje `linear` por default usa `bounds: 'ticks'`, que expande `min`/`max` a sus propios ticks "redondos" autogenerados — `afterBuildTicks` los pisa pero no corrige ese `min` ya inflado, y queda un hueco fantasma antes del primer punto real. Por eso `xAxis()` fija `min`/`max` explícitos al primer/último timestamp real (más `bounds: 'data'` como refuerzo). Si se quita ese `min`/`max` explícito, vuelve el hueco.
-- **Clamp del punto de backward-fill**: `filteredHistorialWithFill()` puede anteponer la última valuación *antes* del rango seleccionado (para que la línea no arranque en cero); su fecha real puede ser muy anterior al rango visible, así que en `renderCharts()` se clampea su `x` al borde del rango (no a su fecha real) — si no, la mayor parte del ancho del chart quedaría desperdiciada en un tramo plano fuera del rango.
-- **Líneas rectas, sin curvas**: `tension: 0` en `makeDataset()` — con tension>0 y espaciado proporcional (gaps muy desiguales entre puntos), el suavizado bezier de Chart.js generaba distorsiones visibles cerca de los bordes. El radio de los puntos (`pointRadiusFor()`) baja según la cantidad de puntos para que no se amontonen en rangos largos.
+- **Calendar-aligned ticks**: `computeCalendarTicks()` decides the granularity based on the visible span (month if >150 days, week if >20, every 4 days if >8, otherwise every day) and returns exact timestamps (start of month/week), not data indices — they're injected by overwriting the ticks array via `afterBuildTicks`, regardless of whether real data exists exactly there.
+- **Chart.js gotcha**: the `linear` axis defaults to `bounds: 'ticks'`, which expands `min`/`max` to its own auto-generated "round" ticks — `afterBuildTicks` overwrites them but doesn't fix that already-inflated `min`, leaving a phantom gap before the first real point. That's why `xAxis()` sets explicit `min`/`max` to the first/last real timestamp (plus `bounds: 'data'` as reinforcement). If that explicit `min`/`max` is removed, the gap comes back.
+- **Backward-fill point clamp**: `filteredHistorialWithFill()` may prepend the last valuation *before* the selected range (so the line doesn't start at zero); its real date can be much earlier than the visible range, so in `renderCharts()` its `x` is clamped to the range edge (not its real date) — otherwise most of the chart width would be wasted on a flat segment outside the range.
+- **Straight lines, no curves**: `tension: 0` in `makeDataset()` — with tension>0 and proportional spacing (very uneven gaps between points), Chart.js's bezier smoothing produced visible distortions near the edges. Point radius (`pointRadiusFor()`) decreases with point count so they don't pile up over long ranges.
 
-### El form de Admin es "state-backed" — no confía en que el navegador retenga los valores
+### The Admin form is "state-backed" — it doesn't trust the browser to retain values
 
-En iOS Safari, los `<input type="date">`/`<input type="time">` del panel Admin a veces se vacían solos: al cambiar de tab (`.tab-content` usa `display:none`/`block`, y el input pierde su valor al re-mostrarse) o durante el reflow grande que dispara `renderAll()` después de guardar. Es un bug de WebKit, no reproducible en Chromium — no lo arregles cambiando el mecanismo de tabs sin probarlo primero en un iPhone real.
+On iOS Safari, the Admin panel's `<input type="date">`/`<input type="time">` sometimes clear themselves: when switching tabs (`.tab-content` uses `display:none`/`block`, and the input loses its value when re-shown) or during the big reflow triggered by `renderAll()` after saving. It's a WebKit bug, not reproducible on Chromium — don't fix it by changing the tabs mechanism without testing on a real iPhone first.
 
-El workaround vive en `src/admin.js`: `FORM_FIELDS` lista los IDs de todos los campos del form; `saveFormSnapshot()` los copia a un objeto en memoria en cada `input`/`change` (delegado en `#admin-panel`, ver `bindAdminEvents()`); `restoreFormSnapshot()` (exportada) los reaplica. Se llama después de `fetchAll()` en `submitMov()`/`submitFondo()`/`agregarParticipante()`/`quitarParticipante()`, y en `setTab()` (`src/ui/tabs.js`) al entrar al tab `admin`. **Si agregás un campo nuevo al form de Admin, sumalo a `FORM_FIELDS`** o quedará fuera de este mecanismo.
+The workaround lives in `src/admin.js`: `FORM_FIELDS` lists the IDs of all form fields; `saveFormSnapshot()` copies them to an in-memory object on every `input`/`change` (delegated on `#admin-panel`, see `bindAdminEvents()`); `restoreFormSnapshot()` (exported) reapplies them. It's called after `fetchAll()` in `submitMov()`/`submitFondo()`/`agregarParticipante()`/`quitarParticipante()`, and in `setTab()` (`src/ui/tabs.js`) when entering the `admin` tab. **If you add a new field to the Admin form, add it to `FORM_FIELDS`** or it will be left out of this mechanism.
 
-### Otras particularidades
+### Other quirks
 
-- **Cero emojis en la UI**: ni en toasts, status messages, banners, ni iconos decorativos (`src/ui/toast.js`, `src/admin.js`, `src/ui/banner.js`). Pedido explícito — el color/clase CSS (`.ok`/`.err`) ya comunica el estado.
-- **Auth del panel admin es cosmética**: `ADMIN_KEY` (`src/config.js`) se valida solo en el frontend, y queda embebida en el bundle público. Aceptado para uso familiar privado (ver `README.md`), no es un control de seguridad real.
-- **Parser de números formato colombiano**: `parseCONumber()` (`src/utils/csv.js`) distingue `1.300,00` (miles+decimal) de `11,23` (solo decimal) de `1.300` (solo miles) — heurística basada en cantidad de dígitos después del último punto. Fechas se normalizan de formato colombiano a ISO en `normDate()` (`src/utils/dates.js`).
-- **TRM** se trae en vivo de la Superfinanciera vía `datos.gov.co` (`fetchTRM()`, `src/api/sheets.js`), con fallback a 4000 si falla el fetch.
-- **`S.historial` es un registro por día, no una fila cruda por movimiento del Sheet**: `fetchAll()` (`src/api/sheets.js`) dedupea `historial_fondo` quedándose con la valuación más reciente de cada día (`fecha.slice(0, 10)` como key). Si el admin registra varias valuaciones el mismo día, solo sobrevive la última — evita que el chart (`filteredHistorialWithFill()`, `src/render/charts.js`) haga zigzag intradía o repita el mismo día en el eje x. Si necesitás el detalle intradía crudo, hay que leer `histRows` antes del dedupe, no `S.historial`.
-- **Sin inline handlers**: el HTML no tiene `onclick`/`oninput`; todos los listeners se registran en `main.js`/`admin.js` vía `addEventListener`, apoyados en atributos `data-*` (`data-tab`, `data-r`, `data-tipo`).
+- **Zero emojis in the UI**: not in toasts, status messages, banners, or decorative icons (`src/ui/toast.js`, `src/admin.js`, `src/ui/banner.js`). Explicit request — the CSS color/class (`.ok`/`.err`) already communicates the state.
+- **Admin panel auth is cosmetic**: `ADMIN_KEY` (`src/config.js`) is validated frontend-only, and ends up embedded in the public bundle. Accepted for private family use (see `README.md`), it's not a real security control.
+- **Colombian number format parser**: `parseCONumber()` (`src/utils/csv.js`) distinguishes `1.300,00` (thousands+decimal) from `11,23` (decimal only) from `1.300` (thousands only) — a heuristic based on the number of digits after the last period. Dates are normalized from Colombian format to ISO in `normDate()` (`src/utils/dates.js`).
+- **TRM (exchange rate)** is fetched live from Superfinanciera via `datos.gov.co` (`fetchTRM()`, `src/api/sheets.js`), with a fallback to 4000 if the fetch fails.
+- **`S.historial` is a per-day record, not a raw per-movement row from the Sheet**: `fetchAll()` (`src/api/sheets.js`) dedupes `historial_fondo` keeping the most recent valuation per day (`fecha.slice(0, 10)` as the key). If the admin records several valuations on the same day, only the last one survives — this keeps the chart (`filteredHistorialWithFill()`, `src/render/charts.js`) from zigzagging intraday or repeating the same day on the x-axis. If you need the raw intraday detail, read `histRows` before the dedupe, not `S.historial`.
+- **No inline handlers**: the HTML has no `onclick`/`oninput`; all listeners are registered in `main.js`/`admin.js` via `addEventListener`, backed by `data-*` attributes (`data-tab`, `data-r`, `data-tipo`).

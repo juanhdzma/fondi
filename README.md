@@ -1,56 +1,56 @@
 # Fondi
 
-Dashboard web para gestionar un fondo de inversión familiar. Muestra valor del fondo, precio de cuota, participación individual y rendimiento en USD y COP.
+Web dashboard for managing a mutual-fund-style investment pool. Shows fund value, share price, individual ownership, and returns in USD and COP.
 
 ---
 
-## Requisitos previos
+## Prerequisites
 
 - Google Account
-- Node.js 20+ (solo para desarrollo local — el contenedor de producción no lo necesita)
-- Cuenta GitHub con acceso a GitHub Container Registry
-- Servidor con Docker + Portainer (o cualquier host con Docker)
+- Node.js 20+ (only for local development — the production container doesn't need it)
+- GitHub account with access to GitHub Container Registry
+- Server with Docker + Portainer (or any Docker host)
 
 ---
 
 ## 1. Google Sheet
 
-### Crear el Sheet
+### Create the Sheet
 
-1. Crear un nuevo Google Sheet en [sheets.google.com](https://sheets.google.com)
-2. Copiar el **Sheet ID** de la URL:
+1. Create a new Google Sheet at [sheets.google.com](https://sheets.google.com)
+2. Copy the **Sheet ID** from the URL:
    ```
    https://docs.google.com/spreadsheets/d/**SHEET_ID**/edit
    ```
 
-### Crear las pestañas con exactamente estos nombres
+### Create tabs with exactly these names
 
-| Pestaña | Columnas (en orden) |
+| Tab | Columns (in order) |
 |---|---|
 | `historial_fondo` | `fecha` · `valor_total_usd` · `precio_cuota_usd` · `cuotas_en_circulacion` · `trm` |
 | `movimientos` | `fecha` · `persona` · `tipo` · `monto_usd` · `precio_cuota_dia` · `cuotas` · `monto_cop` · `trm_dia` |
 | `participantes_config` | `fecha` · `nombre` · `accion` |
 | `participantes` | `nombre` · `cuotas_totales` |
 
-> `participantes_config` es un log append-only (igual que las demás): cada fila es un evento `agregar` o `quitar`. La app calcula la lista activa tomando, por nombre, la última acción registrada — nunca se edita ni borra una fila a mano.
+> `participantes_config` is an append-only log (like the others): each row is an `agregar` (add) or `quitar` (remove) event. The app computes the active list by taking, per name, the most recently recorded action — a row is never edited or deleted by hand.
 
-> La primera fila de cada pestaña debe ser el encabezado. Los datos empiezan en la fila 2.
+> The first row of each tab must be the header. Data starts on row 2.
 
-### Hacer el Sheet público (solo lectura)
+### Make the Sheet public (read-only)
 
-1. Botón **Compartir** → **Cambiar a cualquier persona con el enlace**
-2. Permiso: **Visualizador**
+1. **Share** button → **Change to anyone with the link**
+2. Permission: **Viewer**
 
 ---
 
-## 2. Google Apps Script (escritura)
+## 2. Google Apps Script (write path)
 
-El panel admin escribe datos al Sheet via un Apps Script desplegado como Web App.
+The admin panel writes data to the Sheet via an Apps Script deployed as a Web App.
 
-### Crear el script
+### Create the script
 
-1. En el Sheet: **Extensiones → Apps Script**
-2. Reemplazar todo el contenido con:
+1. In the Sheet: **Extensions → Apps Script**
+2. Replace all the content with:
 
 ```javascript
 function doPost(e) {
@@ -103,73 +103,73 @@ function doPost(e) {
 }
 ```
 
-3. **Guardar** el proyecto (Ctrl+S)
-4. **Desplegar → Nueva implementación**
-   - Tipo: **Web App**
-   - Ejecutar como: **Yo** (tu cuenta Google)
-   - Quién tiene acceso: **Cualquier persona**
-5. Autorizar los permisos cuando se soliciten
-6. Copiar la URL generada (formato `https://script.google.com/macros/s/.../exec`)
+3. **Save** the project (Ctrl+S)
+4. **Deploy → New deployment**
+   - Type: **Web App**
+   - Execute as: **Me** (your Google account)
+   - Who has access: **Anyone**
+5. Authorize the permissions when prompted
+6. Copy the generated URL (format `https://script.google.com/macros/s/.../exec`)
 
-> ⚠️ Cada vez que modifiques el script debes crear una **nueva implementación**. Editar sin redesplegar no afecta la URL de producción.
+> ⚠️ Every time you modify the script you must create a **new deployment**. Editing without redeploying doesn't affect the production URL.
 
 ---
 
-## 3. Configurar la app
+## 3. Configure the app
 
-Abrir `src/config.js` y editar las constantes:
+Open `src/config.js` and edit the constants:
 
 ```javascript
-export const SHEET_ID       = 'TU_SHEET_ID_AQUI';
+export const SHEET_ID       = 'YOUR_SHEET_ID_HERE';
 export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/.../exec';
-export const ADMIN_KEY      = 'TU_CLAVE_SECRETA';
+export const ADMIN_KEY      = 'YOUR_SECRET_KEY';
 ```
 
-| Variable | Descripción |
+| Variable | Description |
 |---|---|
-| `SHEET_ID` | ID del Google Sheet (de la URL) |
-| `APPS_SCRIPT_URL` | URL de la Web App del Apps Script |
-| `ADMIN_KEY` | Clave para acceder al panel admin |
-| `MOCK_MODE` | `true` para datos de prueba, `false` para usar el Sheet real |
+| `SHEET_ID` | Google Sheet ID (from the URL) |
+| `APPS_SCRIPT_URL` | Apps Script Web App URL |
+| `ADMIN_KEY` | Key to access the admin panel |
+| `MOCK_MODE` | `true` for test data, `false` to use the real Sheet |
 
-Los participantes ya no se configuran acá: se agregan y quitan desde el panel Admin → "Gestionar participantes", y quedan guardados en la pestaña `participantes_config` del Sheet.
+Participants are no longer configured here: they're added and removed from the Admin panel → "Manage participants", and get saved to the `participantes_config` tab of the Sheet.
 
 ---
 
-## 4. Correr localmente
+## 4. Run locally
 
 ```bash
 npm install
 npm run dev
-# Abrir http://localhost:8080
+# Open http://localhost:8080
 ```
 
-`npm run build` genera el sitio estático en `dist/` (lo que corre `docker build`); `npm run preview` lo sirve para verificarlo antes de deployar.
+`npm run build` generates the static site in `dist/` (what `docker build` runs); `npm run preview` serves it to check before deploying.
 
-### Estructura
+### Structure
 
 ```
-index.html          Markup, sin lógica ni estilos inline
+index.html          Markup, no inline logic or styles
 src/
-  main.js            Entry point — wiring de event listeners y arranque
-  config.js           Constantes de deployment (Sheet, Apps Script, admin key)
-  state.js             Estado en memoria (S) e instancias de Chart.js
-  computed.js            Derivados del estado (precio de cuota, cuotas por participante, ...)
-  admin.js                 Panel admin: auth, formularios, submit de movimiento/valuación
+  main.js            Entry point — wires up event listeners and boots the app
+  config.js           Deployment constants (Sheet, Apps Script, admin key)
+  state.js             In-memory state (S) and Chart.js instances
+  computed.js            Derived state (share price, shares per participant, ...)
+  admin.js                 Admin panel: auth, forms, movement/valuation submission
   style.css
-  api/sheets.js        Lectura del Sheet (CSV) y escritura vía Apps Script
-  utils/                Formatters, parser CSV/números CO, fechas, inputs de dinero
-  render/               Un módulo por sección de UI (resumen, movimientos, charts)
-  ui/                   Tabs, rango de fechas de las gráficas, banner de error, refresh
+  api/sheets.js        Reads the Sheet (CSV) and writes via Apps Script
+  utils/                Formatters, CO number/CSV parser, dates, money inputs
+  render/               One module per UI section (summary, movements, charts)
+  ui/                   Tabs, chart date range, error banner, refresh
 ```
 
-Sin framework — DOM directo, como en la versión de un solo archivo, solo que separado por dominio y con Vite como bundler.
+No framework — direct DOM manipulation, same as the single-file version, just split by domain and bundled with Vite.
 
 ---
 
 ## 5. Docker
 
-### Build manual
+### Manual build
 
 ```bash
 docker build -t fondi .
@@ -180,49 +180,49 @@ docker run -p 8080:80 fondi
 
 ```bash
 docker compose up -d --build
-# Abrir http://localhost:8080
+# Open http://localhost:8080
 ```
 
-Usa `docker-compose.yml` en la raíz del repo (build local, sin depender de GHCR). Para reconstruir tras un cambio: `docker compose up -d --build` de nuevo; para bajarlo, `docker compose down`.
+Uses `docker-compose.yml` at the repo root (local build, no dependency on GHCR). To rebuild after a change: `docker compose up -d --build` again; to tear it down, `docker compose down`.
 
 ### GitHub Container Registry (GHCR)
 
-El repositorio incluye un workflow en `.github/workflows/docker.yml` que construye y publica la imagen automáticamente en cada push a `main`.
+The repo includes a workflow at `.github/workflows/docker.yml` that builds and publishes the image automatically on every push to `main`.
 
-#### Setup inicial
+#### Initial setup
 
 ```bash
-# 1. Crear el repo en GitHub
-gh repo create <usuario>/fondi --private --source=. --push
+# 1. Create the repo on GitHub
+gh repo create <user>/fondi --private --source=. --push
 
-# 2. Si el remote quedó en SSH y no tenés key configurada:
-git remote set-url origin https://github.com/<usuario>/fondi.git
+# 2. If the remote ended up on SSH and you don't have a key configured:
+git remote set-url origin https://github.com/<user>/fondi.git
 git push -u origin main
 ```
 
-El workflow se dispara solo. En ~2 minutos la imagen queda en:
+The workflow triggers automatically. In ~2 minutes the image lands at:
 ```
-ghcr.io/<usuario>/fondi:latest
+ghcr.io/<user>/fondi:latest
 ```
 
-#### Autenticación para pull desde el servidor
+#### Authentication to pull from the server
 
 ```bash
-# En el servidor donde corre Docker:
-echo <GITHUB_PAT> | docker login ghcr.io -u <usuario> --password-stdin
+# On the server where Docker runs:
+echo <GITHUB_PAT> | docker login ghcr.io -u <user> --password-stdin
 ```
 
-El PAT necesita el scope `read:packages`. Crearlo en:  
+The PAT needs the `read:packages` scope. Create it at:
 GitHub → Settings → Developer settings → Personal access tokens
 
 ---
 
-## 6. Deploy con Docker Compose (Portainer)
+## 6. Deploy with Docker Compose (Portainer)
 
 ```yaml
 services:
   fondi:
-    image: ghcr.io/<usuario>/fondi:latest
+    image: ghcr.io/<user>/fondi:latest
     container_name: fondi
     restart: unless-stopped
     networks:
@@ -233,26 +233,26 @@ networks:
     external: true
 ```
 
-> La red `proxy` debe existir (Traefik u otro reverse proxy). El contenedor sirve en el puerto **80**.
+> The `proxy` network must already exist (Traefik or another reverse proxy). The container serves on port **80**.
 
 ---
 
-## 7. Flujo para actualizar la app
+## 7. Workflow to update the app
 
 ```bash
-# Editar código en src/
+# Edit code under src/
 git add src/ index.html
-git commit -m "feat: descripción del cambio"
+git commit -m "feat: description of the change"
 git push
-# El workflow de GitHub Actions rebuilda la imagen (npm run build dentro del Dockerfile)
-# Luego en Portainer: pull + recreate del contenedor
+# The GitHub Actions workflow rebuilds the image (npm run build inside the Dockerfile)
+# Then in Portainer: pull + recreate the container
 ```
 
 ---
 
-## Notas
+## Notes
 
-- **TRM**: se obtiene automáticamente de [datos.gov.co](https://www.datos.gov.co/resource/32sa-8pi3.json) (Superfinanciera Colombia, TRM oficial).
-- **Escritura al Sheet**: usa `mode: 'no-cors'` por limitaciones de CORS en Apps Script. La escritura ocurre igualmente; el re-fetch del CSV confirma los datos.
-- **Clave admin**: se valida solo en el frontend. Adecuado para uso familiar privado.
-- **Formato de fechas**: el Sheet exporta fechas en formato colombiano (`14/06/2026 17:56:00`). La app normaliza automáticamente a ISO.
+- **TRM (exchange rate)**: fetched automatically from [datos.gov.co](https://www.datos.gov.co/resource/32sa-8pi3.json) (Superfinanciera Colombia, official TRM).
+- **Writing to the Sheet**: uses `mode: 'no-cors'` due to Apps Script CORS limitations. The write still happens; the CSV re-fetch confirms the data.
+- **Admin key**: validated frontend-only. Suitable for private personal/family use.
+- **Date format**: the Sheet exports dates in Colombian format (`14/06/2026 17:56:00`). The app normalizes them to ISO automatically.
