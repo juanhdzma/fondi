@@ -4,11 +4,10 @@ Web dashboard for managing a mutual-fund-style investment pool. Shows fund value
 
 ---
 
-## ⚠️ PRIVATE USE ONLY — NO REAL AUTH
-
-Reading the data requires no login: the Google Sheet is shared as "Anyone with the link — Viewer", so anyone with the URL can see every contribution, the fund value, and each person's shares. The Admin panel has a password (`ADMIN_KEY`), but it's validated frontend-only and ships embedded in the public JS bundle — it stops accidental clicks, not a real actor. Writes go through an append-only Apps Script (no UPDATE/DELETE), but anyone with the key can still append fake movements or valuations.
-
-Do not expose this to the public internet (no open port-forward, no public reverse proxy) without your own auth layer in front (reverse proxy with basic auth, VPN/Tailscale, etc.) if the fund's data should stay private.
+> ## ⚠️ PRIVATE USE ONLY — NO REAL AUTH
+> This app has **no real authentication**. The Google Sheet is shared as "Anyone with the link — Viewer", so anyone who can reach the URL can read every contribution, the fund value, and each person's shares. The Admin panel has a password (`ADMIN_KEY`), but it's validated frontend-only and ships embedded in the public JS bundle — it stops accidental clicks, not a real actor with dev tools.
+>
+> **Do not expose this to the public internet** (no open port-forward, no public reverse proxy) without putting your own auth layer in front of it (e.g. a reverse proxy with basic auth, a VPN/Tailscale, etc.).
 
 ---
 
