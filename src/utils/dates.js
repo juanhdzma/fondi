@@ -2,10 +2,9 @@
 export function normDate(s) {
   if (!s) return '';
   s = String(s).trim();
-  // ISO con T o espacio: "2026-06-14T17:56" / "2026-06-14 17:56:00"
-  if (/^\d{4}-\d{2}-\d{2}[T ]/.test(s)) {
-    return s.slice(0, 10) + 'T' + s.slice(11, 16);  // → "2026-06-14T17:56"
-  }
+  // ISO con T o espacio: "2026-06-14T17:56" / "2026-06-14 17:56:00" / "2026-06-16 8:43"
+  const conHora = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{1,2}):(\d{2})/);
+  if (conHora) return `${conHora[1]}T${conHora[2].padStart(2, '0')}:${conHora[3]}`;
   // ISO solo fecha: "2026-06-14"
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   // DD/MM/YYYY o DD-MM-YYYY con hora opcional
