@@ -4,146 +4,43 @@ Web dashboard for managing a mutual-fund-style investment pool. Shows fund value
 
 ---
 
-> ## ⚠️ PRIVATE USE ONLY — NO REAL AUTH
-> This app has **no real authentication**. The Google Sheet is shared as "Anyone with the link — Viewer", so anyone who can reach the URL can read every contribution, the fund value, and each person's shares. The Admin panel has a password (`ADMIN_KEY`), but it's validated frontend-only and ships embedded in the public JS bundle — it stops accidental clicks, not a real actor with dev tools.
+> ## ⚠️ PRIVATE USE ONLY — NO REAL AUTH BOUNDARY
+> The Admin panel's password (`ADMIN_PASSWORD`) is checked server-side (`secrets.compare_digest`), so it isn't trivially bypassable from the browser — but there's no rate limiting, no session/token, and the read endpoints (`/api/all`, `/api/export`) require **no auth at all**: anyone who can reach the URL can read every contribution, the fund value, and each person's shares.
 >
-> **Do not expose this to the public internet** (no open port-forward, no public reverse proxy) without putting your own auth layer in front of it (e.g. a reverse proxy with basic auth, a VPN/Tailscale, etc.).
+> **Do not expose this to the public internet** (no open port-forward, no public reverse proxy) without putting your own auth layer in front of it (e.g. a reverse proxy with basic auth, a VPN/Tailscale, etc.), and **always set your own `ADMIN_PASSWORD`** — it defaults to `admin` if unset.
 
 ---
 
 ## Prerequisites
 
-- Google Account
-- Node.js 20+ (only for local development — the production container doesn't need it)
+- Node.js 20+ (only for local frontend development — the production container doesn't need it)
+- Python 3.12+ (only for local backend development)
 - GitHub account with access to GitHub Container Registry
 - Server with Docker + Portainer (or any Docker host)
 
 ---
 
-## 1. Google Sheet
+## Architecture
 
-### Create the Sheet
+One image, one container: a multi-stage `Dockerfile` builds the Vite frontend, then a Python stage installs FastAPI and serves the built static files alongside the `/api/*` routes from a single `uvicorn` process — no nginx, no second container. Data lives in a SQLite file (`/data/fondi.db` inside the container, meant to be a mounted volume) with three append-only tables: `historial_fondo`, `movimientos`, `participantes_config`.
 
-1. Create a new Google Sheet at [sheets.google.com](https://sheets.google.com)
-2. Copy the **Sheet ID** from the URL:
-   ```
-   https://docs.google.com/spreadsheets/d/**SHEET_ID**/edit
-   ```
-
-### Create tabs with exactly these names
-
-| Tab | Columns (in order) |
-|---|---|
-| `historial_fondo` | `fecha` · `valor_total_usd` · `precio_cuota_usd` · `cuotas_en_circulacion` · `trm` |
-| `movimientos` | `fecha` · `persona` · `tipo` · `monto_usd` · `precio_cuota_dia` · `cuotas` · `monto_cop` · `trm_dia` |
-| `participantes_config` | `fecha` · `nombre` · `accion` |
-| `participantes` | `nombre` · `cuotas_totales` |
-
-> `participantes_config` is an append-only log (like the others): each row is an `agregar` (add) or `quitar` (remove) event. The app computes the active list by taking, per name, the most recently recorded action — a row is never edited or deleted by hand.
-
-> The first row of each tab must be the header. Data starts on row 2.
-
-### Make the Sheet public (read-only)
-
-1. **Share** button → **Change to anyone with the link**
-2. Permission: **Viewer**
+See `CLAUDE.md` for the full data model, endpoint list, and the non-obvious parts of the share-price math.
 
 ---
 
-## 2. Google Apps Script (write path)
+## 1. Run locally
 
-The admin panel writes data to the Sheet via an Apps Script deployed as a Web App.
+The frontend and backend run as two separate processes in development.
 
-### Create the script
+### Backend
 
-1. In the Sheet: **Extensions → Apps Script**
-2. Replace all the content with:
-
-```javascript
-function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  if (data.action === 'movimiento') {
-    ss.getSheetByName('movimientos').appendRow([
-      data.fecha,
-      data.persona,
-      data.tipo,
-      data.monto_usd,
-      data.precio_cuota_dia,
-      data.cuotas,
-      data.monto_cop,
-      data.trm_dia
-    ]);
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  if (data.action === 'actualizar_fondo') {
-    ss.getSheetByName('historial_fondo').appendRow([
-      data.fecha,
-      data.valor_total_usd,
-      data.precio_cuota_usd,
-      data.cuotas_en_circulacion,
-      data.trm
-    ]);
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  if (data.action === 'participante') {
-    ss.getSheetByName('participantes_config').appendRow([
-      data.fecha,
-      data.nombre,
-      data.accion
-    ]);
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  return ContentService
-    .createTextOutput(JSON.stringify({ error: 'Acción desconocida' }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+```bash
+cd backend
+pip install -r requirements-dev.txt
+ADMIN_PASSWORD=whatever uvicorn app.main:app --port 8000 --reload
 ```
 
-3. **Save** the project (Ctrl+S)
-4. **Deploy → New deployment**
-   - Type: **Web App**
-   - Execute as: **Me** (your Google account)
-   - Who has access: **Anyone**
-5. Authorize the permissions when prompted
-6. Copy the generated URL (format `https://script.google.com/macros/s/.../exec`)
-
-> ⚠️ Every time you modify the script you must create a **new deployment**. Editing without redeploying doesn't affect the production URL.
-
----
-
-## 3. Configure the app
-
-Open `src/config.js` and edit the constants:
-
-```javascript
-export const SHEET_ID       = 'YOUR_SHEET_ID_HERE';
-export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/.../exec';
-export const ADMIN_KEY      = 'YOUR_SECRET_KEY';
-```
-
-| Variable | Description |
-|---|---|
-| `SHEET_ID` | Google Sheet ID (from the URL) |
-| `APPS_SCRIPT_URL` | Apps Script Web App URL |
-| `ADMIN_KEY` | Key to access the admin panel |
-| `MOCK_MODE` | `true` for test data, `false` to use the real Sheet |
-
-Participants are no longer configured here: they're added and removed from the Admin panel → "Manage participants", and get saved to the `participantes_config` tab of the Sheet.
-
----
-
-## 4. Run locally
+### Frontend
 
 ```bash
 npm install
@@ -151,36 +48,50 @@ npm run dev
 # Open http://localhost:8080
 ```
 
-`npm run build` generates the static site in `dist/` (what `docker build` runs); `npm run preview` serves it to check before deploying.
+In dev, the frontend talks to `http://localhost:8000` (see `API_BASE_URL` in `src/config.js`) — the backend has CORS enabled for this cross-origin setup. To test the UI without a running backend, set `MOCK_MODE = true` in `src/config.js`.
+
+`npm run build` generates `dist/` (what the Dockerfile copies into the image); `npm run preview` serves it locally to check before deploying.
+
+### Backend tests
+
+```bash
+cd backend
+python -m pytest
+```
 
 ### Structure
 
 ```
-index.html          Markup, no inline logic or styles
+index.html          Markup only, no inline logic or styles
 src/
   main.js            Entry point — wires up event listeners and boots the app
-  config.js           Deployment constants (Sheet, Apps Script, admin key)
+  config.js           API_BASE_URL, MOCK_MODE / mock fixtures
   state.js             In-memory state (S) and Chart.js instances
   computed.js            Derived state (share price, shares per participant, ...)
   admin.js                 Admin panel: auth, forms, movement/valuation submission
   style.css
-  api/sheets.js        Reads the Sheet (CSV) and writes via Apps Script
-  utils/                Formatters, CO number/CSV parser, dates, money inputs
+  api/backend.js       fetchAll/postMovimiento/postFondo/postParticipante — all I/O
+  utils/                Formatters, dates, money inputs
   render/               One module per UI section (summary, movements, charts)
   ui/                   Tabs, chart date range, error banner, refresh
+backend/
+  app/main.py          FastAPI app: auth dependency, routes, static file mount
+  app/db.py            Schema + sqlite3 connection helper
+  app/xlsx.py          xlsx export/import format
+  tests/               pytest + FastAPI TestClient
 ```
 
-No framework — direct DOM manipulation, same as the single-file version, just split by domain and bundled with Vite.
+No framework on the frontend — direct DOM manipulation, split by domain and bundled with Vite.
 
 ---
 
-## 5. Docker
+## 2. Docker
 
 ### Manual build
 
 ```bash
 docker build -t fondi .
-docker run -p 8080:80 fondi
+docker run -p 8080:8000 -e ADMIN_PASSWORD=whatever -v fondi-db:/data fondi
 ```
 
 ### Docker Compose (local)
@@ -190,24 +101,12 @@ docker compose up -d --build
 # Open http://localhost:8080
 ```
 
-Uses `docker-compose.yml` at the repo root (local build, no dependency on GHCR). To rebuild after a change: `docker compose up -d --build` again; to tear it down, `docker compose down`.
+Uses `docker-compose.yml` at the repo root (local build, no dependency on GHCR). Set `ADMIN_PASSWORD` in a `.env` file or export it before running — it defaults to `admin` otherwise. To rebuild after a change: `docker compose up -d --build` again; to tear it down, `docker compose down`.
 
 ### GitHub Container Registry (GHCR)
 
-The repo includes a workflow at `.github/workflows/docker.yml` that builds and publishes the image automatically on every push to `main`.
+The repo includes a workflow at `.github/workflows/docker.yml` that builds and publishes the image automatically on every push to `main` that touches `index.html`, `src/**`, `package.json`, `Dockerfile`, or `backend/**`. In a couple of minutes the image lands at:
 
-#### Initial setup
-
-```bash
-# 1. Create the repo on GitHub
-gh repo create <user>/fondi --private --source=. --push
-
-# 2. If the remote ended up on SSH and you don't have a key configured:
-git remote set-url origin https://github.com/<user>/fondi.git
-git push -u origin main
-```
-
-The workflow triggers automatically. In ~2 minutes the image lands at:
 ```
 ghcr.io/<user>/fondi:latest
 ```
@@ -224,7 +123,7 @@ GitHub → Settings → Developer settings → Personal access tokens
 
 ---
 
-## 6. Deploy with Docker Compose (Portainer)
+## 3. Deploy with Docker Compose (Portainer)
 
 ```yaml
 services:
@@ -232,34 +131,43 @@ services:
     image: ghcr.io/<user>/fondi:latest
     container_name: fondi
     restart: unless-stopped
+    environment:
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    volumes:
+      - fondi-db:/data
     networks:
       - proxy
 
 networks:
   proxy:
     external: true
+
+volumes:
+  fondi-db:
 ```
 
-> The `proxy` network must already exist (Traefik or another reverse proxy). The container serves on port **80**.
+> The `proxy` network must already exist (Traefik or another reverse proxy) and must be told to route to container port **8000** — this app has no built-in port publishing in this example, the proxy talks to it over the shared network. Without the `fondi-db` volume, the SQLite database is wiped every time the container is recreated.
 
 ---
 
-## 7. Workflow to update the app
+## 4. Workflow to update the app
 
 ```bash
-# Edit code under src/
-git add src/ index.html
+# Edit code under src/ or backend/
+git add -A
 git commit -m "feat: description of the change"
 git push
-# The GitHub Actions workflow rebuilds the image (npm run build inside the Dockerfile)
-# Then in Portainer: pull + recreate the container
+# The GitHub Actions workflow rebuilds the image (npm run build + pip install inside the Dockerfile)
+# Then in Portainer (or docker compose pull && docker compose up -d): pull the new image + recreate the container
 ```
+
+**A plain restart/recreate is not enough to pick up a new image** — Docker won't re-fetch an already-pulled `:latest` tag on its own. Always pull explicitly (`docker compose pull`, or Portainer's "re-pull image" option) before recreating.
 
 ---
 
 ## Notes
 
-- **TRM (exchange rate)**: fetched automatically from [datos.gov.co](https://www.datos.gov.co/resource/32sa-8pi3.json) (Superfinanciera Colombia, official TRM).
-- **Writing to the Sheet**: uses `mode: 'no-cors'` due to Apps Script CORS limitations. The write still happens; the CSV re-fetch confirms the data.
-- **Admin key**: validated frontend-only. Suitable for private personal/family use.
-- **Date format**: the Sheet exports dates in Colombian format (`14/06/2026 17:56:00`). The app normalizes them to ISO automatically.
+- **TRM (exchange rate)**: fetched automatically from [datos.gov.co](https://www.datos.gov.co/resource/32sa-8pi3.json) (Superfinanciera Colombia, official TRM), with a fallback to 4000 if the fetch fails.
+- **`ADMIN_PASSWORD`**: checked server-side with `secrets.compare_digest` on every write request (no session/token — each request is validated independently). Defaults to `admin` if unset; always override it before exposing this beyond your LAN.
+- **Data model**: three append-only SQLite tables (no `UPDATE`/`DELETE` — corrections are new rows). See `CLAUDE.md` for the full schema and the share-price math.
+- **Export/Import**: `GET /api/export` streams an `.xlsx` snapshot (no auth, same as reads); `POST /api/import` replaces all data from an uploaded workbook (requires `ADMIN_PASSWORD`, destructive — confirmed client-side before firing).
