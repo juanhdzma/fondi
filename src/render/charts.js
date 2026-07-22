@@ -60,8 +60,8 @@ function makeGradient(chart, hex) {
   return g;
 }
 
-const ACCENT   = '#3B4C74';
-const ACCENT_2 = '#9AA6C2';
+const ACCENT   = '#0C243B';
+const ACCENT_2 = '#4A6E93';
 
 const toTs = fecha => new Date(fecha.slice(0, 10) + 'T12:00:00').getTime();
 

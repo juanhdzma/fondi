@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
   <title>Fondi</title>
 </head>
 <body>
 
 <header class="header">
   <div class="header-left">
-    <div class="logo">FI</div>
+    <img class="logo" src="/logo-fondi.svg" width="32" height="32" alt="Fondi" />
     <span class="header-title">Fondi</span>
   </div>
   <nav class="header-nav">
@@ -135,11 +137,11 @@
       <div class="admin-header">
         <div class="admin-header-title">Panel de administración</div>
       </div>
-      <div class="admin-grid">
+      <div class="admin-content">
 
         <!-- Registrar movimiento -->
         <div class="card">
-          <div class="section-title" style="margin-bottom:18px">Registrar movimiento</div>
+          <div class="section-title">Registrar movimiento</div>
           <div class="form-group">
             <label class="form-label">Participante</label>
             <select class="form-input" id="f-persona"></select>
@@ -188,7 +190,7 @@
 
         <!-- Registrar valuación (sin movimiento) -->
         <div class="card">
-          <div class="section-title" style="margin-bottom:4px">Registrar valuación</div>
+          <div class="section-title">Registrar valuación</div>
           <p style="font-size:12px;color:var(--text-secondary);margin-bottom:18px">Solo para actualizar el valor sin aporte ni retiro (ej. cierre de semana).</p>
           <div class="form-group">
             <label class="form-label">Valor total del portafolio (USD)</label>
@@ -213,7 +215,7 @@
 
         <!-- Gestionar participantes -->
         <div class="card">
-          <div class="section-title" style="margin-bottom:18px">Gestionar participantes</div>
+          <div class="section-title">Gestionar participantes</div>
           <div id="participants-manage-list" style="margin-bottom:14px"></div>
           <div class="form-group">
             <label class="form-label">Nuevo participante</label>
@@ -227,7 +229,28 @@
           </div>
         </div>
 
+        <!-- Exportar / importar datos -->
+        <div class="card">
+          <div class="section-title">Datos</div>
+          <div class="form-group">
+            <label class="form-label">Exportar</label>
+            <div class="form-footer" style="margin-top:0">
+              <a class="btn btn-green" id="btn-export-xlsx" href="#" style="text-decoration:none;text-align:center">Descargar xlsx</a>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Importar</label>
+            <p class="form-hint" style="margin-bottom:8px">Reemplaza TODOS los datos actuales por los del archivo.</p>
+            <input class="input-base" type="file" id="f-import-xlsx" accept=".xlsx" />
+          </div>
+          <div class="form-footer">
+            <button class="btn btn-green" id="btn-import-xlsx">Importar</button>
+            <span class="form-status" id="st-import"></span>
+          </div>
+        </div>
+
       </div>
+    </div>
   </div>
 
 </main>
