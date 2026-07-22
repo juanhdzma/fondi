@@ -1,4 +1,4 @@
-import { fetchAll } from '../api/sheets.js';
+import { fetchAll } from '../api/backend.js';
 import { renderAdminParticipants } from '../admin.js';
 
 export async function refreshData() {

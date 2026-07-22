@@ -1,9 +1,11 @@
-import { ADMIN_KEY } from './config.js';
+import { API_BASE_URL } from './config.js';
 import { S } from './state.js';
 import { cuotasCirc, precioCuota, participantesActivos } from './computed.js';
-import { fetchAll, postScript } from './api/sheets.js';
+import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx } from './api/backend.js';
 import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
 import { showToast } from './ui/toast.js';
+
+let adminKey = '';
 
 function setStatus(el, cls, msg) {
   el.className = 'form-status' + (cls ? ' ' + cls : '');
@@ -17,14 +19,20 @@ function nowLocal() {
   return { date, time, iso: `${date}T${time}` };
 }
 
-function unlockAdmin() {
+async function unlockAdmin() {
   const val = document.getElementById('admin-key').value;
   const errEl = document.getElementById('key-err');
-  if (val === ADMIN_KEY) {
+  try {
+    const r = await fetch(`${API_BASE_URL}/api/auth/verify`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': val },
+    });
+    if (!r.ok) throw new Error();
+    adminKey = val;
     document.getElementById('admin-lock').style.display = 'none';
     document.getElementById('admin-panel').style.display = 'block';
     initAdminForms();
-  } else {
+  } catch {
     document.getElementById('admin-key').classList.add('err');
     errEl.textContent = 'Clave incorrecta';
     setTimeout(() => {
@@ -108,7 +116,7 @@ async function agregarParticipante() {
 
   setStatus(st, '', 'Guardando...');
   try {
-    await postScript({ action: 'participante', fecha: nowLocal().iso, nombre, accion: 'agregar' });
+    await postParticipante({ fecha: nowLocal().iso, nombre, accion: 'agregar' }, adminKey);
     input.value = '';
     setStatus(st, '', '');
     saveFormSnapshot();
@@ -127,7 +135,7 @@ async function quitarParticipante(nombre) {
 
   setStatus(st, '', 'Guardando...');
   try {
-    await postScript({ action: 'participante', fecha: nowLocal().iso, nombre, accion: 'quitar' });
+    await postParticipante({ fecha: nowLocal().iso, nombre, accion: 'quitar' }, adminKey);
     setStatus(st, '', '');
     await fetchAll();
     renderAdminParticipants();
@@ -186,8 +194,8 @@ async function submitMov() {
   btn.disabled = true;
   setStatus(st, '', 'Guardando...');
   try {
-    await postScript({ action: 'movimiento', fecha, persona, tipo, monto_usd, precio_cuota_dia: pc, cuotas, monto_cop, trm_dia });
-    await postScript({ action: 'actualizar_fondo', fecha, valor_total_usd: valorFondo, precio_cuota_usd: pcNuevo, cuotas_en_circulacion: cuotasNuevas, trm: S.trm || 0 });
+    await postMovimiento({ fecha, persona, tipo, monto_usd, precio_cuota_dia: pc, cuotas, monto_cop, trm_dia }, adminKey);
+    await postFondo({ fecha, valor_total_usd: valorFondo, precio_cuota_usd: pcNuevo, cuotas_en_circulacion: cuotasNuevas, trm: S.trm || 0 }, adminKey);
     setStatus(st, '', '');
     document.getElementById('f-monto-cop').value  = '';
     document.getElementById('f-monto').value      = '';
@@ -200,6 +208,28 @@ async function submitMov() {
     setStatus(st, 'err', err.message);
   } finally {
     btn.disabled = false;
+  }
+}
+
+async function importXlsx() {
+  const input = document.getElementById('f-import-xlsx');
+  const st    = document.getElementById('st-import');
+  const file  = input.files[0];
+
+  if (!file) { setStatus(st, 'err', 'Elige un archivo'); return; }
+  if (!confirm('Esto reemplaza TODOS los datos actuales por los del archivo. ¿Continuar?')) return;
+
+  setStatus(st, '', 'Importando...');
+  try {
+    await postImportXlsx(file, adminKey);
+    input.value = '';
+    setStatus(st, '', '');
+    await fetchAll();
+    renderAdminParticipants();
+    restoreFormSnapshot();
+    showToast('Importado');
+  } catch (err) {
+    setStatus(st, 'err', err.message);
   }
 }
 
@@ -220,7 +250,7 @@ async function submitFondo() {
   btn.disabled = true;
   setStatus(st, '', 'Guardando...');
   try {
-    await postScript({ action: 'actualizar_fondo', fecha, valor_total_usd: val, precio_cuota_usd: pc, cuotas_en_circulacion: circ, trm: S.trm || 0 });
+    await postFondo({ fecha, valor_total_usd: val, precio_cuota_usd: pc, cuotas_en_circulacion: circ, trm: S.trm || 0 }, adminKey);
     setStatus(st, '', '');
     document.getElementById('f-valor').value = '';
     saveFormSnapshot();
@@ -235,9 +265,12 @@ async function submitFondo() {
 }
 
 export function bindAdminEvents() {
-  const adminKey = document.getElementById('admin-key');
-  adminKey.addEventListener('keydown', e => { if (e.key === 'Enter') unlockAdmin(); });
+  const adminKeyInput = document.getElementById('admin-key');
+  adminKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') unlockAdmin(); });
   document.getElementById('unlock-btn').addEventListener('click', unlockAdmin);
+
+  document.getElementById('btn-export-xlsx').href = exportUrl();
+  document.getElementById('btn-import-xlsx').addEventListener('click', importXlsx);
 
   // Snapshot continuo del form — ver comentario junto a FORM_FIELDS.
   document.getElementById('admin-panel').addEventListener('input', saveFormSnapshot);

@@ -1,2 +1,10 @@
 .git
 .github
+node_modules
+dist
+backend/.venv
+backend/__pycache__
+backend/**/__pycache__
+backend/.pytest_cache
+backend/tests
+*.db
