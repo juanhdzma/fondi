@@ -132,13 +132,13 @@ docker run -p 8080:8000 -e ADMIN_PASSWORD=whatever -v fondi-db:/data fondi
 Image to pull:
 
 ```
-ghcr.io/<user>/fondi:latest
+ghcr.io/juanhdzma/fondi:latest
 ```
 
 ```bash
 # On the server where Docker runs, authenticate first (PAT needs the read:packages scope,
 # created at GitHub → Settings → Developer settings → Personal access tokens):
-echo <GITHUB_PAT> | docker login ghcr.io -u <user> --password-stdin
+echo <GITHUB_PAT> | docker login ghcr.io -u juanhdzma --password-stdin
 ```
 
 `docker-compose.yml` for a reverse-proxied deploy (e.g. via Portainer):
@@ -146,7 +146,7 @@ echo <GITHUB_PAT> | docker login ghcr.io -u <user> --password-stdin
 ```yaml
 services:
   fondi:
-    image: ghcr.io/<user>/fondi:latest
+    image: ghcr.io/juanhdzma/fondi:latest
     container_name: fondi
     restart: unless-stopped
     environment:
