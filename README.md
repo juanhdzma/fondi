@@ -4,6 +4,18 @@ Web dashboard for managing a mutual-fund-style investment pool. Shows fund value
 
 ---
 
+## Features
+
+- **Fund overview**: total value, share price, and their % change over a selectable range (1 week to all-time), plus an accumulated-gain view colored green/red by sign.
+- **Per-participant tracking**: each person's current value, gain (USD and COP), total contributed, and an independent investment-evolution chart with its own date range.
+- **Movements log**: full history of contributions/withdrawals, filterable by participant.
+- **Admin panel**: register movements and fund valuations with live previews (real-time TRM, resulting share price) before saving; add/remove participants; export/import all data as `.xlsx`.
+- **Live TRM (USD/COP exchange rate)**, fetched automatically from Superfinanciera via datos.gov.co.
+- **Mobile-friendly**: responsive layout, bottom tab bar, no pinch-zoom or input-focus-zoom quirks.
+- Self-hosted as a single Docker container (FastAPI + SQLite backend, static frontend, no external dependencies beyond the TRM fetch).
+
+---
+
 ## Screenshots
 
 ### Desktop
