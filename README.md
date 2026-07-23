@@ -1,27 +1,21 @@
 # Fondi
 
+[![Build & push to GHCR](https://github.com/juanhdzma/fondi/actions/workflows/docker.yml/badge.svg)](https://github.com/juanhdzma/fondi/actions/workflows/docker.yml)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPLv3-blue.svg)](LICENSE)
+
 Web dashboard for managing a mutual-fund-style investment pool. Shows fund value, share price, individual ownership, and returns in USD and COP.
 
----
+Modeled like a real mutual fund: every contribution/withdrawal buys "shares" at the price in effect that moment, so each participant's stake is just their share count — the fund can grow or shrink and everyone's value moves proportionally, no manual gain-splitting. Everything is an append-only log; nothing is ever edited or deleted.
 
 ## Features
 
-### How it works
-
-The fund is modeled like a real mutual fund: every contribution or withdrawal is converted into "shares" at whatever the share price happens to be at that moment (`share price = total fund value / shares outstanding`). From then on, each participant's stake is just their share count — so if the fund grows or shrinks, everyone's value moves proportionally to how many shares they hold, without needing to manually split gains/losses. All of it — movements, valuations, participant changes — is stored as an append-only log (nothing is ever edited or deleted, only new rows added), so the full history is always auditable.
-
-### What you get
-
-- **Fund overview** (Resumen tab): total value and share price front and center, each with its own % change over a range you pick (1 week up to all-time). A third view, "Ganancia acumulada," plots the fund's accumulated gain over time as a single line — green while the fund is ahead of what's been contributed, red while it's behind, with the color switching exactly at the point it crosses zero.
-- **Per-participant tracking**: below the fund overview, every participant gets a row with their current value and % gain at a glance. Click into the Movimientos tab and pick someone from the dropdown to see their full breakdown — current value, gain in USD and COP, total contributed — plus a chart of their investment's value vs. what they put in over time, with its own independent date-range selector (separate from the fund-wide one).
-- **Movements log**: a scrollable history of every contribution and withdrawal ever recorded, filterable down to one participant.
-- **Admin panel**, gated behind a server-checked password:
-  - Register a contribution/withdrawal or a plain valuation (e.g. a weekly close with no movement), with live hints as you type — the resulting COP/USD exchange rate and the new share price/% change, so you can sanity-check a number before saving it.
-  - Add or remove participants (removing someone keeps their historical shares/movements — it just takes them off the list for new movements).
-  - Export the entire dataset to `.xlsx`, or import one back in (a full, destructive replace — meant for backups/migrations, not merging).
-- **Live TRM**: the USD/COP exchange rate shown throughout the app is fetched automatically from Colombia's Superfinanciera (via datos.gov.co), so COP figures are never stale.
-- **Mobile-friendly**: same features on a phone, with a bottom tab bar instead of a top nav, no pinch-zoom, and no iOS zoom-in-on-tap surprises when filling out a form.
-- **Self-hosted**: one Docker image (FastAPI + SQLite backend serving the built frontend) — no separate database server, no second container, no external dependency besides the TRM fetch.
+- **Fund overview** — total value and share price, each with its own % change over a range you pick (1 week to all-time), plus an accumulated-gain view colored green/red by sign.
+- **Per-participant tracking** — current value, gain in USD/COP, total contributed, and an investment-evolution chart with its own independent date range.
+- **Movements log**, filterable by participant.
+- **Admin panel** — register movements/valuations with live preview hints (TRM, resulting share price); manage participants; export/import the whole dataset as `.xlsx`.
+- **Live TRM**, fetched automatically from Colombia's Superfinanciera.
+- **Mobile-friendly** — bottom tab bar, no pinch-zoom or iOS zoom-on-tap surprises.
+- **Self-hosted**, one Docker image, no external dependency besides the TRM fetch.
 
 ---
 
@@ -192,26 +186,4 @@ volumes:
 
 > The `proxy` network must already exist (Traefik or another reverse proxy) and must be told to route to container port **8000** — this app has no built-in port publishing in this example, the proxy talks to it over the shared network. Without the `fondi-db` volume, the SQLite database is wiped every time the container is recreated.
 
----
-
-## 4. Workflow to update the app
-
-```bash
-# Edit code under src/ or backend/
-git add -A
-git commit -m "feat: description of the change"
-git push
-# The GitHub Actions workflow rebuilds the image (npm run build + pip install inside the Dockerfile)
-# Then in Portainer (or docker compose pull && docker compose up -d): pull the new image + recreate the container
-```
-
-**A plain restart/recreate is not enough to pick up a new image** — Docker won't re-fetch an already-pulled `:latest` tag on its own. Always pull explicitly (`docker compose pull`, or Portainer's "re-pull image" option) before recreating.
-
----
-
-## Notes
-
-- **TRM (exchange rate)**: fetched automatically from [datos.gov.co](https://www.datos.gov.co/resource/32sa-8pi3.json) (Superfinanciera Colombia, official TRM), with a fallback to 4000 if the fetch fails.
-- **`ADMIN_PASSWORD`**: checked server-side with `secrets.compare_digest` on every write request (no session/token — each request is validated independently). Defaults to `admin` if unset; always override it before exposing this beyond your LAN.
-- **Data model**: three append-only SQLite tables (no `UPDATE`/`DELETE` — corrections are new rows). See `CLAUDE.md` for the full schema and the share-price math.
-- **Export/Import**: `GET /api/export` streams an `.xlsx` snapshot (no auth, same as reads); `POST /api/import` replaces all data from an uploaded workbook (requires `ADMIN_PASSWORD`, destructive — confirmed client-side before firing).
+**After a new image is published, a plain restart/recreate is not enough** — Docker won't re-fetch an already-pulled `:latest` tag on its own. Pull explicitly (`docker compose pull`, or Portainer's "re-pull image" option) before recreating.
