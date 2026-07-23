@@ -8,9 +8,14 @@ Web dashboard for managing a mutual-fund-style investment pool. Shows fund value
 
 ### Desktop
 
-| Resumen | Movimientos | Admin |
-|---|---|---|
-| ![Resumen — desktop](docs/screenshots/desktop-resumen.png) | ![Movimientos — desktop](docs/screenshots/desktop-movimientos.png) | ![Admin — desktop](docs/screenshots/desktop-admin.png) |
+**Resumen**
+![Resumen — desktop](docs/screenshots/desktop-resumen.png)
+
+**Movimientos**
+![Movimientos — desktop](docs/screenshots/desktop-movimientos.png)
+
+**Admin**
+![Admin — desktop](docs/screenshots/desktop-admin.png)
 
 ### Mobile
 
