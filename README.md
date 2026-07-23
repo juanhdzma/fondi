@@ -4,6 +4,24 @@ Web dashboard for managing a mutual-fund-style investment pool. Shows fund value
 
 ---
 
+## Screenshots
+
+### Desktop
+
+| Resumen | Movimientos | Admin |
+|---|---|---|
+| ![Resumen — desktop](docs/screenshots/desktop-resumen.png) | ![Movimientos — desktop](docs/screenshots/desktop-movimientos.png) | ![Admin — desktop](docs/screenshots/desktop-admin.png) |
+
+### Mobile
+
+<p>
+  <img src="docs/screenshots/mobile-resumen.png" alt="Resumen — mobile" width="260" />
+  <img src="docs/screenshots/mobile-movimientos.png" alt="Movimientos — mobile" width="260" />
+  <img src="docs/screenshots/mobile-admin.png" alt="Admin — mobile" width="260" />
+</p>
+
+---
+
 > ## ⚠️ PRIVATE USE ONLY — NO REAL AUTH BOUNDARY
 > The Admin panel's password (`ADMIN_PASSWORD`) is checked server-side (`secrets.compare_digest`), so it isn't trivially bypassable from the browser — but there's no rate limiting, no session/token, and the read endpoints (`/api/all`, `/api/export`) require **no auth at all**: anyone who can reach the URL can read every contribution, the fund value, and each person's shares.
 >
