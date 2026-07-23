@@ -5,7 +5,7 @@ export const S = {
   participantesLog: [],
   range: '1M',
   personaRange: 'todo',
-  heroMetric: 'total',
+  heroMetric: 'ganancia',
 };
 
 export const charts = {
