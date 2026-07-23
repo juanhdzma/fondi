@@ -6,13 +6,22 @@ Web dashboard for managing a mutual-fund-style investment pool. Shows fund value
 
 ## Features
 
-- **Fund overview**: total value, share price, and their % change over a selectable range (1 week to all-time), plus an accumulated-gain view colored green/red by sign.
-- **Per-participant tracking**: each person's current value, gain (USD and COP), total contributed, and an independent investment-evolution chart with its own date range.
-- **Movements log**: full history of contributions/withdrawals, filterable by participant.
-- **Admin panel**: register movements and fund valuations with live previews (real-time TRM, resulting share price) before saving; add/remove participants; export/import all data as `.xlsx`.
-- **Live TRM (USD/COP exchange rate)**, fetched automatically from Superfinanciera via datos.gov.co.
-- **Mobile-friendly**: responsive layout, bottom tab bar, no pinch-zoom or input-focus-zoom quirks.
-- Self-hosted as a single Docker container (FastAPI + SQLite backend, static frontend, no external dependencies beyond the TRM fetch).
+### How it works
+
+The fund is modeled like a real mutual fund: every contribution or withdrawal is converted into "shares" at whatever the share price happens to be at that moment (`share price = total fund value / shares outstanding`). From then on, each participant's stake is just their share count — so if the fund grows or shrinks, everyone's value moves proportionally to how many shares they hold, without needing to manually split gains/losses. All of it — movements, valuations, participant changes — is stored as an append-only log (nothing is ever edited or deleted, only new rows added), so the full history is always auditable.
+
+### What you get
+
+- **Fund overview** (Resumen tab): total value and share price front and center, each with its own % change over a range you pick (1 week up to all-time). A third view, "Ganancia acumulada," plots the fund's accumulated gain over time as a single line — green while the fund is ahead of what's been contributed, red while it's behind, with the color switching exactly at the point it crosses zero.
+- **Per-participant tracking**: below the fund overview, every participant gets a row with their current value and % gain at a glance. Click into the Movimientos tab and pick someone from the dropdown to see their full breakdown — current value, gain in USD and COP, total contributed — plus a chart of their investment's value vs. what they put in over time, with its own independent date-range selector (separate from the fund-wide one).
+- **Movements log**: a scrollable history of every contribution and withdrawal ever recorded, filterable down to one participant.
+- **Admin panel**, gated behind a server-checked password:
+  - Register a contribution/withdrawal or a plain valuation (e.g. a weekly close with no movement), with live hints as you type — the resulting COP/USD exchange rate and the new share price/% change, so you can sanity-check a number before saving it.
+  - Add or remove participants (removing someone keeps their historical shares/movements — it just takes them off the list for new movements).
+  - Export the entire dataset to `.xlsx`, or import one back in (a full, destructive replace — meant for backups/migrations, not merging).
+- **Live TRM**: the USD/COP exchange rate shown throughout the app is fetched automatically from Colombia's Superfinanciera (via datos.gov.co), so COP figures are never stale.
+- **Mobile-friendly**: same features on a phone, with a bottom tab bar instead of a top nav, no pinch-zoom, and no iOS zoom-in-on-tap surprises when filling out a form.
+- **Self-hosted**: one Docker image (FastAPI + SQLite backend serving the built frontend) — no separate database server, no second container, no external dependency besides the TRM fetch.
 
 ---
 
