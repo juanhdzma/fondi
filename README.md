@@ -66,7 +66,7 @@ See `CLAUDE.md` for the full data model, endpoint list, and the non-obvious part
 
 ---
 
-## 1. Run locally
+## Run locally
 
 The frontend and backend run as two separate processes in development.
 
@@ -123,7 +123,7 @@ No framework on the frontend — direct DOM manipulation, split by domain and bu
 
 ---
 
-## 2. Docker
+## Docker
 
 ### Manual build
 
@@ -140,6 +140,8 @@ docker compose up -d --build
 ```
 
 Uses `docker-compose.yml` at the repo root (local build, no dependency on GHCR). Set `ADMIN_PASSWORD` in a `.env` file or export it before running — it defaults to `admin` otherwise. To rebuild after a change: `docker compose up -d --build` again; to tear it down, `docker compose down`.
+
+**Reachable from any device on your network**: the container listens on all interfaces, so once it's running you're not limited to `localhost` — find your machine's LAN IP (`ipconfig getifaddr en0` on Mac, `hostname -I` on Linux, `ipconfig` on Windows) and open `http://<that-ip>:8080` from your phone, tablet, or any other device on the same Wi-Fi. Handy given the app is mobile-friendly.
 
 ### GitHub Container Registry (GHCR)
 
@@ -161,7 +163,7 @@ GitHub → Settings → Developer settings → Personal access tokens
 
 ---
 
-## 3. Deploy with Docker Compose (Portainer)
+## Deploy with Docker Compose (Portainer)
 
 ```yaml
 services:
