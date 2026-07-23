@@ -46,6 +46,7 @@ function setTipo(tipo) {
   document.querySelector('.tipo-btn.aporte').classList.toggle('sel', tipo === 'aporte');
   document.querySelector('.tipo-btn.retiro').classList.toggle('sel', tipo === 'retiro');
   saveFormSnapshot();
+  previewMov();
 }
 
 // Safari a veces vacía los <input type="date">/<input type="time"> cuando su contenedor
@@ -146,6 +147,41 @@ async function quitarParticipante(nombre) {
   }
 }
 
+function previewTrm() {
+  const cop = parseMoneyInput(document.getElementById('f-monto-cop'));
+  const usd = parseMoneyInput(document.getElementById('f-monto'));
+  const el  = document.getElementById('hint-trm-mov');
+  if (!el) return;
+
+  if (!cop || !usd) { el.textContent = ''; return; }
+  const trm = cop / usd;
+  el.textContent = `TRM: $${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(trm)}`;
+}
+
+// Misma cuenta que submitMov() para la nueva cuota, en vivo mientras el admin escribe.
+function previewMov() {
+  const monto_usd  = parseMoneyInput(document.getElementById('f-monto'));
+  const valorFondo = parseMoneyInput(document.getElementById('f-valor-mov'));
+  const tipo       = document.getElementById('f-tipo').value;
+  const el         = document.getElementById('hint-valor-mov');
+  if (!el) return;
+
+  if (!monto_usd || !valorFondo) { el.textContent = ''; return; }
+
+  const cuotasActuales = cuotasCirc();
+  const valorAntes     = tipo === 'retiro' ? valorFondo + monto_usd : valorFondo - monto_usd;
+  const pc             = cuotasActuales > 0 ? valorAntes / cuotasActuales : 1;
+  const cuotas         = tipo === 'retiro' ? -Math.abs(monto_usd / pc) : Math.abs(monto_usd / pc);
+  const cuotasNuevas   = cuotasActuales + cuotas;
+  const pcNuevo        = cuotasNuevas > 0 ? valorFondo / cuotasNuevas : 1;
+
+  const actual = precioCuota();
+  const diff   = actual ? (pcNuevo - actual) / actual * 100 : 0;
+  const sign   = diff >= 0 ? '+' : '';
+
+  el.textContent = `Nueva cuota → $${pcNuevo.toFixed(2)} (${sign}${diff.toFixed(2)}%)`;
+}
+
 function previewFondo() {
   const val  = parseMoneyInput(document.getElementById('f-valor'));
   const circ = cuotasCirc();
@@ -200,6 +236,8 @@ async function submitMov() {
     document.getElementById('f-monto-cop').value  = '';
     document.getElementById('f-monto').value      = '';
     document.getElementById('f-valor-mov').value  = '';
+    previewTrm();
+    previewMov();
     saveFormSnapshot();
     await fetchAll();
     restoreFormSnapshot();
@@ -279,9 +317,9 @@ export function bindAdminEvents() {
   document.querySelectorAll('.tipo-btn').forEach(btn =>
     btn.addEventListener('click', () => setTipo(btn.dataset.tipo)));
 
-  document.getElementById('f-monto-cop').addEventListener('input', e => fmtMoneyInput(e.target, 0));
-  document.getElementById('f-monto').addEventListener('input', e => fmtMoneyInput(e.target, 2));
-  document.getElementById('f-valor-mov').addEventListener('input', e => fmtMoneyInput(e.target, 2));
+  document.getElementById('f-monto-cop').addEventListener('input', e => { fmtMoneyInput(e.target, 0); previewTrm(); });
+  document.getElementById('f-monto').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewTrm(); previewMov(); });
+  document.getElementById('f-valor-mov').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewMov(); });
   document.getElementById('f-valor').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewFondo(); });
   document.getElementById('f-fecha-fondo').addEventListener('input', previewFondo);
 
