@@ -145,7 +145,7 @@ Uses `docker-compose.yml` at the repo root (local build, no dependency on GHCR).
 
 ### GitHub Container Registry (GHCR)
 
-The repo includes a workflow at `.github/workflows/docker.yml` that builds and publishes the image automatically on every push to `main` that touches `index.html`, `src/**`, `package.json`, `Dockerfile`, or `backend/**`. In a couple of minutes the image lands at:
+Image to pull:
 
 ```
 ghcr.io/<user>/fondi:latest
