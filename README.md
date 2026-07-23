@@ -27,7 +27,9 @@ Modeled like a real mutual fund: every contribution/withdrawal buys "shares" at 
 
 ### Resumen
 
-Fund value and share price at a glance (screenshot above), each with its own % change over a range you pick (1 week to all-time) — plus a "Ganancia acumulada" view that plots the fund's accumulated gain over time as a single line, green while it's ahead of what's been contributed and red while behind, switching color exactly where it crosses zero. Below that, every participant's current value and % gain in one row each.
+Fund value and share price at a glance, each with its own % change over a range you pick (1 week to all-time) — plus a "Ganancia acumulada" view that plots the fund's accumulated gain over time as a single line, green while it's ahead of what's been contributed and red while behind, switching color exactly where it crosses zero. Below that, every participant's current value and % gain in one row each.
+
+![Resumen](docs/screenshots/desktop-resumen.png)
 
 ### Movimientos
 
