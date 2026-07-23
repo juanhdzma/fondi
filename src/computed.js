@@ -80,6 +80,19 @@ export function participanteColor(nombre) {
   return PARTICIPANT_COLORS[Math.max(idx, 0) % PARTICIPANT_COLORS.length];
 }
 
+// Ganancia acumulada del fondo completo en cada snapshot del historial: valor total
+// menos los aportes netos acumulados a esa fecha (mismo patrón que historialParticipante,
+// pero agregado sobre todos los movimientos en vez de uno solo).
+export function historialGananciaFondo() {
+  const movs = [...S.movimientos].sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+  return S.historial.map(h => {
+    const hasta = movs.filter(m => m.fecha <= h.fecha);
+    const aportesNetos = hasta.reduce((s, m) => s + (m.tipo === 'retiro' ? -m.monto : m.monto), 0);
+    return { fecha: h.fecha, ganancia: h.valor_total - aportesNetos };
+  });
+}
+
 // Valor de la inversión del participante y su neto invertido en cada snapshot del
 // historial del fondo, usando sus cuotas/aportes acumulados a esa fecha (no los totales actuales)
 export function historialParticipante(nombre) {

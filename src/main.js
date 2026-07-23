@@ -1,15 +1,18 @@
 import './style.css';
 import { fetchAll } from './api/backend.js';
 import { renderMovimientos } from './render/index.js';
-import { setTab, setRange, setHeroMetric } from './ui/tabs.js';
+import { setTab, setRange, setHeroMetric, setPersonaRange } from './ui/tabs.js';
 import { refreshData } from './ui/refresh.js';
 import { bindAdminEvents } from './admin.js';
 
 document.querySelectorAll('.nav-btn').forEach(btn =>
   btn.addEventListener('click', () => setTab(btn.dataset.tab)));
 
-document.querySelectorAll('.range-btn').forEach(btn =>
+document.querySelectorAll('.range-btn:not(.persona-range-btn)').forEach(btn =>
   btn.addEventListener('click', () => setRange(btn.dataset.r)));
+
+document.querySelectorAll('.persona-range-btn').forEach(btn =>
+  btn.addEventListener('click', () => setPersonaRange(btn.dataset.r)));
 
 document.querySelectorAll('.hero-tab').forEach(btn =>
   btn.addEventListener('click', () => setHeroMetric(btn.dataset.metric)));

@@ -42,6 +42,7 @@
 
     <div class="chart-card">
       <div class="hero-toggle">
+        <button class="hero-tab" data-metric="ganancia">Ganancia acumulada</button>
         <button class="hero-tab active" data-metric="total">Valor total</button>
         <button class="hero-tab" data-metric="cuota">Precio cuota</button>
       </div>
@@ -49,11 +50,11 @@
       <div class="range-btns">
         <button class="range-btn" data-r="1W"><span class="rl-full">1 semana</span><span class="rl-short">1S</span></button>
         <button class="range-btn" data-r="2W"><span class="rl-full">2 semanas</span><span class="rl-short">2S</span></button>
-        <button class="range-btn" data-r="1M"><span class="rl-full">1 mes</span><span class="rl-short">1M</span></button>
+        <button class="range-btn active" data-r="1M"><span class="rl-full">1 mes</span><span class="rl-short">1M</span></button>
         <button class="range-btn" data-r="3M"><span class="rl-full">3 meses</span><span class="rl-short">3M</span></button>
         <button class="range-btn" data-r="6M"><span class="rl-full">6 meses</span><span class="rl-short">6M</span></button>
         <button class="range-btn" data-r="1A"><span class="rl-full">1 año</span><span class="rl-short">1A</span></button>
-        <button class="range-btn active" data-r="todo">Todo</button>
+        <button class="range-btn" data-r="todo">Todo</button>
       </div>
     </div>
 
@@ -112,6 +113,15 @@
       <div class="chart-card">
         <div class="chart-header"><div class="chart-title">Evolución de tu inversión</div></div>
         <div class="chart-wrap"><canvas id="chart-persona"></canvas></div>
+        <div class="range-btns">
+          <button class="range-btn persona-range-btn" data-r="1W"><span class="rl-full">1 semana</span><span class="rl-short">1S</span></button>
+          <button class="range-btn persona-range-btn" data-r="2W"><span class="rl-full">2 semanas</span><span class="rl-short">2S</span></button>
+          <button class="range-btn persona-range-btn" data-r="1M"><span class="rl-full">1 mes</span><span class="rl-short">1M</span></button>
+          <button class="range-btn persona-range-btn" data-r="3M"><span class="rl-full">3 meses</span><span class="rl-short">3M</span></button>
+          <button class="range-btn persona-range-btn" data-r="6M"><span class="rl-full">6 meses</span><span class="rl-short">6M</span></button>
+          <button class="range-btn persona-range-btn" data-r="1A"><span class="rl-full">1 año</span><span class="rl-short">1A</span></button>
+          <button class="range-btn persona-range-btn active" data-r="todo">Todo</button>
+        </div>
       </div>
     </div>
 

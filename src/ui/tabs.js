@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { renderResumen, renderCharts } from '../render/index.js';
-import { resetLineCharts } from '../render/charts.js';
+import { resetLineCharts, renderPersonaChart } from '../render/charts.js';
 import { restoreFormSnapshot } from '../admin.js';
 
 export function setTab(tab) {
@@ -14,7 +14,7 @@ export function setTab(tab) {
 
 export function setRange(r) {
   S.range = r;
-  document.querySelectorAll('.range-btn').forEach(b => {
+  document.querySelectorAll('.range-btn:not(.persona-range-btn)').forEach(b => {
     const active = b.dataset.r === r;
     b.classList.toggle('active', active);
     if (active) b.scrollIntoView({ inline: 'nearest', block: 'nearest' });
@@ -22,6 +22,17 @@ export function setRange(r) {
   resetLineCharts();
   renderResumen();
   renderCharts();
+}
+
+export function setPersonaRange(r) {
+  S.personaRange = r;
+  document.querySelectorAll('.persona-range-btn').forEach(b => {
+    const active = b.dataset.r === r;
+    b.classList.toggle('active', active);
+    if (active) b.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  });
+  const nombre = document.getElementById('filter-persona').value;
+  if (nombre) renderPersonaChart(nombre);
 }
 
 export function setHeroMetric(metric) {

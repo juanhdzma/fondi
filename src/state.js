@@ -3,7 +3,8 @@ export const S = {
   historial: [],
   movimientos: [],
   participantesLog: [],
-  range: 'todo',
+  range: '1M',
+  personaRange: 'todo',
   heroMetric: 'total',
 };
 

@@ -1,6 +1,6 @@
 import { Chart } from 'chart.js/auto';
 import { S, charts } from '../state.js';
-import { participanteColor, historialParticipante } from '../computed.js';
+import { participanteColor, historialParticipante, historialGananciaFondo } from '../computed.js';
 import { fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort } from '../utils/dates.js';
 
@@ -17,15 +17,15 @@ function rangeCutoff(range) {
   return cutoffs[range] ?? null;
 }
 
-function filteredHistorial() {
-  const cut = rangeCutoff(S.range);
-  if (!cut) return S.historial;
-  return S.historial.filter(h => new Date(h.fecha.split('T')[0] + 'T12:00:00') >= cut);
+function filteredHistorial(range = S.range, source = S.historial) {
+  const cut = rangeCutoff(range);
+  if (!cut) return source;
+  return source.filter(h => new Date(h.fecha.split('T')[0] + 'T12:00:00') >= cut);
 }
 
-function filteredHistorialWithFill() {
-  const raw = filteredHistorial();
-  const all = S.historial;
+function filteredHistorialWithFill(range = S.range, source = S.historial) {
+  const raw = filteredHistorial(range, source);
+  const all = source;
   if (!all.length) return [];
 
   let result = [...raw];
@@ -137,14 +137,18 @@ const TT_BASE = {
   backgroundColor: '#FFFFFF',
   borderColor: '#E7E7EA',
   borderWidth: 1,
-  titleColor: '#6E6F76',
   bodyColor: '#0C0D0F',
+  footerColor: '#9AA0A6',
   padding: 12,
-  titleFont: { size: 13 },
-  bodyFont: { size: 14 },
+  bodyFont: { size: 15, weight: '700' },
+  footerFont: { size: 11, weight: '600' },
+  footerMarginTop: 4,
 };
 
-const tooltipTitle = items => items.length ? fmtTs(items[0].parsed.x) : '';
+// El precio/valor va grande en el body (arriba), la fecha chica y gris en el footer (abajo) —
+// al revés del orden default de Chart.js (title arriba, body abajo).
+const tooltipNoTitle = () => '';
+const tooltipFooterDate = items => items.length ? fmtTs(items[0].parsed.x) : '';
 
 function chartOpts(tickValues) {
   return {
@@ -157,8 +161,9 @@ function chartOpts(tickValues) {
       tooltip: {
         ...TT_BASE,
         callbacks: {
-          title: tooltipTitle,
-          label: ctx => ` $${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(ctx.parsed.y)} USD`
+          title: tooltipNoTitle,
+          label: ctx => ` $${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(ctx.parsed.y)} USD`,
+          footer: tooltipFooterDate,
         }
       }
     },
@@ -200,6 +205,53 @@ function makeDataset(points, color) {
   };
 }
 
+const GAIN_GREEN = '#17803D';
+const GAIN_RED   = '#B4231F';
+
+// Un segmento que cruza cero (empieza positivo, termina negativo o viceversa) no puede
+// pintarse con un solo color sin que parte quede del lado equivocado de la línea de 0 —
+// se inserta un punto interpolado exacto en y=0 en el cruce, así ningún segmento lo atraviesa.
+function splitAtZero(points) {
+  const result = [];
+  for (let i = 0; i < points.length; i++) {
+    result.push(points[i]);
+    const a = points[i], b = points[i + 1];
+    if (b && (a.y < 0) !== (b.y < 0)) {
+      const t = a.y / (a.y - b.y);
+      result.push({ x: a.x + (b.x - a.x) * t, y: 0, interpolated: true });
+    }
+  }
+  return result;
+}
+
+// Ganancia acumulada: verde/rojo según el signo del segmento. Si p1 es el punto interpolado
+// en y=0 (splitAtZero), su signo no dice nada — hay que mirar p0 (el extremo real) en su lugar,
+// si no un cruce ascendente (negativo → 0) se pintaba verde en vez de rojo.
+function gainSegmentColor(ctx) {
+  const y1 = ctx.p1.parsed.y;
+  const y  = y1 !== 0 ? y1 : ctx.p0.parsed.y;
+  return y >= 0 ? GAIN_GREEN : GAIN_RED;
+}
+
+function makeGananciaDataset(rawPoints) {
+  const r = pointRadiusFor(rawPoints.length);
+  const points = splitAtZero(rawPoints);
+  return {
+    data: points,
+    borderWidth: 3,
+    fill: true,
+    segment: {
+      borderColor: gainSegmentColor,
+      backgroundColor: ctx => gainSegmentColor(ctx) + '22',
+    },
+    pointRadius: ctx => ctx.raw?.interpolated ? 0 : r,
+    pointHoverRadius: ctx => ctx.raw?.interpolated ? 0 : r + 2,
+    pointBackgroundColor: ctx => (ctx.raw?.y ?? 0) >= 0 ? GAIN_GREEN : GAIN_RED,
+    pointHoverBackgroundColor: ctx => (ctx.raw?.y ?? 0) >= 0 ? GAIN_GREEN : GAIN_RED,
+    tension: 0,
+  };
+}
+
 function cuotaChartOpts(tickValues) {
   return {
     responsive: true, maintainAspectRatio: false,
@@ -213,13 +265,14 @@ function cuotaChartOpts(tickValues) {
       tooltip: {
         ...TT_BASE,
         callbacks: {
-          title: tooltipTitle,
+          title: tooltipNoTitle,
           label: ctx => {
             const v = ctx.parsed.y;
             const sign = v >= 0 ? '+' : '';
             const label = ctx.datasetIndex === 0 ? 'USD' : 'COP';
             return ` ${sign}${fmtPct(v)}% ${label}`;
-          }
+          },
+          footer: tooltipFooterDate,
         }
       }
     },
@@ -244,6 +297,11 @@ function periodPct(data, key) {
   return s > 0 ? (e - s) / s * 100 : null;
 }
 
+const RANGE_LABELS = {
+  '1W': '1 semana', '2W': '2 semanas', '1M': '1 mes',
+  '3M': '3 meses', '6M': '6 meses', '1A': '1 año', 'todo': 'todo el periodo',
+};
+
 export function renderCharts() {
   const data = filteredHistorialWithFill();
   if (!data.length) return;
@@ -267,6 +325,10 @@ export function renderCharts() {
   const pctUSDPoints = data.map((h, i) => ({ x: ts[i], y: (h.precio_cuota / base0 - 1) * 100 }));
   const pctCOPPoints = data.map((h, i) => ({ x: ts[i], y: (h.precio_cuota * (h.trm || S.trm || 1) / baseCOP0 - 1) * 100 }));
 
+  // ── Ganancia acumulada del fondo — misma serie de fechas que `data`, filtrada/rellenada igual ──
+  const gananciaData = filteredHistorialWithFill(S.range, historialGananciaFondo());
+  const gananciaPoints = gananciaData.map((h, i) => ({ x: ts[i], y: h.ganancia }));
+
   // ── Chart hero: un solo canvas, cambia según S.heroMetric ──
   const metric = S.heroMetric;
   if (charts.hero && charts.heroMetric !== metric) { charts.hero.destroy(); charts.hero = null; }
@@ -286,6 +348,18 @@ export function renderCharts() {
         options: cuotaChartOpts(tickValues),
       });
     }
+  } else if (metric === 'ganancia') {
+    if (charts.hero) {
+      charts.hero.data.datasets[0].data = splitAtZero(gananciaPoints);
+      charts.hero.options.scales.x = xAxis(tickValues);
+      charts.hero.update('none');
+    } else {
+      charts.hero = new Chart(document.getElementById('chart-hero'), {
+        type: 'line',
+        data: { datasets: [makeGananciaDataset(gananciaPoints)] },
+        options: chartOpts(tickValues),
+      });
+    }
   } else {
     if (charts.hero) {
       charts.hero.data.datasets[0].data = totalPoints;
@@ -302,11 +376,12 @@ export function renderCharts() {
   charts.heroMetric = metric;
 
   // ── Deltas de las tarjetas fijas: siempre sobre el rango seleccionado ──
+  const periodLabel = RANGE_LABELS[S.range] || '';
   const setChg = (id, pct) => {
     const el = document.getElementById(id);
     if (!el) return;
     if (pct === null) { el.textContent = ''; el.className = 'stat-chg'; return; }
-    el.textContent = `${signStr(pct)}${fmtPct(Math.abs(pct))}%`;
+    el.innerHTML = `${signStr(pct)}${fmtPct(Math.abs(pct))}%<span class="stat-chg-period"> · ${periodLabel}</span>`;
     el.className = `stat-chg ${pct > 0 ? 'pos' : pct < 0 ? 'neg' : 'muted'}`;
   };
   setChg('stat-fondo-chg', periodPct(data, 'valor_total'));
@@ -315,6 +390,41 @@ export function renderCharts() {
 
 export function resetLineCharts() {
   if (charts.hero) { charts.hero.destroy(); charts.hero = null; charts.heroMetric = null; }
+}
+
+// ── Tooltip HTML custom: solo el label ("Valor actual"/"Invertido") en negrilla, el monto no —
+// el tooltip nativo de Chart.js no permite mezclar pesos de fuente dentro de una misma línea.
+function getPersonaTooltipEl() {
+  let el = document.getElementById('persona-tooltip');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'persona-tooltip';
+    Object.assign(el.style, {
+      position: 'absolute', pointerEvents: 'none', zIndex: '50',
+      background: '#FFFFFF', border: '1px solid #E7E7EA', borderRadius: '10px',
+      padding: '10px 12px', fontSize: '14px', color: '#0C0D0F',
+      boxShadow: '0 4px 14px rgba(16,24,40,.1)', transition: 'opacity .1s ease',
+      transform: 'translate(-50%, -110%)', opacity: '0',
+    });
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function personaTooltipHandler({ chart, tooltip }) {
+  const el = getPersonaTooltipEl();
+  if (tooltip.opacity === 0) { el.style.opacity = '0'; return; }
+
+  const fmtUsd = v => '$' + new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+  const lines = tooltip.dataPoints.map(dp => `<div><b>${dp.dataset.label}</b>: ${fmtUsd(dp.parsed.y)} USD</div>`).join('');
+  const date  = tooltip.dataPoints.length ? fmtTs(tooltip.dataPoints[0].parsed.x) : '';
+
+  el.innerHTML = `${lines}<div style="color:#9AA0A6;font-size:11px;font-weight:600;margin-top:4px">${date}</div>`;
+
+  const rect = chart.canvas.getBoundingClientRect();
+  el.style.opacity = '1';
+  el.style.left = `${rect.left + window.scrollX + tooltip.caretX}px`;
+  el.style.top = `${rect.top + window.scrollY + tooltip.caretY}px`;
 }
 
 // ── Línea: valor actual vs. invertido de un participante en el tiempo (tab Movimientos) ──
@@ -328,13 +438,7 @@ function personaChartOpts(tickValues) {
         display: true, position: 'bottom',
         labels: { color: '#6E6F76', font: { size: 14 }, padding: 14, usePointStyle: true },
       },
-      tooltip: {
-        ...TT_BASE,
-        callbacks: {
-          title: tooltipTitle,
-          label: ctx => ` ${ctx.dataset.label}: $${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(ctx.parsed.y)} USD`
-        }
-      }
+      tooltip: { enabled: false, external: personaTooltipHandler },
     },
     scales: {
       x: xAxis(tickValues),
@@ -351,10 +455,18 @@ function personaChartOpts(tickValues) {
 }
 
 export function renderPersonaChart(nombre) {
-  const data = historialParticipante(nombre);
+  const raw = historialParticipante(nombre);
+  const data = filteredHistorialWithFill(S.personaRange, raw);
   if (!data.length) { resetPersonaChart(); return; }
 
-  const ts = data.map(h => toTs(h.fecha));
+  // Mismo clamp que el chart hero: el primer punto (posible backward-fill) no arranca
+  // en su fecha real si esta cae fuera del rango visible.
+  const cutoff = rangeCutoff(S.personaRange);
+  const cutoffTs = cutoff ? cutoff.getTime() : null;
+  const ts = data.map((h, i) => {
+    const t = toTs(h.fecha);
+    return (i === 0 && cutoffTs != null && t < cutoffTs) ? cutoffTs : t;
+  });
   const valorPoints = data.map((h, i) => ({ x: ts[i], y: h.valor }));
   const invertidoPoints = data.map((h, i) => ({ x: ts[i], y: h.invertido }));
   const color = participanteColor(nombre);
@@ -373,4 +485,5 @@ export function renderPersonaChart(nombre) {
 
 export function resetPersonaChart() {
   if (charts.persona) { charts.persona.destroy(); charts.persona = null; }
+  document.getElementById('persona-tooltip')?.remove();
 }
