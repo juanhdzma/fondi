@@ -5,6 +5,13 @@ import { setTab, setRange, setHeroMetric, setPersonaRange } from './ui/tabs.js';
 import { refreshData } from './ui/refresh.js';
 import { bindAdminEvents } from './admin.js';
 
+// Refuerzo para pinch-zoom: Safari dispara sus propios eventos 'gesture*' para el gesto de
+// pellizco por fuera del control de touch-action, y algunos Android antiguos no respetan
+// touch-action en absoluto — se bloquea también a mano vía multi-touch en touchmove.
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
 document.querySelectorAll('.nav-btn').forEach(btn =>
   btn.addEventListener('click', () => setTab(btn.dataset.tab)));
 

@@ -24,6 +24,16 @@
   --shadow: 0 1px 2px rgba(16,24,40,.03);
 }
 
+html, body {
+  /* "manipulation" es shorthand de "pan-x pan-y pinch-zoom" menos double-tap — SÍ permite pinch.
+     Para bloquear pinch de verdad hay que omitirlo de la lista permitida. */
+  touch-action: pan-x pan-y;
+}
+
+/* Scrollbar oculta, el scroll sigue funcionando igual */
+html { scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar { display: none; }
+
 body {
   font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
   font-size: 16px;
@@ -385,6 +395,8 @@ button, input, select { font: inherit; }
   /* backdrop-filter crea containing block para hijos position:fixed — rompería el tab bar inferior */
   .header { padding: 8px 14px; backdrop-filter: none; }
   .main { padding: 14px 14px calc(84px + env(safe-area-inset-bottom)); }
+  /* iOS hace zoom automático al enfocar un input con font-size < 16px */
+  .form-input, .input-base { font-size: 16px; }
   .chart-header { flex-wrap: wrap; gap: 8px; }
   .range-btn { padding: 5px 9px; font-size: 12px; min-height: 28px; }
   .p-summary-grid { grid-template-columns: repeat(2, 1fr); gap: 14px 0; }
