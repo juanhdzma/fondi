@@ -70,7 +70,7 @@ src/
   computed.js            Derived state (share price, shares per participant, ...)
   admin.js                 Admin panel: auth, forms, movement/valuation submission
   style.css
-  api/backend.js       fetchAll/postMovimiento/postFondo/postParticipante — all I/O
+  api/backend.js       fetchAll/postMovimiento/postFondo/postParticipante/exportUrl/postImportXlsx — all I/O
   utils/                Formatters, dates, money inputs
   render/               One module per UI section (summary, movements, charts)
   ui/                   Tabs, chart date range, error banner, refresh
