@@ -26,7 +26,7 @@ docker build -t fondi .
 docker run -p 8080:8000 -e ADMIN_PASSWORD=whatever -v fondi-db:/data fondi
 ```
 
-There's no linter configured for the frontend. The backend has `pytest` (see `backend/tests/`). The only "CI" is `.github/workflows/docker.yml`, which on every push to `main` that touches `index.html`, `src/**`, `package.json`, `Dockerfile`, or `backend/**` builds and publishes the single image to `ghcr.io/<user>/fondi:latest`.
+There's no linter configured for the frontend. The backend has `pytest` (see `backend/tests/`). The only "CI" is `.github/workflows/docker.yml`, which on every push to `main` that touches `index.html`, `src/**`, `public/**`, `package.json`, `Dockerfile`, or `backend/**` builds and publishes the single image to `ghcr.io/<user>/fondi:latest` (also runnable manually via `workflow_dispatch`).
 
 To test changes without hitting the real backend, set `MOCK_MODE = true` in `src/config.js` — it uses `MOCK_HISTORIAL`/`MOCK_MOVIMIENTOS`/`MOCK_PARTICIPANTES_LOG` instead of calling `/api/all`.
 
