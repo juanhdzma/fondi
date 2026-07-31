@@ -11,6 +11,11 @@ SHEET_COLUMNS = {
 
 TEXT_COLUMNS = {"fecha", "persona", "tipo", "nombre", "accion"}
 
+ENUM_COLUMNS = {
+    "tipo": {"aporte", "retiro"},
+    "accion": {"agregar", "quitar"},
+}
+
 # Acepta tanto nuestro propio formato de export (columnas = nombres de la tabla) como los
 # nombres de columna del Google Sheet original que reemplaza esta DB (p.ej. "valor_total_usd",
 # "valor_pesos") — así el mismo importador sirve tanto para restaurar un backup como para
@@ -74,6 +79,27 @@ class InvalidWorkbook(Exception):
     pass
 
 
+# El import reemplaza toda la DB: una celda con "aporte " o "Aporte" se normaliza, pero
+# cualquier otra cosa se rechaza en vez de entrar y romper la matemática de cuotas en silencio.
+def _to_enum(value, col, sheet_name, fila):
+    valor = str(value).strip().lower() if value is not None else ""
+    if valor not in ENUM_COLUMNS[col]:
+        opciones = " / ".join(sorted(ENUM_COLUMNS[col]))
+        raise InvalidWorkbook(
+            f"{sheet_name} fila {fila}: '{col}' es '{value}' y solo acepta {opciones}"
+        )
+    return valor
+
+
+def _to_float(value, col, sheet_name, fila):
+    if value is None:
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise InvalidWorkbook(f"{sheet_name} fila {fila}: '{col}' no es un número ('{value}')") from None
+
+
 def parse_workbook(content: bytes):
     try:
         wb = load_workbook(BytesIO(content), data_only=True)
@@ -94,7 +120,7 @@ def parse_workbook(content: bytes):
         # Para cada columna canónica, qué nombre de columna real trae este archivo (si trae alguno).
         source = {col: next((a for a in alts if a in header_set), None) for col, alts in aliases.items()}
 
-        for raw in rows[1:]:
+        for n, raw in enumerate(rows[1:], start=2):
             if raw is None or all(v is None for v in raw):
                 continue
             record = dict(zip(header, raw))
@@ -105,9 +131,11 @@ def parse_workbook(content: bytes):
                 value = record.get(source[col]) if source[col] else None
                 if col == "fecha":
                     item[col] = _to_fecha_str(value)
+                elif col in ENUM_COLUMNS:
+                    item[col] = _to_enum(value, col, sheet_name, n)
                 elif col in TEXT_COLUMNS:
                     item[col] = str(value).strip() if value is not None else ""
                 else:
-                    item[col] = float(value) if value is not None else 0.0
+                    item[col] = _to_float(value, col, sheet_name, n)
             parsed[sheet_name].append(item)
     return parsed

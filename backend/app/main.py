@@ -1,16 +1,18 @@
 import os
 import secrets
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .db import get_conn, init_db, replace_all
 from .xlsx import InvalidWorkbook, build_workbook, parse_workbook
+
+FECHA_RE = r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?$"
 
 # Default "admin" a propósito: uso familiar sin auth real de por sí (ver README), la
 # prioridad es que la app no quede inutilizable si a alguien se le olvida setear la env var.
@@ -48,22 +50,23 @@ def require_admin(x_admin_key: str = Header(default="")):
 
 
 class Fondo(BaseModel):
-    fecha: str
-    valor_total_usd: float
-    precio_cuota_usd: float
-    cuotas_en_circulacion: float
-    trm: float
+    fecha: str = Field(pattern=FECHA_RE)
+    # ge=0 y no gt=0: un retiro total deja el fondo en 0 con 0 cuotas, y eso es válido.
+    valor_total_usd: float = Field(ge=0)
+    precio_cuota_usd: float = Field(gt=0)
+    cuotas_en_circulacion: float = Field(ge=0)
+    trm: float = Field(ge=0)
 
 
 class Movimiento(BaseModel):
-    fecha: str
-    persona: str
-    tipo: str
-    monto_usd: float
-    precio_cuota_dia: float
+    fecha: str = Field(pattern=FECHA_RE)
+    persona: str = Field(min_length=1)
+    tipo: Literal["aporte", "retiro"]
+    monto_usd: float = Field(gt=0)
+    precio_cuota_dia: float = Field(gt=0)
     cuotas: float
-    monto_cop: float
-    trm_dia: float
+    monto_cop: float = Field(ge=0)
+    trm_dia: float = Field(ge=0)
     # Valuación del fondo que resulta de este movimiento. Va en el mismo request para que
     # ambas filas entren en una sola transacción: un movimiento sin su valuación cambia las
     # cuotas en circulación dejando el precio de cuota viejo, y todos los porcentajes de
@@ -72,9 +75,9 @@ class Movimiento(BaseModel):
 
 
 class Participante(BaseModel):
-    fecha: str
-    nombre: str
-    accion: str
+    fecha: str = Field(pattern=FECHA_RE)
+    nombre: str = Field(min_length=1)
+    accion: Literal["agregar", "quitar"]
 
 
 @app.get("/api/health")

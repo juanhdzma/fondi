@@ -200,3 +200,81 @@ def test_movimiento_con_fondo_es_atomico(client):
     data = client.get("/api/all").json()
     assert len(data["movimientos"]) == 1
     assert len(data["historial"]) == 1
+
+
+def test_movimiento_con_fondo_invalido_no_guarda_nada(client):
+    payload = {
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {
+            "fecha": "no-es-fecha", "valor_total_usd": 100, "precio_cuota_usd": 1.0,
+            "cuotas_en_circulacion": 100, "trm": 3300,
+        },
+    }
+    r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
+    assert r.status_code == 422
+
+    data = client.get("/api/all").json()
+    assert data["movimientos"] == []
+    assert data["historial"] == []
+
+
+@pytest.mark.parametrize("campo,valor", [
+    ("tipo", "regalo"),
+    ("monto_usd", -100),
+    ("monto_usd", 0),
+    ("fecha", "10/01/2026"),
+    ("persona", ""),
+])
+def test_movimiento_rechaza_datos_invalidos(client, campo, valor):
+    payload = {
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+    }
+    payload[campo] = valor
+
+    r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
+    assert r.status_code == 422
+    assert client.get("/api/all").json()["movimientos"] == []
+
+
+def test_participante_rechaza_accion_desconocida(client):
+    r = client.post("/api/participante", headers={"X-Admin-Key": "s3cret"},
+                    json={"fecha": "2026-01-10T00:00", "nombre": "Patico", "accion": "borrar"})
+    assert r.status_code == 422
+
+
+def test_retiro_total_deja_el_fondo_en_cero(client):
+    payload = {
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "retiro",
+        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": -100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {
+            "fecha": "2026-01-10T00:00", "valor_total_usd": 0, "precio_cuota_usd": 1.0,
+            "cuotas_en_circulacion": 0, "trm": 3300,
+        },
+    }
+    r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
+    assert r.status_code == 201
+
+
+def test_import_normaliza_tipo_y_rechaza_valores_desconocidos(client):
+    ok = _xlsx_bytes({"movimientos": [
+        ["fecha", "persona", "tipo", "monto", "precio_cuota_dia", "cuotas", "monto_cop", "trm_dia"],
+        ["2026-01-10", "Patico", " Aporte ", 100, 1.0, 100, 330000, 3300],
+    ]})
+    r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                    files={"file": ("data.xlsx", ok, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200
+    assert client.get("/api/all").json()["movimientos"][0]["tipo"] == "aporte"
+
+    malo = _xlsx_bytes({"movimientos": [
+        ["fecha", "persona", "tipo", "monto", "precio_cuota_dia", "cuotas", "monto_cop", "trm_dia"],
+        ["2026-01-10", "Patico", "regalo", 100, 1.0, 100, 330000, 3300],
+    ]})
+    r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                    files={"file": ("data.xlsx", malo, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 400
+    assert "fila 2" in r.json()["detail"]
+
+    # El import inválido no debe haber borrado lo que ya estaba.
+    assert len(client.get("/api/all").json()["movimientos"]) == 1
