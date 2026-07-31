@@ -1,11 +1,12 @@
 import { API_BASE_URL } from './config.js';
 import { S } from './state.js';
-import { cuotasCirc, precioCuota, participantesActivos } from './computed.js';
+import { cuotasCirc, precioCuota, participantesActivos, latest } from './computed.js';
 import { calcularCuotas } from './domain/cuotas.js';
 import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx } from './api/backend.js';
 import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
 import { todayLocal } from './utils/dates.js';
 import { esc } from './utils/html.js';
+import { fmtN } from './utils/format.js';
 import { showToast } from './ui/toast.js';
 
 let adminKey = '';
@@ -88,7 +89,29 @@ function initAdminForms() {
   saveFormSnapshot();
 }
 
+// El front deriva las cuotas de la suma de movimientos, pero historial_fondo guarda su
+// propia columna cuotas_circ. Un import con historial completo y movimientos incompletos
+// hace divergir las dos fuentes y todos los porcentajes por participante quedan mal —
+// sin este aviso la diferencia solo se nota meses después.
+function renderConsistencyCheck() {
+  const el = document.getElementById('admin-check');
+  if (!el) return;
+
+  const ultima = latest();
+  const suma   = cuotasCirc();
+  const diff   = ultima ? Math.abs(suma - ultima.cuotas_circ) : 0;
+
+  if (!ultima || diff <= 0.01) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+  el.style.display = 'block';
+  el.innerHTML = `<b>Datos inconsistentes.</b> Los movimientos suman ${fmtN(suma, 2)} cuotas,
+    pero la última valuación registra ${fmtN(ultima.cuotas_circ, 2)}
+    (diferencia de ${fmtN(diff, 2)}). Los porcentajes por participante no son confiables
+    hasta que cuadren — revisá el histórico importado.`;
+}
+
 export function renderAdminParticipants() {
+  renderConsistencyCheck();
   const nombres = participantesActivos();
 
   const sel = document.getElementById('f-persona');
@@ -247,6 +270,7 @@ async function submitMov() {
     saveFormSnapshot();
     await fetchAll();
     restoreFormSnapshot();
+    renderConsistencyCheck();
     showToast('Guardado');
   } catch (err) {
     setStatus(st, 'err', err.message);
@@ -300,6 +324,7 @@ async function submitFondo() {
     saveFormSnapshot();
     await fetchAll();
     restoreFormSnapshot();
+    renderConsistencyCheck();
     showToast('Actualizado');
   } catch (err) {
     setStatus(st, 'err', err.message);

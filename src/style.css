@@ -290,6 +290,11 @@ button, input, select { font: inherit; }
 .btn-green { background: var(--accent); color: #FFFFFF; box-shadow: 0 4px 12px rgba(12,36,59,.25); }
 .btn-dim { background: var(--divider); color: var(--text); }
 .admin-content { display: flex; flex-direction: column; gap: 16px; }
+.admin-check {
+  background: var(--red-dim); border-radius: 14px; padding: 14px 16px;
+  color: var(--red); font-size: 13px; line-height: 1.5;
+}
+.admin-check b { font-weight: 700; }
 
 /* ── Tipo toggle ── */
 .tipo-toggle { display: flex; gap: 8px; }
