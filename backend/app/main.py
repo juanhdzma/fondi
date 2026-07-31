@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 from contextlib import asynccontextmanager
@@ -12,6 +13,14 @@ from pydantic import BaseModel, Field
 from .db import get_conn, init_db, replace_all
 from .xlsx import InvalidWorkbook, build_workbook, parse_workbook
 
+# uvicorn solo configura handlers para sus propios loggers: sin esto el logger raíz se queda
+# en WARNING y los INFO de cada escritura no salen por ningún lado.
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+log = logging.getLogger("fondi")
+
 FECHA_RE = r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?$"
 
 # Default "admin" a propósito: uso familiar sin auth real de por sí (ver README), la
@@ -23,7 +32,9 @@ STATIC_DIR = os.environ.get("STATIC_DIR", os.path.join(os.path.dirname(__file__)
 # se usa; en `npm run dev` el frontend corre en :8080 y este backend en :8000 — orígenes
 # distintos, así que el browser exige CORS (incluye preflight OPTIONS por el header
 # X-Admin-Key). Sin esto, cualquier POST del panel admin falla en dev.
-ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",")]
+# Vacío = ningún origen cruzado permitido (el caso de prod, mismo origen). Sin el filtro,
+# ALLOWED_ORIGINS="" dejaba la lista en [""], que es lo mismo pero por accidente.
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 
 
 @asynccontextmanager
@@ -129,6 +140,11 @@ def post_movimiento(m: Movimiento):
         if m.fondo is not None:
             _insert_fondo(conn, m.fondo)
 
+    log.info(
+        "movimiento persona=%s tipo=%s monto_usd=%s cuotas=%.4f fecha=%s valuacion=%s",
+        m.persona, m.tipo, m.monto_usd, m.cuotas, m.fecha,
+        m.fondo.valor_total_usd if m.fondo else "sin",
+    )
     return {"ok": True}
 
 
@@ -137,6 +153,10 @@ def post_fondo(f: Fondo):
     with get_conn() as conn:
         _insert_fondo(conn, f)
 
+    log.info(
+        "valuacion valor_total=%s precio_cuota=%.6f cuotas_circ=%.4f fecha=%s",
+        f.valor_total_usd, f.precio_cuota_usd, f.cuotas_en_circulacion, f.fecha,
+    )
     return {"ok": True}
 
 
@@ -147,6 +167,8 @@ def post_participante(p: Participante):
             "INSERT INTO participantes_config (fecha, nombre, accion) VALUES (?, ?, ?)",
             (p.fecha, p.nombre, p.accion),
         )
+
+    log.info("participante nombre=%s accion=%s fecha=%s", p.nombre, p.accion, p.fecha)
     return {"ok": True}
 
 
@@ -170,7 +192,10 @@ async def import_xlsx(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(exc))
 
     replace_all(parsed["historial_fondo"], parsed["movimientos"], parsed["participantes_config"])
-    return {"ok": True, "counts": {k: len(v) for k, v in parsed.items()}}
+
+    counts = {k: len(v) for k, v in parsed.items()}
+    log.warning("import destructivo aplicado archivo=%s counts=%s", file.filename, counts)
+    return {"ok": True, "counts": counts}
 
 
 # Sirve el build de Vite (dist/) — montado al final para que las rutas /api/* de arriba

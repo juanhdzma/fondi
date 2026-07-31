@@ -6,6 +6,8 @@ services:
       - "8080:8000"
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      # En prod front y back son el mismo origen, así que no hace falta abrir CORS a nadie.
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
     volumes:
       - fondi-db:/data
     restart: unless-stopped

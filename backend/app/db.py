@@ -40,8 +40,9 @@ CREATE TABLE IF NOT EXISTS participantes_config (
 
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 10000")
     try:
         yield conn
         conn.commit()
@@ -51,6 +52,7 @@ def get_conn():
 
 def init_db():
     with get_conn() as conn:
+        conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
 
 
