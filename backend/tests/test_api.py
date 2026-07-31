@@ -1,6 +1,6 @@
 import importlib
 import io
-import os
+import sqlite3
 
 import pytest
 from fastapi.testclient import TestClient
@@ -278,3 +278,24 @@ def test_import_normaliza_tipo_y_rechaza_valores_desconocidos(client):
 
     # El import inválido no debe haber borrado lo que ya estaba.
     assert len(client.get("/api/all").json()["movimientos"]) == 1
+
+
+def test_import_hace_backup_de_la_db(client, tmp_path):
+    client.post("/api/participante", headers={"X-Admin-Key": "s3cret"},
+                json={"fecha": "2026-01-01T00:00", "nombre": "Viejo", "accion": "agregar"})
+
+    content = _xlsx_bytes({"participantes_config": [
+        ["fecha", "nombre", "accion"],
+        ["2026-01-10", "Nuevo", "agregar"],
+    ]})
+    r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                    files={"file": ("data.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200
+
+    backups = list(tmp_path.glob("test.db.*.bak"))
+    assert len(backups) == 1
+
+    viejo = sqlite3.connect(backups[0])
+    nombres = [row[0] for row in viejo.execute("SELECT nombre FROM participantes_config")]
+    viejo.close()
+    assert nombres == ["Viejo"]

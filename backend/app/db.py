@@ -1,8 +1,11 @@
+import datetime as dt
+import glob
 import os
 import sqlite3
 from contextlib import contextmanager
 
 DB_PATH = os.environ.get("DB_PATH", "/data/fondi.db")
+BACKUPS_TO_KEEP = 5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS historial_fondo (
@@ -51,7 +54,32 @@ def init_db():
         conn.executescript(SCHEMA)
 
 
+# El import es destructivo y el modelo es append-only (no hay UPDATE/DELETE para deshacer
+# a mano): sin esta copia, importar el archivo equivocado es pérdida total de la historia.
+def backup_db():
+    if not os.path.isfile(DB_PATH):
+        return None
+
+    stamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+    destino = f"{DB_PATH}.{stamp}.bak"
+    with get_conn() as conn:
+        destino_conn = sqlite3.connect(destino)
+        try:
+            conn.backup(destino_conn)
+        finally:
+            destino_conn.close()
+
+    for viejo in sorted(glob.glob(f"{DB_PATH}.*.bak"))[:-BACKUPS_TO_KEEP]:
+        try:
+            os.remove(viejo)
+        except OSError:
+            pass
+
+    return destino
+
+
 def replace_all(historial, movimientos, participantes_config):
+    backup_db()
     with get_conn() as conn:
         conn.execute("DELETE FROM historial_fondo")
         conn.execute("DELETE FROM movimientos")
