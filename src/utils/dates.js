@@ -1,3 +1,9 @@
+// Fecha de hoy en hora LOCAL. Con toISOString() se obtiene la fecha en UTC: en Colombia
+// (GMT-5) después de las 19:00 eso ya es el día siguiente, y todo quedaba fechado mañana.
+export function todayLocal(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // Normaliza cualquier formato de fecha del Sheet → YYYY-MM-DD o YYYY-MM-DDTHH:MM
 export function normDate(s) {
   if (!s) return '';

@@ -2,7 +2,7 @@ import { Chart } from 'chart.js/auto';
 import { S, charts } from '../state.js';
 import { participanteColor, historialParticipante, historialGananciaFondo } from '../computed.js';
 import { fmtPct, signStr } from '../utils/format.js';
-import { fmtDateShort } from '../utils/dates.js';
+import { fmtDateShort, todayLocal } from '../utils/dates.js';
 
 function rangeCutoff(range) {
   const now = new Date();
@@ -42,7 +42,7 @@ function filteredHistorialWithFill(range = S.range, source = S.historial) {
   }
 
   // Forward fill: extender hasta hoy con el último valor conocido (línea plana)
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayLocal();
   const last = result[result.length - 1];
   if (last && last.fecha.split('T')[0] < today) {
     result.push({ ...last, fecha: today });

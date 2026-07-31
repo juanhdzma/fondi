@@ -3,6 +3,7 @@ import { S } from './state.js';
 import { cuotasCirc, precioCuota, participantesActivos } from './computed.js';
 import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx } from './api/backend.js';
 import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
+import { todayLocal } from './utils/dates.js';
 import { showToast } from './ui/toast.js';
 
 let adminKey = '';
@@ -14,7 +15,7 @@ function setStatus(el, cls, msg) {
 
 function nowLocal() {
   const now  = new Date();
-  const date = now.toISOString().split('T')[0];
+  const date = todayLocal(now);
   const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   return { date, time, iso: `${date}T${time}` };
 }
