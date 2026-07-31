@@ -4,6 +4,7 @@ import { cuotasCirc, precioCuota, participantesActivos } from './computed.js';
 import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx } from './api/backend.js';
 import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
 import { todayLocal } from './utils/dates.js';
+import { esc } from './utils/html.js';
 import { showToast } from './ui/toast.js';
 
 let adminKey = '';
@@ -100,8 +101,8 @@ export function renderAdminParticipants() {
     list.innerHTML = nombres.length
       ? nombres.map(n => `
         <div class="participant-row">
-          <span>${n}</span>
-          <button type="button" class="btn-remove-participant" data-nombre="${n}" title="Quitar" aria-label="Quitar a ${n}">✕</button>
+          <span>${esc(n)}</span>
+          <button type="button" class="btn-remove-participant" data-nombre="${esc(n)}" title="Quitar" aria-label="Quitar a ${esc(n)}">✕</button>
         </div>`).join('')
       : '<div class="form-hint">Sin participantes — agrega el primero abajo.</div>';
   }

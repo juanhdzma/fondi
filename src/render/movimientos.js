@@ -2,6 +2,7 @@ import { S } from '../state.js';
 import { participantesTodos, calcParticipante, participanteColor } from '../computed.js';
 import { fmt, fmtPct, COP, signStr } from '../utils/format.js';
 import { fmtDate } from '../utils/dates.js';
+import { esc } from '../utils/html.js';
 import { renderPersonaChart, resetPersonaChart } from './charts.js';
 
 function populateFiltroPersona() {
@@ -9,7 +10,7 @@ function populateFiltroPersona() {
   const current = sel.value;
   const nombres = participantesTodos();
   sel.innerHTML = '<option value="">Todos los participantes</option>' +
-    nombres.map(n => `<option${n === current ? ' selected' : ''}>${n}</option>`).join('');
+    nombres.map(n => `<option value="${esc(n)}"${n === current ? ' selected' : ''}>${esc(n)}</option>`).join('');
 }
 
 const fmtCOP = n => n ? '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(n) : '—';
@@ -21,8 +22,8 @@ function renderPersonaPanel(nombre) {
 
   document.getElementById('mov-persona-summary').innerHTML = `
     <div class="p-head" style="margin-bottom:18px">
-      <div class="p-avatar" style="background:${color}">${p.nombre.charAt(0).toUpperCase()}</div>
-      <div class="p-name">${p.nombre}</div>
+      <div class="p-avatar" style="background:${color}">${esc(p.nombre.charAt(0).toUpperCase())}</div>
+      <div class="p-name">${esc(p.nombre)}</div>
     </div>
     <div class="p-summary-grid">
       <div>
@@ -71,11 +72,11 @@ export function renderMovimientos() {
   list.innerHTML = movs.map(m => `
     <li class="mov-card">
       <div class="mov-who">
-        <div class="mov-persona">${m.persona}</div>
+        <div class="mov-persona">${esc(m.persona)}</div>
         <div class="mov-fecha">${fmtDate(m.fecha)}</div>
       </div>
       <div class="mov-figures">
-        <div class="mov-monto"><span class="badge badge-${m.tipo}">${m.tipo}</span>${fmt(m.monto)} USD</div>
+        <div class="mov-monto"><span class="badge badge-${esc(m.tipo)}">${esc(m.tipo)}</span>${fmt(m.monto)} USD</div>
         <div class="mov-meta">${fmtCOP(m.monto_cop)} COP · TRM ${m.trm_dia ? fmtCOP(m.trm_dia) : '—'}</div>
       </div>
     </li>`).join('');

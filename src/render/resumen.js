@@ -2,6 +2,7 @@ import { S } from '../state.js';
 import { PARTICIPANT_COLORS } from '../config.js';
 import { latest, calcParticipante, participantesTodos, participantesActivos, cuotasCirc } from '../computed.js';
 import { fmt, fmtPct, fmtN, COP, signStr } from '../utils/format.js';
+import { esc } from '../utils/html.js';
 
 export function renderResumen() {
   const l = latest();
@@ -61,9 +62,9 @@ export function renderResumen() {
 
     return `
     <div class="p-row">
-      <div class="p-avatar" style="background:${tone}">${inicial}</div>
+      <div class="p-avatar" style="background:${tone}">${esc(inicial)}</div>
       <div class="p-main">
-        <div class="p-name">${p.nombre}</div>
+        <div class="p-name">${esc(p.nombre)}</div>
         <div class="p-bar-row">
           <div class="p-bar"><span style="width:${pctFondo.toFixed(1)}%;background:${tone}"></span></div>
           <span class="p-pct">${pctFondo.toFixed(0)}%</span>
