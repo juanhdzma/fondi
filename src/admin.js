@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config.js';
 import { S } from './state.js';
 import { cuotasCirc, precioCuota, participantesActivos } from './computed.js';
+import { calcularCuotas } from './domain/cuotas.js';
 import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx } from './api/backend.js';
 import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
 import { todayLocal } from './utils/dates.js';
@@ -171,18 +172,15 @@ function previewMov() {
 
   if (!monto_usd || !valorFondo) { el.textContent = ''; return; }
 
-  const cuotasActuales = cuotasCirc();
-  const valorAntes     = tipo === 'retiro' ? valorFondo + monto_usd : valorFondo - monto_usd;
-  const pc             = cuotasActuales > 0 ? valorAntes / cuotasActuales : 1;
-  const cuotas         = tipo === 'retiro' ? -Math.abs(monto_usd / pc) : Math.abs(monto_usd / pc);
-  const cuotasNuevas   = cuotasActuales + cuotas;
-  const pcNuevo        = cuotasNuevas > 0 ? valorFondo / cuotasNuevas : 1;
+  const { precioDespues } = calcularCuotas({
+    tipo, monto: monto_usd, valorFondo, cuotasActuales: cuotasCirc(),
+  });
 
   const actual = precioCuota();
-  const diff   = actual ? (pcNuevo - actual) / actual * 100 : 0;
+  const diff   = actual ? (precioDespues - actual) / actual * 100 : 0;
   const sign   = diff >= 0 ? '+' : '';
 
-  el.textContent = `Nueva cuota → $${pcNuevo.toFixed(2)} (${sign}${diff.toFixed(2)}%)`;
+  el.textContent = `Nueva cuota → $${precioDespues.toFixed(2)} (${sign}${diff.toFixed(2)}%)`;
 }
 
 function previewFondo() {
@@ -219,22 +217,16 @@ async function submitMov() {
   if (!valorFondo || valorFondo <= 0) { setStatus(st, 'err', 'Ingresa el valor del fondo después'); return; }
   if (!fecha)                         { setStatus(st, 'err', 'Fecha requerida'); return; }
 
-  const trm_dia        = monto_cop / monto_usd;   // TRM calculada internamente
-  const cuotasActuales = cuotasCirc();
-  // Precio de cuota justo antes de este movimiento, derivado del valor real (valorFondo)
-  // que el admin acaba de confirmar — no del último checkpoint guardado, que puede estar
-  // desactualizado si el fondo ganó/perdió valor desde esa última valuación.
-  const valorAntes     = tipo === 'retiro' ? valorFondo + monto_usd : valorFondo - monto_usd;
-  const pc             = cuotasActuales > 0 ? valorAntes / cuotasActuales : 1;
-  const cuotas         = tipo === 'retiro' ? -Math.abs(monto_usd / pc) : Math.abs(monto_usd / pc);
-  const cuotasNuevas   = cuotasActuales + cuotas;
-  const pcNuevo        = cuotasNuevas > 0 ? valorFondo / cuotasNuevas : 1;
+  const trm_dia = monto_cop / monto_usd;   // TRM calculada internamente
+  const { precioAntes, cuotas, cuotasNuevas, precioDespues } = calcularCuotas({
+    tipo, monto: monto_usd, valorFondo, cuotasActuales: cuotasCirc(),
+  });
 
   btn.disabled = true;
   setStatus(st, '', 'Guardando...');
   try {
-    await postMovimiento({ fecha, persona, tipo, monto_usd, precio_cuota_dia: pc, cuotas, monto_cop, trm_dia }, adminKey);
-    await postFondo({ fecha, valor_total_usd: valorFondo, precio_cuota_usd: pcNuevo, cuotas_en_circulacion: cuotasNuevas, trm: S.trm || 0 }, adminKey);
+    await postMovimiento({ fecha, persona, tipo, monto_usd, precio_cuota_dia: precioAntes, cuotas, monto_cop, trm_dia }, adminKey);
+    await postFondo({ fecha, valor_total_usd: valorFondo, precio_cuota_usd: precioDespues, cuotas_en_circulacion: cuotasNuevas, trm: S.trm || 0 }, adminKey);
     setStatus(st, '', '');
     document.getElementById('f-monto-cop').value  = '';
     document.getElementById('f-monto').value      = '';
