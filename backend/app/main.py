@@ -39,8 +39,10 @@ app.add_middleware(
 )
 
 
+# compare_digest sobre str tira TypeError si hay caracteres no-ASCII (una clave con "ñ"
+# daba 500 en vez de 401) — comparando bytes eso no pasa.
 def require_admin(x_admin_key: str = Header(default="")):
-    if not ADMIN_PASSWORD or not secrets.compare_digest(x_admin_key, ADMIN_PASSWORD):
+    if not ADMIN_PASSWORD or not secrets.compare_digest(x_admin_key.encode(), ADMIN_PASSWORD.encode()):
         raise HTTPException(status_code=401, detail="Clave incorrecta")
 
 

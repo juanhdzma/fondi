@@ -176,3 +176,10 @@ def test_import_invalid_file(client):
     r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
                      files={"file": ("data.xlsx", b"not an xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
     assert r.status_code == 400
+
+
+def test_auth_con_clave_no_ascii_da_401_no_500(client):
+    # El browser manda los valores de header en latin-1; Starlette los decodifica a str y
+    # secrets.compare_digest sobre str no-ASCII tiraba TypeError → 500 en vez de 401.
+    r = client.post("/api/auth/verify", headers={"X-Admin-Key": "clavé".encode("latin-1")})
+    assert r.status_code == 401

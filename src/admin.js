@@ -30,6 +30,7 @@ async function unlockAdmin() {
     });
     if (!r.ok) throw new Error();
     adminKey = val;
+    errEl.textContent = '';
     document.getElementById('admin-lock').style.display = 'none';
     document.getElementById('admin-panel').style.display = 'block';
     initAdminForms();
