@@ -1,6 +1,7 @@
 import os
 import secrets
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +47,14 @@ def require_admin(x_admin_key: str = Header(default="")):
         raise HTTPException(status_code=401, detail="Clave incorrecta")
 
 
+class Fondo(BaseModel):
+    fecha: str
+    valor_total_usd: float
+    precio_cuota_usd: float
+    cuotas_en_circulacion: float
+    trm: float
+
+
 class Movimiento(BaseModel):
     fecha: str
     persona: str
@@ -55,14 +64,11 @@ class Movimiento(BaseModel):
     cuotas: float
     monto_cop: float
     trm_dia: float
-
-
-class Fondo(BaseModel):
-    fecha: str
-    valor_total_usd: float
-    precio_cuota_usd: float
-    cuotas_en_circulacion: float
-    trm: float
+    # Valuación del fondo que resulta de este movimiento. Va en el mismo request para que
+    # ambas filas entren en una sola transacción: un movimiento sin su valuación cambia las
+    # cuotas en circulación dejando el precio de cuota viejo, y todos los porcentajes de
+    # todos los participantes quedan mal sin forma de deshacerlo (el log es append-only).
+    fondo: Optional[Fondo] = None
 
 
 class Participante(BaseModel):
@@ -101,6 +107,14 @@ def get_all():
     }
 
 
+def _insert_fondo(conn, f: Fondo):
+    conn.execute(
+        "INSERT INTO historial_fondo (fecha, valor_total, precio_cuota, cuotas_circ, trm) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (f.fecha, f.valor_total_usd, f.precio_cuota_usd, f.cuotas_en_circulacion, f.trm),
+    )
+
+
 @app.post("/api/movimiento", status_code=201, dependencies=[Depends(require_admin)])
 def post_movimiento(m: Movimiento):
     with get_conn() as conn:
@@ -109,17 +123,17 @@ def post_movimiento(m: Movimiento):
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (m.fecha, m.persona, m.tipo, m.monto_usd, m.precio_cuota_dia, m.cuotas, m.monto_cop, m.trm_dia),
         )
+        if m.fondo is not None:
+            _insert_fondo(conn, m.fondo)
+
     return {"ok": True}
 
 
 @app.post("/api/fondo", status_code=201, dependencies=[Depends(require_admin)])
 def post_fondo(f: Fondo):
     with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO historial_fondo (fecha, valor_total, precio_cuota, cuotas_circ, trm) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (f.fecha, f.valor_total_usd, f.precio_cuota_usd, f.cuotas_en_circulacion, f.trm),
-        )
+        _insert_fondo(conn, f)
+
     return {"ok": True}
 
 

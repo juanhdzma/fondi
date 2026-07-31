@@ -183,3 +183,20 @@ def test_auth_con_clave_no_ascii_da_401_no_500(client):
     # secrets.compare_digest sobre str no-ASCII tiraba TypeError → 500 en vez de 401.
     r = client.post("/api/auth/verify", headers={"X-Admin-Key": "clavé".encode("latin-1")})
     assert r.status_code == 401
+
+
+def test_movimiento_con_fondo_es_atomico(client):
+    payload = {
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {
+            "fecha": "2026-01-10T00:00", "valor_total_usd": 100, "precio_cuota_usd": 1.0,
+            "cuotas_en_circulacion": 100, "trm": 3300,
+        },
+    }
+    r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
+    assert r.status_code == 201
+
+    data = client.get("/api/all").json()
+    assert len(data["movimientos"]) == 1
+    assert len(data["historial"]) == 1

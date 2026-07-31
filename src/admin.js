@@ -225,8 +225,19 @@ async function submitMov() {
   btn.disabled = true;
   setStatus(st, '', 'Guardando...');
   try {
-    await postMovimiento({ fecha, persona, tipo, monto_usd, precio_cuota_dia: precioAntes, cuotas, monto_cop, trm_dia }, adminKey);
-    await postFondo({ fecha, valor_total_usd: valorFondo, precio_cuota_usd: precioDespues, cuotas_en_circulacion: cuotasNuevas, trm: S.trm || 0 }, adminKey);
+    // Movimiento y valuación van juntos en un solo request: el backend los inserta en la
+    // misma transacción. Separados, si el segundo fallaba quedaba un movimiento que cambió
+    // las cuotas con el precio de cuota viejo, sin forma de deshacerlo (log append-only).
+    await postMovimiento({
+      fecha, persona, tipo, monto_usd, precio_cuota_dia: precioAntes, cuotas, monto_cop, trm_dia,
+      fondo: {
+        fecha,
+        valor_total_usd: valorFondo,
+        precio_cuota_usd: precioDespues,
+        cuotas_en_circulacion: cuotasNuevas,
+        trm: S.trm || 0,
+      },
+    }, adminKey);
     setStatus(st, '', '');
     document.getElementById('f-monto-cop').value  = '';
     document.getElementById('f-monto').value      = '';
