@@ -47,11 +47,17 @@ export async function postImportXlsx(file, adminKey) {
   return r.json();
 }
 
+// datos.gov.co es un tercero fuera de nuestro control: sin timeout, un día que responda lento
+// el fetch se queda colgado el default del browser (decenas de segundos) — y como el
+// dashboard espera por él, la página entera se queda en skeleton por una TRM que tiene fallback.
+const TRM_TIMEOUT_MS = 4000;
+
 export async function fetchTRM() {
   const badge = document.getElementById('trm-badge');
   try {
     // TRM oficial Colombia — Superfinanciera vía datos.gov.co
-    const r = await fetch('https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciadesde+DESC');
+    const r = await fetch('https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciadesde+DESC',
+      { signal: AbortSignal.timeout(TRM_TIMEOUT_MS) });
     const d = await r.json();
     S.trm = parseFloat(d[0]?.valor) || 4000;
     badge.textContent = `TRM $${S.trm.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -62,8 +68,10 @@ export async function fetchTRM() {
 }
 
 export async function fetchAll() {
+  // La TRM va en paralelo, no antes: nunca rechaza (tiene fallback) y los datos del fondo no
+  // dependen de ella, así que no tiene por qué demorar el render.
+  const trmListo = fetchTRM();
   try {
-    await fetchTRM();
     let historial, movimientos, participantesLog;
     if (MOCK_MODE) {
       historial = MOCK_HISTORIAL;
@@ -92,9 +100,9 @@ export async function fetchAll() {
     S.participantesLog = participantesLog;
 
     hideBanner();
-    renderAll();
   } catch (err) {
     showBanner(err.message);
-    renderAll();
   }
+  await trmListo;
+  renderAll();
 }
