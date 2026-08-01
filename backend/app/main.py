@@ -38,11 +38,45 @@ STATIC_DIR = os.environ.get("STATIC_DIR", os.path.join(os.path.dirname(__file__)
 # ALLOWED_ORIGINS="" dejaba la lista en [""], que es lo mismo pero por accidente.
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 
+# El único destructivo es el import; el resto es append-only. Esta copia periódica cubre lo
+# que el backup del import no: corrupción del archivo o un borrado accidental del volumen.
+# Vive al lado de la DB, así que NO reemplaza sacar el xlsx a otra máquina (ver README).
+BACKUP_INTERVAL_H = float(os.environ.get("BACKUP_INTERVAL_H", "24"))
+MAX_IMPORT_BYTES = 5 * 1024 * 1024
+# La clave es única y sin sesión: cada request la reintenta. Sin freno, probar claves contra
+# /api/auth/verify es gratis e ilimitado.
+AUTH_MAX_FAILS = 10
+AUTH_WINDOW_S = 300
+
+CSP = (
+    "default-src 'self'; "
+    "connect-src 'self' https://www.datos.gov.co; "
+    "img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self'; "
+    "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+)
+
+
+async def _backup_periodico():
+    while True:
+        await asyncio.sleep(BACKUP_INTERVAL_H * 3600)
+        try:
+            destino = await asyncio.to_thread(backup_db)
+            log.info("backup automático %s", destino)
+        except Exception:
+            log.exception("backup automático falló")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    tarea = asyncio.create_task(_backup_periodico()) if BACKUP_INTERVAL_H > 0 else None
     yield
+    if tarea:
+        tarea.cancel()
+        with suppress(asyncio.CancelledError):
+            await tarea
 
 
 app = FastAPI(title="fondi-backend", lifespan=lifespan)

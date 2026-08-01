@@ -8,6 +8,8 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
       # En prod front y back son el mismo origen, así que no hace falta abrir CORS a nadie.
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      # Horas entre backups automáticos de la DB dentro del volumen (0 lo desactiva).
+      - BACKUP_INTERVAL_H=${BACKUP_INTERVAL_H:-24}
     volumes:
       - fondi-db:/data
     restart: unless-stopped
