@@ -17,3 +17,12 @@ export function calcularCuotas({ tipo, monto, valorFondo, cuotasActuales }) {
 
   return { precioAntes, cuotas, cuotasNuevas, precioDespues };
 }
+
+// El log es append-only: un retiro por más de lo que la persona tiene deja sus cuotas en
+// negativo para siempre y todos los porcentajes del fondo quedan mal. La tolerancia absorbe
+// el error de punto flotante de un retiro total (cuotas acumuladas vs. monto/precio).
+const TOLERANCIA_CUOTAS = 1e-6;
+
+export function excedeSaldo({ cuotas, cuotasDisponibles }) {
+  return -cuotas > cuotasDisponibles + TOLERANCIA_CUOTAS;
+}

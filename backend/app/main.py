@@ -129,9 +129,26 @@ def _insert_fondo(conn, f: Fondo):
     )
 
 
+# Un retiro por más cuotas de las que la persona tiene la deja en negativo, y como no hay
+# UPDATE ni DELETE eso no se arregla desde la app: solo exportando el xlsx y reimportándolo.
+# El front ya lo valida, pero es la regla que no puede depender del navegador.
+TOLERANCIA_CUOTAS = 1e-6
+
+
 @app.post("/api/movimiento", status_code=201, dependencies=[Depends(require_admin)])
 def post_movimiento(m: Movimiento):
     with get_conn() as conn:
+        if m.cuotas < 0:
+            actuales = conn.execute(
+                "SELECT COALESCE(SUM(cuotas), 0) AS total FROM movimientos WHERE persona = ?",
+                (m.persona,),
+            ).fetchone()["total"]
+            if actuales + m.cuotas < -TOLERANCIA_CUOTAS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{m.persona} tiene {actuales:.4f} cuotas y el retiro pide {-m.cuotas:.4f}",
+                )
+
         conn.execute(
             "INSERT INTO movimientos (fecha, persona, tipo, monto, precio_cuota_dia, cuotas, monto_cop, trm_dia) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",

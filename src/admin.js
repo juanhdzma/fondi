@@ -1,12 +1,12 @@
 import { API_BASE_URL } from './config.js';
 import { S } from './state.js';
-import { cuotasCirc, precioCuota, participantesActivos, latest } from './computed.js';
-import { calcularCuotas } from './domain/cuotas.js';
+import { cuotasCirc, precioCuota, participantesActivos, calcParticipante, latest } from './computed.js';
+import { calcularCuotas, excedeSaldo } from './domain/cuotas.js';
 import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx } from './api/backend.js';
 import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
 import { todayLocal } from './utils/dates.js';
 import { esc } from './utils/html.js';
-import { fmtN } from './utils/format.js';
+import { fmt, fmtN } from './utils/format.js';
 import { showToast } from './ui/toast.js';
 
 let adminKey = '';
@@ -244,6 +244,14 @@ async function submitMov() {
   const { precioAntes, cuotas, cuotasNuevas, precioDespues } = calcularCuotas({
     tipo, monto: monto_usd, valorFondo, cuotasActuales: cuotasCirc(),
   });
+
+  // Sin esto un retiro por más de lo que la persona tiene se guarda igual y le deja cuotas
+  // negativas: no hay UPDATE/DELETE para arreglarlo, solo exportar el xlsx y reimportarlo.
+  const disponibles = calcParticipante(persona).cuotas;
+  if (excedeSaldo({ cuotas, cuotasDisponibles: disponibles })) {
+    setStatus(st, 'err', `${persona} solo tiene ${fmt(disponibles * precioAntes)} USD disponibles`);
+    return;
+  }
 
   btn.disabled = true;
   setStatus(st, '', 'Guardando...');

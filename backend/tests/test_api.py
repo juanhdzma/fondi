@@ -245,6 +245,11 @@ def test_participante_rechaza_accion_desconocida(client):
 
 
 def test_retiro_total_deja_el_fondo_en_cero(client):
+    client.post("/api/movimiento", headers={"X-Admin-Key": "s3cret"}, json={
+        "fecha": "2026-01-09T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+    })
+
     payload = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "retiro",
         "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": -100, "monto_cop": 330000, "trm_dia": 3300,
@@ -278,6 +283,108 @@ def test_import_normaliza_tipo_y_rechaza_valores_desconocidos(client):
 
     # El import inválido no debe haber borrado lo que ya estaba.
     assert len(client.get("/api/all").json()["movimientos"]) == 1
+
+
+def test_retiro_mayor_al_saldo_se_rechaza(client):
+    aporte = {
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+    }
+    client.post("/api/movimiento", json=aporte, headers={"X-Admin-Key": "s3cret"})
+
+    # Un cero de más en el retiro: dejaría a Patico con -900 cuotas y sin forma de deshacerlo.
+    retiro = {**aporte, "tipo": "retiro", "monto_usd": 1000, "cuotas": -1000}
+    r = client.post("/api/movimiento", json=retiro, headers={"X-Admin-Key": "s3cret"})
+    assert r.status_code == 400
+
+    assert len(client.get("/api/all").json()["movimientos"]) == 1
+
+
+def test_retiro_total_pasa(client):
+    aporte = {
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+    }
+    client.post("/api/movimiento", json=aporte, headers={"X-Admin-Key": "s3cret"})
+
+    retiro = {**aporte, "tipo": "retiro", "cuotas": -100}
+    r = client.post("/api/movimiento", json=retiro, headers={"X-Admin-Key": "s3cret"})
+    assert r.status_code == 201
+
+
+def test_auth_bloquea_despues_de_muchos_intentos(client):
+    for _ in range(10):
+        assert client.post("/api/auth/verify", headers={"X-Admin-Key": "no"}).status_code == 401
+
+    r = client.post("/api/auth/verify", headers={"X-Admin-Key": "no"})
+    assert r.status_code == 429
+    # Bloqueo por origen, no por clave: la correcta tampoco pasa hasta que expire la ventana.
+    assert client.post("/api/auth/verify", headers={"X-Admin-Key": "s3cret"}).status_code == 429
+
+
+def test_export_reimportado_deja_la_db_igual(client):
+    # El export es el único backup que sale de la máquina: tiene que poder volver a entrar
+    # tal cual, incluida la validación de columnas requeridas del import.
+    client.post("/api/movimiento", headers={"X-Admin-Key": "s3cret"}, json={
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {
+            "fecha": "2026-01-10T00:00", "valor_total_usd": 100, "precio_cuota_usd": 1.0,
+            "cuotas_en_circulacion": 100, "trm": 3300,
+        },
+    })
+    client.post("/api/participante", headers={"X-Admin-Key": "s3cret"},
+                json={"fecha": "2026-01-10T00:00", "nombre": "Patico", "accion": "agregar"})
+
+    antes = client.get("/api/all").json()
+    export = client.get("/api/export").content
+
+    r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                    files={"file": ("fondi-export.xlsx", export, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200
+    assert client.get("/api/all").json() == antes
+
+
+def test_import_rechaza_archivo_gigante(client):
+    grande = b"x" * (6 * 1024 * 1024)
+    r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                    files={"file": ("data.xlsx", grande, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 413
+
+
+def test_import_rechaza_hoja_sin_columnas_requeridas(client):
+    # Header equivocado: sin este chequeo cada fila entraba con monto/cuotas en 0 y el
+    # import destructivo dejaba la DB con movimientos que no significan nada.
+    content = _xlsx_bytes({"movimientos": [
+        ["fecha", "persona", "tipo", "valor", "cuotitas"],
+        ["2026-01-10", "Patico", "aporte", 100, 100],
+    ]})
+    r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                    files={"file": ("data.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 400
+    assert "monto" in r.json()["detail"]
+
+
+def test_get_all_ordena_por_fecha(client):
+    # El import respeta el orden de filas del archivo; /api/all tiene que devolverlas
+    # ordenadas igual, porque el front resuelve "última acción gana" con ese orden.
+    content = _xlsx_bytes({"participantes_config": [
+        ["fecha", "nombre", "accion"],
+        ["2026-03-01", "Patico", "quitar"],
+        ["2026-01-01", "Patico", "agregar"],
+        ["2026-06-01", "Patico", "agregar"],
+    ]})
+    client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                files={"file": ("data.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+
+    fechas = [p["fecha"] for p in client.get("/api/all").json()["participantes_config"]]
+    assert fechas == sorted(fechas)
+
+
+def test_manda_security_headers(client):
+    r = client.get("/api/health")
+    assert "default-src 'self'" in r.headers["content-security-policy"]
+    assert r.headers["x-content-type-options"] == "nosniff"
 
 
 def test_import_hace_backup_de_la_db(client, tmp_path):
