@@ -12,6 +12,7 @@ on:
       - vite.config.js
       - Dockerfile
       - backend/**
+      - .github/workflows/docker.yml
   workflow_dispatch: {}
 
 env:
