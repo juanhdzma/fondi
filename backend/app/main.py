@@ -101,17 +101,22 @@ def verify_auth():
     return {"ok": True}
 
 
+# ORDER BY explícito: sin él el orden es el de inserción, que después de un import es el
+# orden de filas del xlsx. El front resuelve "última acción gana" por participante y
+# "última valuación" con ese orden, así que unas filas desordenadas cambian el resultado.
 @app.get("/api/all")
 def get_all():
     with get_conn() as conn:
         historial = conn.execute(
-            "SELECT fecha, valor_total, precio_cuota, cuotas_circ, trm FROM historial_fondo"
+            "SELECT fecha, valor_total, precio_cuota, cuotas_circ, trm FROM historial_fondo "
+            "ORDER BY fecha, id"
         ).fetchall()
         movimientos = conn.execute(
-            "SELECT fecha, persona, tipo, monto, precio_cuota_dia, cuotas, monto_cop, trm_dia FROM movimientos"
+            "SELECT fecha, persona, tipo, monto, precio_cuota_dia, cuotas, monto_cop, trm_dia "
+            "FROM movimientos ORDER BY fecha, id"
         ).fetchall()
         participantes = conn.execute(
-            "SELECT fecha, nombre, accion FROM participantes_config"
+            "SELECT fecha, nombre, accion FROM participantes_config ORDER BY fecha, id"
         ).fetchall()
 
     return {

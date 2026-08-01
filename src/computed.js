@@ -13,10 +13,14 @@ export function cuotasCirc() {
   return S.movimientos.reduce((s, m) => s + m.cuotas, 0);
 }
 
-// Participantes activos según el log agregar/quitar (última acción por nombre gana)
+// Participantes activos según el log agregar/quitar (última acción por nombre gana).
+// Se ordena por fecha y no se confía en el orden en que vienen las filas: después de un
+// import el orden es el del xlsx, y ahí un "quitar" viejo puede venir después de un
+// "agregar" nuevo y sacar de la lista a alguien que sí está activo.
 export function participantesActivos() {
   const estado = new Map();
-  for (const p of S.participantesLog) estado.set(p.nombre, p.accion);
+  const log = [...S.participantesLog].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+  for (const p of log) estado.set(p.nombre, p.accion);
   return [...estado.entries()]
     .filter(([, accion]) => accion === 'agregar')
     .map(([nombre]) => nombre);
