@@ -238,6 +238,20 @@ def test_movimiento_rechaza_datos_invalidos(client, campo, valor):
     assert client.get("/api/all").json()["movimientos"] == []
 
 
+def test_error_de_validacion_devuelve_texto_legible(client):
+    # El front muestra `detail` tal cual en el formulario: con la lista de errores de pydantic
+    # el admin veía "[object Object]" y no qué campo estaba mal.
+    payload = {
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": -5, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+    }
+    r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert isinstance(detail, str)
+    assert "monto_usd" in detail
+
+
 def test_participante_rechaza_accion_desconocida(client):
     r = client.post("/api/participante", headers={"X-Admin-Key": "s3cret"},
                     json={"fecha": "2026-01-10T00:00", "nombre": "Patico", "accion": "borrar"})
@@ -385,6 +399,53 @@ def test_manda_security_headers(client):
     r = client.get("/api/health")
     assert "default-src 'self'" in r.headers["content-security-policy"]
     assert r.headers["x-content-type-options"] == "nosniff"
+
+
+@pytest.mark.parametrize("literal", ["Infinity", "-Infinity", "NaN"])
+def test_movimiento_rechaza_montos_no_finitos(client, literal):
+    # json.loads acepta estos literales, `inf` pasa cualquier gt/ge y `nan` no tiene constraint:
+    # se guardaban con 201 y después /api/all no podía serializarse nunca más (500 permanente).
+    body = (
+        '{"fecha":"2026-01-10T00:00","persona":"Patico","tipo":"aporte","monto_usd":%s,'
+        '"precio_cuota_dia":1.0,"cuotas":100,"monto_cop":330000,"trm_dia":3300}' % literal
+    )
+    r = client.post("/api/movimiento", content=body,
+                    headers={"X-Admin-Key": "s3cret", "Content-Type": "application/json"})
+    assert r.status_code == 422
+    assert client.get("/api/all").status_code == 200
+
+
+def test_movimiento_rechaza_cuotas_no_finitas(client):
+    body = (
+        '{"fecha":"2026-01-10T00:00","persona":"Patico","tipo":"aporte","monto_usd":100,'
+        '"precio_cuota_dia":1.0,"cuotas":NaN,"monto_cop":330000,"trm_dia":3300}'
+    )
+    r = client.post("/api/movimiento", content=body,
+                    headers={"X-Admin-Key": "s3cret", "Content-Type": "application/json"})
+    assert r.status_code == 422
+
+
+def test_fondo_rechaza_valores_no_finitos(client):
+    body = (
+        '{"fecha":"2026-01-10T00:00","valor_total_usd":Infinity,"precio_cuota_usd":1.0,'
+        '"cuotas_en_circulacion":100,"trm":3300}'
+    )
+    r = client.post("/api/fondo", content=body,
+                    headers={"X-Admin-Key": "s3cret", "Content-Type": "application/json"})
+    assert r.status_code == 422
+
+
+def test_import_rechaza_celdas_no_finitas(client):
+    # float("inf") funciona: una celda con ese texto entraba a la DB por la vía del import.
+    content = _xlsx_bytes({"movimientos": [
+        ["fecha", "persona", "tipo", "monto", "cuotas"],
+        ["2026-01-10", "Patico", "aporte", "inf", 100],
+    ]})
+    r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                    files={"file": ("data.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 400
+    assert "finito" in r.json()["detail"]
+    assert client.get("/api/all").json()["movimientos"] == []
 
 
 def test_import_hace_backup_de_la_db(client, tmp_path):

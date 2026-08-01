@@ -1,4 +1,5 @@
 import datetime as dt
+import math
 from io import BytesIO
 
 from openpyxl import Workbook, load_workbook
@@ -101,13 +102,18 @@ def _to_enum(value, col, sheet_name, fila):
     return valor
 
 
+# float() acepta "inf"/"nan" como si fueran números: una celda así entraba a la DB y después
+# /api/all no podía serializar la respuesta, dejando el dashboard en 500 de forma permanente.
 def _to_float(value, col, sheet_name, fila):
     if value is None:
         return 0.0
     try:
-        return float(value)
+        numero = float(value)
     except (TypeError, ValueError):
         raise InvalidWorkbook(f"{sheet_name} fila {fila}: '{col}' no es un número ('{value}')") from None
+    if not math.isfinite(numero):
+        raise InvalidWorkbook(f"{sheet_name} fila {fila}: '{col}' no es un número finito ('{value}')")
+    return numero
 
 
 def parse_workbook(content: bytes):

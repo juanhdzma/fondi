@@ -7,10 +7,11 @@ from contextlib import asynccontextmanager, suppress
 from typing import Literal, Optional
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .db import backup_db, get_conn, init_db, replace_all
 from .xlsx import InvalidWorkbook, build_workbook, parse_workbook
@@ -102,6 +103,19 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+# El handler default de FastAPI devuelve el valor recibido dentro del cuerpo del 422, y con un
+# inf/nan ese cuerpo no se puede serializar: el rechazo terminaba siendo un 500. Además el
+# front hace `throw new Error(detail.detail)`, así que un string sirve y la lista daba
+# "[object Object]" en el formulario del panel admin.
+@app.exception_handler(RequestValidationError)
+async def error_de_validacion(request: Request, exc: RequestValidationError):
+    partes = []
+    for e in exc.errors():
+        campo = ".".join(str(x) for x in e["loc"][1:]) or "body"
+        partes.append(f"{campo}: {e['msg']}")
+    return JSONResponse(status_code=422, content={"detail": "; ".join(partes)})
+
+
 _auth_fails: dict[str, tuple[int, float]] = {}
 
 
@@ -127,7 +141,15 @@ def require_admin(request: Request, x_admin_key: str = Header(default="")):
     _auth_fails.pop(ip, None)
 
 
+# `inf` pasa cualquier gt/ge (inf > 0 es True) y `nan` no tiene constraint que lo frene: sin
+# esto un monto infinito se guardaba con 201 y a partir de ahí /api/all respondía 500 para
+# siempre (json no serializa inf), con el log append-only y sin forma de borrar la fila.
+SIN_INF_NAN = ConfigDict(allow_inf_nan=False)
+
+
 class Fondo(BaseModel):
+    model_config = SIN_INF_NAN
+
     fecha: str = Field(pattern=FECHA_RE)
     # ge=0 y no gt=0: un retiro total deja el fondo en 0 con 0 cuotas, y eso es válido.
     valor_total_usd: float = Field(ge=0)
@@ -137,6 +159,8 @@ class Fondo(BaseModel):
 
 
 class Movimiento(BaseModel):
+    model_config = SIN_INF_NAN
+
     fecha: str = Field(pattern=FECHA_RE)
     persona: str = Field(min_length=1)
     tipo: Literal["aporte", "retiro"]
