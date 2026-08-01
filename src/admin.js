@@ -16,6 +16,19 @@ function setStatus(el, cls, msg) {
   el.textContent = msg;
 }
 
+// El log es append-only: un segundo click mientras el request está en vuelo escribe la fila
+// dos veces y no hay forma de borrar la repetida desde la app. En el import es peor — el
+// segundo pasa a backupear la DB ya reemplazada y empuja un backup bueno fuera de la rotación.
+async function conBoton(btn, fn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    await fn();
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function nowLocal() {
   const now  = new Date();
   const date = todayLocal(now);
@@ -151,36 +164,40 @@ async function agregarParticipante() {
     setStatus(st, 'err', 'Ya existe ese participante'); return;
   }
 
-  setStatus(st, '', 'Guardando...');
-  try {
-    await postParticipante({ fecha: nowLocal().iso, nombre, accion: 'agregar' }, adminKey);
-    input.value = '';
-    setStatus(st, '', '');
-    saveFormSnapshot();
-    await fetchAll();
-    renderAdminParticipants();
-    restoreFormSnapshot();
-    showToast('Agregado');
-  } catch (err) {
-    setStatus(st, 'err', err.message);
-  }
+  await conBoton(document.getElementById('btn-add-participante'), async () => {
+    setStatus(st, '', 'Guardando...');
+    try {
+      await postParticipante({ fecha: nowLocal().iso, nombre, accion: 'agregar' }, adminKey);
+      input.value = '';
+      setStatus(st, '', '');
+      saveFormSnapshot();
+      await fetchAll();
+      renderAdminParticipants();
+      restoreFormSnapshot();
+      showToast('Agregado');
+    } catch (err) {
+      setStatus(st, 'err', err.message);
+    }
+  });
 }
 
-async function quitarParticipante(nombre) {
+async function quitarParticipante(btn, nombre) {
   const st = document.getElementById('st-participantes');
   if (!confirm(`¿Quitar a ${nombre} de la lista? Su historial de movimientos se mantiene.`)) return;
 
-  setStatus(st, '', 'Guardando...');
-  try {
-    await postParticipante({ fecha: nowLocal().iso, nombre, accion: 'quitar' }, adminKey);
-    setStatus(st, '', '');
-    await fetchAll();
-    renderAdminParticipants();
-    restoreFormSnapshot();
-    showToast('Actualizado');
-  } catch (err) {
-    setStatus(st, 'err', err.message);
-  }
+  await conBoton(btn, async () => {
+    setStatus(st, '', 'Guardando...');
+    try {
+      await postParticipante({ fecha: nowLocal().iso, nombre, accion: 'quitar' }, adminKey);
+      setStatus(st, '', '');
+      await fetchAll();
+      renderAdminParticipants();
+      restoreFormSnapshot();
+      showToast('Actualizado');
+    } catch (err) {
+      setStatus(st, 'err', err.message);
+    }
+  });
 }
 
 // La TRM implícita (COP/USD) se guarda tal cual y no se puede corregir después: un cero de
@@ -317,18 +334,20 @@ async function importXlsx() {
   if (!file) { setStatus(st, 'err', 'Elige un archivo'); return; }
   if (!confirm('Esto reemplaza TODOS los datos actuales por los del archivo. ¿Continuar?')) return;
 
-  setStatus(st, '', 'Importando...');
-  try {
-    await postImportXlsx(file, adminKey);
-    input.value = '';
-    setStatus(st, '', '');
-    await fetchAll();
-    renderAdminParticipants();
-    restoreFormSnapshot();
-    showToast('Importado');
-  } catch (err) {
-    setStatus(st, 'err', err.message);
-  }
+  await conBoton(document.getElementById('btn-import-xlsx'), async () => {
+    setStatus(st, '', 'Importando...');
+    try {
+      await postImportXlsx(file, adminKey);
+      input.value = '';
+      setStatus(st, '', '');
+      await fetchAll();
+      renderAdminParticipants();
+      restoreFormSnapshot();
+      showToast('Importado');
+    } catch (err) {
+      setStatus(st, 'err', err.message);
+    }
+  });
 }
 
 async function submitFondo() {
@@ -399,6 +418,6 @@ export function bindAdminEvents() {
   });
   document.getElementById('participants-manage-list').addEventListener('click', e => {
     const btn = e.target.closest('.btn-remove-participant');
-    if (btn) quitarParticipante(btn.dataset.nombre);
+    if (btn) quitarParticipante(btn, btn.dataset.nombre);
   });
 }
