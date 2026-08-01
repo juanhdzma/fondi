@@ -10,6 +10,8 @@ Web dashboard for managing a mutual-fund-style investment pool: several particip
 > The Admin panel's password (`ADMIN_PASSWORD`) is checked server-side, so it isn't trivially bypassable from the browser, and failed attempts are rate-limited per IP (10 per 5 minutes) — but there's no session/token, and the read endpoints (`/api/all`, `/api/export`) require **no auth at all**: anyone who can reach the URL can read every contribution, the fund value, and each person's shares.
 >
 > **Do not expose this to the public internet** (no open port-forward, no public reverse proxy) without putting your own auth layer in front of it (e.g. a reverse proxy with basic auth, a VPN/Tailscale, etc.), and **always set your own `ADMIN_PASSWORD`** — it defaults to `admin` if unset.
+>
+> Behind a reverse proxy every request arrives with the proxy's IP, so one person's failed attempt rate-limits everyone. Set `TRUST_PROXY=1` there to count per real client (`X-Forwarded-For`). Leave it unset when the port is exposed directly — that header is client-supplied, and trusting it would let anyone skip the limit by sending a different one each try.
 
 ## Contents
 
@@ -159,6 +161,8 @@ services:
     restart: unless-stopped
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      # There's a proxy in front, so rate-limit failed logins per real client, not per proxy IP.
+      - TRUST_PROXY=1
     volumes:
       - fondi-db:/data
     networks:
@@ -195,7 +199,7 @@ That file is a full restore: Admin → Datos → Importar replaces everything wi
 
 ```bash
 cd backend && python -m pytest   # API, auth, import/export, share-balance rules
-npm test                         # vitest — the share math in src/domain/
+npm test                         # vitest — share math, per-participant figures, money input
 ```
 
 The rest of the frontend is DOM-coupled and untested; anything worth testing gets extracted into `src/domain/` first. No linter or type checker is configured.
