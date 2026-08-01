@@ -5,8 +5,12 @@ export function latest() {
   return S.historial.length ? S.historial[S.historial.length - 1] : null;
 }
 
+// El fallback a 1 es solo para el fondo sin historial (la primera cuota vale $1). Con una
+// valuación guardada se devuelve su precio tal cual, aunque sea 0: tomar 1 ahí inventaba
+// valor para cuotas que no lo tienen y el número salía mal sin que nada lo avisara.
 export function precioCuota() {
-  return latest()?.precio_cuota || 1;
+  const l = latest();
+  return l ? l.precio_cuota : 1;
 }
 
 export function cuotasCirc() {
