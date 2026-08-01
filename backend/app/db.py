@@ -54,6 +54,10 @@ def init_db():
     with get_conn() as conn:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        # Escritura de prueba: si el proceso no puede escribir la DB (caso típico: un volumen
+        # creado por una imagen que corría como root), sin esto el container arranca "healthy",
+        # lee perfecto y solo revienta al guardar — un aporte a la vez, en producción.
+        conn.execute("PRAGMA user_version = 1")
 
 
 # El import es destructivo y el modelo es append-only (no hay UPDATE/DELETE para deshacer
