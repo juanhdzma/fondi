@@ -448,6 +448,39 @@ def test_import_rechaza_celdas_no_finitas(client):
     assert client.get("/api/all").json()["movimientos"] == []
 
 
+def test_rate_limit_usa_forwarded_for_solo_con_trust_proxy(tmp_path, monkeypatch):
+    # Detrás de un proxy todos comparten IP y un intento fallido bloqueaba a todos. Con
+    # TRUST_PROXY el contador es por cliente real; sin él el header se ignora, porque si no
+    # cualquiera se saltaría el límite mandando un X-Forwarded-For distinto en cada intento.
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("ADMIN_PASSWORD", "s3cret")
+    monkeypatch.setenv("TRUST_PROXY", "1")
+
+    from app import db as db_module
+    from app import main as main_module
+
+    importlib.reload(db_module)
+    importlib.reload(main_module)
+
+    with TestClient(main_module.app) as c:
+        for _ in range(10):
+            c.post("/api/auth/verify", headers={"X-Admin-Key": "no", "X-Forwarded-For": "10.0.0.1"})
+
+        bloqueado = c.post("/api/auth/verify", headers={"X-Admin-Key": "no", "X-Forwarded-For": "10.0.0.1"})
+        assert bloqueado.status_code == 429
+
+        otro = c.post("/api/auth/verify", headers={"X-Admin-Key": "s3cret", "X-Forwarded-For": "10.0.0.2"})
+        assert otro.status_code == 200
+
+
+def test_rate_limit_ignora_forwarded_for_sin_trust_proxy(client):
+    for i in range(10):
+        client.post("/api/auth/verify", headers={"X-Admin-Key": "no", "X-Forwarded-For": f"10.0.0.{i}"})
+
+    r = client.post("/api/auth/verify", headers={"X-Admin-Key": "no", "X-Forwarded-For": "10.0.0.99"})
+    assert r.status_code == 429
+
+
 def test_import_hace_backup_de_la_db(client, tmp_path):
     client.post("/api/participante", headers={"X-Admin-Key": "s3cret"},
                 json={"fecha": "2026-01-01T00:00", "nombre": "Viejo", "accion": "agregar"})

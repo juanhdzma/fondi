@@ -10,6 +10,9 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       # Horas entre backups automáticos de la DB dentro del volumen (0 lo desactiva).
       - BACKUP_INTERVAL_H=${BACKUP_INTERVAL_H:-24}
+      # Solo con un reverse proxy adelante: hace que el límite de intentos de clave cuente
+      # por cliente real (X-Forwarded-For) y no por la IP del proxy. Ver .env.example.
+      - TRUST_PROXY=${TRUST_PROXY:-}
     volumes:
       - fondi-db:/data
     restart: unless-stopped

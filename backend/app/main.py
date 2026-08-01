@@ -48,6 +48,11 @@ MAX_IMPORT_BYTES = 5 * 1024 * 1024
 # /api/auth/verify es gratis e ilimitado.
 AUTH_MAX_FAILS = 10
 AUTH_WINDOW_S = 300
+# Detrás de un reverse proxy todas las requests llegan con la IP del proxy: un solo intento
+# fallido de alguien bloquea a todos. Con esto se usa X-Forwarded-For, pero solo si se declara
+# que hay un proxy adelante — sin proxy ese header lo pone el cliente y saltarse el límite
+# sería mandar uno distinto en cada intento.
+TRUST_PROXY = os.environ.get("TRUST_PROXY", "").strip().lower() in ("1", "true", "yes")
 
 CSP = (
     "default-src 'self'; "
@@ -119,10 +124,18 @@ async def error_de_validacion(request: Request, exc: RequestValidationError):
 _auth_fails: dict[str, tuple[int, float]] = {}
 
 
+def _client_ip(request: Request) -> str:
+    if TRUST_PROXY:
+        reenviada = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        if reenviada:
+            return reenviada
+    return request.client.host if request.client else "desconocida"
+
+
 # compare_digest sobre str tira TypeError si hay caracteres no-ASCII (una clave con "ñ"
 # daba 500 en vez de 401) — comparando bytes eso no pasa.
 def require_admin(request: Request, x_admin_key: str = Header(default="")):
-    ip = request.client.host if request.client else "desconocida"
+    ip = _client_ip(request)
     ahora = time.monotonic()
 
     intentos, desde = _auth_fails.get(ip, (0, ahora))
