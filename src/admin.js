@@ -117,7 +117,7 @@ export function renderAdminParticipants() {
   const sel = document.getElementById('f-persona');
   if (sel) {
     const current = sel.value;
-    sel.innerHTML = nombres.map(n => `<option${n === current ? ' selected' : ''}>${n}</option>`).join('');
+    sel.innerHTML = nombres.map(n => `<option${n === current ? ' selected' : ''}>${esc(n)}</option>`).join('');
   }
 
   const list = document.getElementById('participants-manage-list');
@@ -174,15 +174,26 @@ async function quitarParticipante(nombre) {
   }
 }
 
+// La TRM implícita (COP/USD) se guarda tal cual y no se puede corregir después: un cero de
+// menos en el monto en COP entra sin fricción. Si se aleja mucho de la TRM del día, se avisa.
+const TRM_DESVIO_MAX = 0.15;
+
 function previewTrm() {
   const cop = parseMoneyInput(document.getElementById('f-monto-cop'));
   const usd = parseMoneyInput(document.getElementById('f-monto'));
   const el  = document.getElementById('hint-trm-mov');
   if (!el) return;
 
+  el.className = 'form-hint';
   if (!cop || !usd) { el.textContent = ''; return; }
+
   const trm = cop / usd;
-  el.textContent = `TRM: $${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(trm)}`;
+  const desvio = S.trm ? Math.abs(trm - S.trm) / S.trm : 0;
+  el.textContent = `TRM: ${fmt(trm)}`;
+  if (desvio > TRM_DESVIO_MAX) {
+    el.className = 'form-hint warn';
+    el.textContent += ` — revisá los montos, la TRM de hoy es ${fmt(S.trm)}`;
+  }
 }
 
 // Misma cuenta que submitMov() para la nueva cuota, en vivo mientras el admin escribe.
@@ -213,7 +224,9 @@ function previewFondo() {
 
   if (!val) { el.textContent = ''; return; }
   if (!circ) {
-    el.textContent = `Primer registro — cuota inicial = $${val.toFixed(2)} USD`;
+    el.textContent = latest()
+      ? 'No hay cuotas en circulación — registrá primero un aporte'
+      : `Primer registro — cuota inicial = $${val.toFixed(2)} USD`;
     return;
   }
 
@@ -318,8 +331,14 @@ async function submitFondo() {
   if (!val || val <= 0) { setStatus(st, 'err', 'Valor inválido'); return; }
   if (!fecha) { setStatus(st, 'err', 'Fecha requerida'); return; }
 
+  // Sin cuotas hay dos casos distintos: fondo nuevo (arranca en $1 por cuota) o fondo del que
+  // ya salieron todos. En el segundo, valuar contra cuotas=valor inventa cuotas que ningún
+  // movimiento respalda y dispara el aviso de inconsistencia — no hay nada que valuar.
   let circ = cuotasCirc();
-  if (!circ) circ = val; // primer registro: $1 por cuota → cuotas = valor total
+  if (!circ) {
+    if (latest()) { setStatus(st, 'err', 'No hay cuotas en circulación — registrá primero un aporte'); return; }
+    circ = val;
+  }
 
   const pc = val / circ;
 

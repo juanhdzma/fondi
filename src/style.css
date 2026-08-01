@@ -327,6 +327,7 @@ button, input, select { font: inherit; }
 }
 .form-input:focus { border-color: var(--accent); }
 .form-hint { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+.form-hint.warn { color: var(--red); }
 .form-hint:empty { margin-top: 0; }
 .form-footer { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
 .form-footer .btn { flex: 1 1 100%; }
