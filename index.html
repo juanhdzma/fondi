@@ -18,16 +18,16 @@
     <img class="logo" src="/fondi.svg" width="32" height="32" alt="Fondi" />
     <span class="header-title">Fondi</span>
   </div>
-  <nav class="header-nav">
-    <button class="nav-btn active" data-tab="resumen">
+  <nav class="header-nav" role="tablist" aria-label="Secciones">
+    <button class="nav-btn active" data-tab="resumen" role="tab" id="nav-resumen" aria-controls="tab-resumen" aria-selected="true">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="12" width="3.5" height="8"/><rect x="10.25" y="7" width="3.5" height="13"/><rect x="16.5" y="4" width="3.5" height="16"/></svg>
       <span>Resumen</span>
     </button>
-    <button class="nav-btn" data-tab="movimientos">
+    <button class="nav-btn" data-tab="movimientos" role="tab" id="nav-movimientos" aria-controls="tab-movimientos" aria-selected="false">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg>
       <span>Movimientos</span>
     </button>
-    <button class="nav-btn" data-tab="admin">
+    <button class="nav-btn" data-tab="admin" role="tab" id="nav-admin" aria-controls="tab-admin" aria-selected="false">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="4" x2="6" y2="20"/><circle cx="6" cy="9" r="2.2" fill="currentColor" stroke="none"/><line x1="12" y1="4" x2="12" y2="20"/><circle cx="12" cy="15" r="2.2" fill="currentColor" stroke="none"/><line x1="18" y1="4" x2="18" y2="20"/><circle cx="18" cy="7" r="2.2" fill="currentColor" stroke="none"/></svg>
       <span>Admin</span>
     </button>
@@ -41,8 +41,8 @@
 <main class="main">
 
   <!-- ── RESUMEN ── -->
-  <div id="tab-resumen" class="tab-content active">
-    <div class="error-banner" id="err-banner"></div>
+  <div id="tab-resumen" class="tab-content active" role="tabpanel" aria-labelledby="nav-resumen">
+    <div class="error-banner" id="err-banner" role="alert"></div>
 
     <div class="chart-card">
       <div class="hero-toggle">
@@ -105,9 +105,9 @@
   </div>
 
   <!-- ── MOVIMIENTOS ── -->
-  <div id="tab-movimientos" class="tab-content">
+  <div id="tab-movimientos" class="tab-content" role="tabpanel" aria-labelledby="nav-movimientos">
     <div class="table-filters">
-      <select class="select-styled" id="filter-persona">
+      <select class="select-styled" id="filter-persona" aria-label="Filtrar por participante">
         <option value="">Todos los participantes</option>
       </select>
     </div>
@@ -135,16 +135,16 @@
   </div>
 
   <!-- ── ADMIN ── -->
-  <div id="tab-admin" class="tab-content">
+  <div id="tab-admin" class="tab-content" role="tabpanel" aria-labelledby="nav-admin">
     <div id="admin-lock" class="admin-lock">
       <div class="admin-title">Panel de administración</div>
       <div class="admin-sub">Ingresa la clave para continuar</div>
       <div class="input-row input-row-stack">
         <input class="input-base input-flex" type="password" id="admin-key"
-          placeholder="Clave de acceso" />
+          autocomplete="current-password" aria-label="Clave de acceso" placeholder="Clave de acceso" />
         <button class="btn btn-green" id="unlock-btn">Entrar</button>
       </div>
-      <div class="err-msg" id="key-err"></div>
+      <div class="err-msg" id="key-err" role="alert"></div>
     </div>
 
     <div id="admin-panel" style="display:none">
@@ -153,32 +153,32 @@
       </div>
       <div class="admin-content">
 
-        <div class="admin-check" id="admin-check" style="display:none"></div>
+        <div class="admin-check" id="admin-check" role="alert" style="display:none"></div>
 
         <!-- Registrar movimiento -->
         <div class="card">
           <div class="section-title">Registrar movimiento</div>
           <div class="form-group">
-            <label class="form-label">Participante</label>
+            <label class="form-label" for="f-persona">Participante</label>
             <select class="form-input" id="f-persona"></select>
           </div>
           <div class="form-group">
-            <label class="form-label">Tipo</label>
-            <div class="tipo-toggle">
+            <div class="form-label" id="lbl-tipo">Tipo</div>
+            <div class="tipo-toggle" role="group" aria-labelledby="lbl-tipo">
               <button type="button" class="tipo-btn aporte sel" data-tipo="aporte">Aporte</button>
               <button type="button" class="tipo-btn retiro" data-tipo="retiro">Retiro</button>
             </div>
             <input type="hidden" id="f-tipo" value="aporte" />
           </div>
           <div class="form-group">
-            <label class="form-label">Monto (COP)</label>
+            <label class="form-label" for="f-monto-cop">Monto (COP)</label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
               <input class="form-input" type="text" inputmode="numeric" id="f-monto-cop" placeholder="0" />
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">Monto (USD)</label>
+            <label class="form-label" for="f-monto">Monto (USD)</label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
               <input class="form-input" type="text" inputmode="decimal" id="f-monto" placeholder="0,00" />
@@ -186,7 +186,7 @@
             <div class="form-hint" id="hint-trm-mov"></div>
           </div>
           <div class="form-group">
-            <label class="form-label">Valor del fondo después (USD) <span style="color:var(--red)">*</span></label>
+            <label class="form-label" for="f-valor-mov">Valor del fondo después (USD) <span style="color:var(--red)">*</span></label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
               <input class="form-input" type="text" inputmode="decimal" id="f-valor-mov" placeholder="0,00" />
@@ -194,10 +194,10 @@
             <div class="form-hint" id="hint-valor-mov"></div>
           </div>
           <div class="form-group">
-            <label class="form-label">Fecha y hora</label>
-            <div style="display:flex;gap:8px">
-              <input class="form-input" type="date" id="f-fecha" style="flex:1" />
-              <input class="form-input" type="time" id="f-hora" style="flex:1" />
+            <div class="form-label" id="lbl-fecha-mov">Fecha y hora</div>
+            <div style="display:flex;gap:8px" role="group" aria-labelledby="lbl-fecha-mov">
+              <input class="form-input" type="date" id="f-fecha" aria-label="Fecha" style="flex:1" />
+              <input class="form-input" type="time" id="f-hora" aria-label="Hora" style="flex:1" />
             </div>
           </div>
           <div class="form-footer">
@@ -211,7 +211,7 @@
           <div class="section-title">Registrar valuación</div>
           <p style="font-size:12px;color:var(--text-secondary);margin-bottom:18px">Solo para actualizar el valor sin aporte ni retiro (ej. cierre de semana).</p>
           <div class="form-group">
-            <label class="form-label">Valor total del portafolio (USD)</label>
+            <label class="form-label" for="f-valor">Valor total del portafolio (USD)</label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
               <input class="form-input" type="text" inputmode="decimal" id="f-valor" placeholder="0,00" />
@@ -219,10 +219,10 @@
             <div class="form-hint" id="hint-fondo"></div>
           </div>
           <div class="form-group">
-            <label class="form-label">Fecha y hora</label>
-            <div style="display:flex;gap:8px">
-              <input class="form-input" type="date" id="f-fecha-fondo" style="flex:1" />
-              <input class="form-input" type="time" id="f-hora-fondo" style="flex:1" />
+            <div class="form-label" id="lbl-fecha-fondo">Fecha y hora</div>
+            <div style="display:flex;gap:8px" role="group" aria-labelledby="lbl-fecha-fondo">
+              <input class="form-input" type="date" id="f-fecha-fondo" aria-label="Fecha" style="flex:1" />
+              <input class="form-input" type="time" id="f-hora-fondo" aria-label="Hora" style="flex:1" />
             </div>
           </div>
           <div class="form-footer">
@@ -236,7 +236,7 @@
           <div class="section-title">Gestionar participantes</div>
           <div id="participants-manage-list" style="margin-bottom:14px"></div>
           <div class="form-group">
-            <label class="form-label">Nuevo participante</label>
+            <label class="form-label" for="f-nuevo-participante">Nuevo participante</label>
             <div class="input-row">
               <input class="input-base input-flex" type="text" id="f-nuevo-participante" placeholder="Nombre" />
               <button class="btn btn-green" id="btn-add-participante">Agregar</button>
@@ -251,13 +251,13 @@
         <div class="card">
           <div class="section-title">Datos</div>
           <div class="form-group">
-            <label class="form-label">Exportar</label>
+            <div class="form-label">Exportar</div>
             <div class="form-footer" style="margin-top:0">
               <a class="btn btn-green" id="btn-export-xlsx" href="#" style="text-decoration:none;text-align:center">Descargar xlsx</a>
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">Importar</label>
+            <label class="form-label" for="f-import-xlsx">Importar</label>
             <p class="form-hint" style="margin-bottom:8px">Reemplaza TODOS los datos actuales por los del archivo.</p>
             <input class="input-base" type="file" id="f-import-xlsx" accept=".xlsx" />
           </div>
