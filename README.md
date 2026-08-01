@@ -20,6 +20,8 @@ Web dashboard for managing a mutual-fund-style investment pool: several particip
 - [Running locally](#running-locally)
 - [Running via Docker](#running-via-docker)
 - [Deploying](#deploying)
+- [Configuration](#configuration)
+- [Backups](#backups)
 - [Testing](#testing)
 - [License](#license)
 
@@ -101,9 +103,11 @@ src/
   admin.js                 Admin panel: auth, forms, movement/valuation submission
   style.css
   api/backend.js       fetchAll/postMovimiento/postFondo/postParticipante/exportUrl/postImportXlsx — all I/O
+  domain/cuotas.js      The share math, pure and DOM-free so it can be unit tested
   utils/                Formatters, dates, money inputs
   render/               One module per UI section (summary, movements, charts)
   ui/                   Tabs, chart date range, error banner, refresh
+  *.test.js             vitest, next to what they cover (domain/, computed.js, utils/)
 backend/
   app/main.py          FastAPI app: auth dependency, routes, static file mount
   app/db.py            Schema + sqlite3 connection helper
@@ -180,6 +184,20 @@ The `proxy` network must already exist (Traefik or another reverse proxy) and mu
 
 **After a new image is published, a plain restart/recreate is not enough** — Docker won't re-fetch an already-pulled `:latest` tag on its own. Pull explicitly (`docker compose pull`, or Portainer's "re-pull image" option) before recreating.
 
+## Configuration
+
+All of it is environment variables on the backend; `.env.example` has the same list with the reasoning. None are required — the defaults run.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `ADMIN_PASSWORD` | `admin` | Password for the Admin panel. **Set your own.** The default exists so a missing variable never makes the app unusable, not because it's safe. |
+| `TRUST_PROXY` | off | Read `X-Forwarded-For` when counting failed logins. Turn it on **only** behind a reverse proxy — see the warning at the top. |
+| `BACKUP_INTERVAL_H` | `24` | Hours between automatic DB snapshots. `0` disables them. |
+| `ALLOWED_ORIGINS` | `*` | Comma-separated CORS origins. Only matters for `npm run dev`, where frontend and backend are on different ports; production is same-origin. |
+| `DB_PATH` | `/data/fondi.db` | SQLite file. Must be on the mounted volume, or the history dies with the container. |
+| `LOG_LEVEL` | `INFO` | Backend log level. |
+| `STATIC_DIR` | `../static` | Where the built frontend lives inside the image. If the directory doesn't exist, no static routes are mounted and only the API is served — which is what running the backend standalone for frontend dev relies on. |
+
 ## Backups
 
 The database is the only copy of the fund's history, and the app has no UPDATE/DELETE to fix a bad write from the UI. Two things guard it, both inside the `/data` volume next to `fondi.db` (last 5 kept, named `fondi.db.<timestamp>.bak`):
@@ -202,7 +220,7 @@ cd backend && python -m pytest   # API, auth, import/export, share-balance rules
 npm test                         # vitest — share math, per-participant figures, money input
 ```
 
-The rest of the frontend is DOM-coupled and untested; anything worth testing gets extracted into `src/domain/` first. No linter or type checker is configured.
+Covered on the frontend: the share math (`src/domain/`), everything derived per participant (`src/computed.js`) and the money inputs (`src/utils/`). The rest — `render/`, `admin.js`, `ui/` — is DOM-coupled and untested, so anything worth testing gets extracted into one of those three first rather than tested in place. No linter or type checker is configured.
 
 ## License
 
