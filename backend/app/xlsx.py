@@ -11,6 +11,16 @@ SHEET_COLUMNS = {
 
 TEXT_COLUMNS = {"fecha", "persona", "tipo", "nombre", "accion"}
 
+# Columnas sin las cuales la fila no significa nada: si falta alguna, todas las filas de esa
+# hoja entrarían con "" o 0.0 y el import es destructivo — se aborta en vez de reemplazar la
+# DB por filas vacías. Las que no están acá (trm, monto_cop, precio_cuota_dia) sí pueden
+# faltar: se derivan o solo afectan la vista en COP.
+REQUIRED_COLUMNS = {
+    "historial_fondo": ["fecha", "valor_total", "precio_cuota", "cuotas_circ"],
+    "movimientos": ["fecha", "persona", "tipo", "monto", "cuotas"],
+    "participantes_config": ["fecha", "nombre", "accion"],
+}
+
 ENUM_COLUMNS = {
     "tipo": {"aporte", "retiro"},
     "accion": {"agregar", "quitar"},
@@ -119,6 +129,12 @@ def parse_workbook(content: bytes):
         aliases = COLUMN_ALIASES[sheet_name]
         # Para cada columna canónica, qué nombre de columna real trae este archivo (si trae alguno).
         source = {col: next((a for a in alts if a in header_set), None) for col, alts in aliases.items()}
+
+        faltan = [c for c in REQUIRED_COLUMNS[sheet_name] if source[c] is None]
+        if faltan:
+            raise InvalidWorkbook(
+                f"{sheet_name}: faltan columnas requeridas ({', '.join(faltan)})"
+            )
 
         for n, raw in enumerate(rows[1:], start=2):
             if raw is None or all(v is None for v in raw):

@@ -207,7 +207,19 @@ def export_xlsx():
 
 @app.post("/api/import", dependencies=[Depends(require_admin)])
 async def import_xlsx(file: UploadFile = File(...)):
-    content = await file.read()
+    # Se lee por partes con tope: un xlsx real de esta app pesa kilobytes, y sin límite un
+    # upload grande se traga la memoria/disco del container antes de que openpyxl lo mire.
+    partes, total = [], 0
+    while chunk := await file.read(1 << 20):
+        total += len(chunk)
+        if total > MAX_IMPORT_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"El archivo supera el máximo de {MAX_IMPORT_BYTES // (1024 * 1024)} MB",
+            )
+        partes.append(chunk)
+    content = b"".join(partes)
+
     try:
         parsed = parse_workbook(content)
     except InvalidWorkbook as exc:
