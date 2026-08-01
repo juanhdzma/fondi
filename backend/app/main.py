@@ -1,16 +1,18 @@
+import asyncio
 import logging
 import os
 import secrets
-from contextlib import asynccontextmanager
+import time
+from contextlib import asynccontextmanager, suppress
 from typing import Literal, Optional
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .db import get_conn, init_db, replace_all
+from .db import backup_db, get_conn, init_db, replace_all
 from .xlsx import InvalidWorkbook, build_workbook, parse_workbook
 
 # uvicorn solo configura handlers para sus propios loggers: sin esto el logger raíz se queda
@@ -53,11 +55,42 @@ app.add_middleware(
 )
 
 
+# La CSP se manda como header y no como <meta> en el index.html a propósito: el mismo HTML
+# lo sirve Vite en dev contra el backend en otro puerto, y una CSP con 'self' ahí rompería
+# el HMR y las llamadas a :8000. Acá solo aplica cuando este proceso sirve el build.
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = CSP
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
+
+
+_auth_fails: dict[str, tuple[int, float]] = {}
+
+
 # compare_digest sobre str tira TypeError si hay caracteres no-ASCII (una clave con "ñ"
 # daba 500 en vez de 401) — comparando bytes eso no pasa.
-def require_admin(x_admin_key: str = Header(default="")):
+def require_admin(request: Request, x_admin_key: str = Header(default="")):
+    ip = request.client.host if request.client else "desconocida"
+    ahora = time.monotonic()
+
+    intentos, desde = _auth_fails.get(ip, (0, ahora))
+    if ahora - desde > AUTH_WINDOW_S:
+        intentos, desde = 0, ahora
+    if intentos >= AUTH_MAX_FAILS:
+        raise HTTPException(status_code=429, detail="Demasiados intentos fallidos, esperá unos minutos")
+
     if not ADMIN_PASSWORD or not secrets.compare_digest(x_admin_key.encode(), ADMIN_PASSWORD.encode()):
+        for vieja in [k for k, (_, ts) in _auth_fails.items() if ahora - ts > AUTH_WINDOW_S]:
+            del _auth_fails[vieja]
+        _auth_fails[ip] = (intentos + 1, desde)
+        log.warning("auth fallida ip=%s intentos=%d", ip, intentos + 1)
         raise HTTPException(status_code=401, detail="Clave incorrecta")
+
+    _auth_fails.pop(ip, None)
 
 
 class Fondo(BaseModel):
