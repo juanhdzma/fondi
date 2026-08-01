@@ -7,7 +7,7 @@ Web dashboard for managing a mutual-fund-style investment pool: several particip
 ![Resumen](docs/screenshots/desktop-resumen.png)
 
 > ## ⚠️ PRIVATE USE ONLY — NO REAL AUTH BOUNDARY
-> The Admin panel's password (`ADMIN_PASSWORD`) is checked server-side, so it isn't trivially bypassable from the browser — but there's no rate limiting, no session/token, and the read endpoints (`/api/all`, `/api/export`) require **no auth at all**: anyone who can reach the URL can read every contribution, the fund value, and each person's shares.
+> The Admin panel's password (`ADMIN_PASSWORD`) is checked server-side, so it isn't trivially bypassable from the browser, and failed attempts are rate-limited per IP (10 per 5 minutes) — but there's no session/token, and the read endpoints (`/api/all`, `/api/export`) require **no auth at all**: anyone who can reach the URL can read every contribution, the fund value, and each person's shares.
 >
 > **Do not expose this to the public internet** (no open port-forward, no public reverse proxy) without putting your own auth layer in front of it (e.g. a reverse proxy with basic auth, a VPN/Tailscale, etc.), and **always set your own `ADMIN_PASSWORD`** — it defaults to `admin` if unset.
 
@@ -116,7 +116,15 @@ docker compose up -d --build
 # Open http://localhost:8080
 ```
 
-Uses `docker-compose.yml` at the repo root (local build, no dependency on GHCR). Set `ADMIN_PASSWORD` in a `.env` file or export it before running — it defaults to `admin` otherwise.
+Uses `docker-compose.yml` at the repo root (local build, no dependency on GHCR). Copy `.env.example` to `.env` and set `ADMIN_PASSWORD` before running — it defaults to `admin` otherwise.
+
+> **Upgrading from an image built before the container ran as a non-root user**: the process now runs as uid `10001`, and a `fondi-db` volume created by an older image is still owned by root, so SQLite can't write to it. The container refuses to start in that case (`attempt to write a readonly database`) rather than coming up healthy and failing one save at a time. Fix it once:
+>
+> ```bash
+> docker run --rm -v fondi-db:/data alpine chown -R 10001:10001 /data
+> ```
+>
+> A volume created fresh by the current image already has the right owner.
 
 Or build/run manually:
 
@@ -168,9 +176,29 @@ The `proxy` network must already exist (Traefik or another reverse proxy) and mu
 
 **After a new image is published, a plain restart/recreate is not enough** — Docker won't re-fetch an already-pulled `:latest` tag on its own. Pull explicitly (`docker compose pull`, or Portainer's "re-pull image" option) before recreating.
 
+## Backups
+
+The database is the only copy of the fund's history, and the app has no UPDATE/DELETE to fix a bad write from the UI. Two things guard it, both inside the `/data` volume next to `fondi.db` (last 5 kept, named `fondi.db.<timestamp>.bak`):
+
+- a snapshot taken right before every `.xlsx` import, since that's the one destructive operation;
+- a periodic snapshot every `BACKUP_INTERVAL_H` hours (default 24, `0` disables it).
+
+Both live on the same volume, so they cover corruption and bad writes — **not** losing the volume itself. For that, pull the export off the box on a schedule:
+
+```bash
+curl -sf http://<host>:8080/api/export -o "fondi-$(date +%F).xlsx"
+```
+
+That file is a full restore: Admin → Datos → Importar replaces everything with its contents.
+
 ## Testing
 
-Backend has `pytest` (`cd backend && python -m pytest`). Frontend has no automated tests, linter, or type checker configured — verify changes by running the app and exercising the UI manually.
+```bash
+cd backend && python -m pytest   # API, auth, import/export, share-balance rules
+npm test                         # vitest — the share math in src/domain/
+```
+
+The rest of the frontend is DOM-coupled and untested; anything worth testing gets extracted into `src/domain/` first. No linter or type checker is configured.
 
 ## License
 
