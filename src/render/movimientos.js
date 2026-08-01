@@ -13,7 +13,7 @@ function populateFiltroPersona() {
     nombres.map(n => `<option value="${esc(n)}"${n === current ? ' selected' : ''}>${esc(n)}</option>`).join('');
 }
 
-const fmtCOP = n => n ? '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(n) : '—';
+const fmtCOP = n => n ? COP(n) : '—';
 
 function renderPersonaPanel(nombre) {
   const p = calcParticipante(nombre);

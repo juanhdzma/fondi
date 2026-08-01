@@ -104,9 +104,9 @@ function renderConsistencyCheck() {
   if (!ultima || diff <= 0.01) { el.style.display = 'none'; el.innerHTML = ''; return; }
 
   el.style.display = 'block';
-  el.innerHTML = `<b>Datos inconsistentes.</b> Los movimientos suman ${fmtN(suma, 2)} cuotas,
-    pero la última valuación registra ${fmtN(ultima.cuotas_circ, 2)}
-    (diferencia de ${fmtN(diff, 2)}). Los porcentajes por participante no son confiables
+  el.innerHTML = `<b>Datos inconsistentes.</b> Los movimientos suman ${fmtN(suma)} cuotas,
+    pero la última valuación registra ${fmtN(ultima.cuotas_circ)}
+    (diferencia de ${fmtN(diff)}). Los porcentajes por participante no son confiables
     hasta que cuadren — revisá el histórico importado.`;
 }
 

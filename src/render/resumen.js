@@ -37,7 +37,7 @@ export function renderResumen() {
   const totalCuotas = cuotasCirc();
 
   // ── Sub-fila dentro de "Precio de cuota": cuotas en circulación y su valor en COP ──
-  document.getElementById('stat-cuotas-value').textContent = fmtN(totalCuotas, 2);
+  document.getElementById('stat-cuotas-value').textContent = fmtN(totalCuotas);
   document.getElementById('stat-cuota-cop-value').textContent = `${COP(Math.round(l.precio_cuota * (S.trm || 1)))} COP`;
 
   // ── Sub-fila dentro de "Valor del fondo": aportado vs. ganancia acumulada ──

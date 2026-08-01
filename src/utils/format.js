@@ -1,14 +1,10 @@
-export function fmt(usd, dec = 2) {
-  return '$' + new Intl.NumberFormat('es-CO', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(usd);
-}
+// Los formatters se instancian una sola vez: varios de estos se llaman desde callbacks de
+// ticks/tooltips de Chart.js, que corren por cada tick en cada frame de render.
+const NF2 = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const NF0 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
 
-export function fmtN(n, d = 2) {
-  return new Intl.NumberFormat('es-CO', { minimumFractionDigits: d, maximumFractionDigits: d }).format(Number(n || 0));
-}
-
-export function fmtPct(n, d = 2) {
-  return new Intl.NumberFormat('es-CO', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
-}
-
-export const COP = n => '$' + new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(n);
+export const fmt = usd => '$' + NF2.format(usd);
+export const fmtN = n => NF2.format(Number(n || 0));
+export const fmtPct = n => NF2.format(n);
+export const COP = n => '$' + NF0.format(n);
 export const signStr = n => n >= 0 ? '+' : '−';

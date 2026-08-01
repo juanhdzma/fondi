@@ -1,7 +1,7 @@
 import { Chart } from 'chart.js/auto';
 import { S, charts } from '../state.js';
 import { participanteColor, historialParticipante, historialGananciaFondo } from '../computed.js';
-import { fmtPct, signStr } from '../utils/format.js';
+import { fmt, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
 
 function rangeCutoff(range) {
@@ -162,7 +162,7 @@ function chartOpts(tickValues) {
         ...TT_BASE,
         callbacks: {
           title: tooltipNoTitle,
-          label: ctx => ` $${new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(ctx.parsed.y)} USD`,
+          label: ctx => ` ${fmt(ctx.parsed.y)} USD`,
           footer: tooltipFooterDate,
         }
       }
@@ -174,7 +174,7 @@ function chartOpts(tickValues) {
         ticks: {
           color: '#6E6F76',
           font: { size: 13 },
-          callback: v => '$' + new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v),
+          callback: v => fmt(v),
         },
         grid: { color: '#E7E7EA' },
         border: { display: false },
@@ -415,8 +415,7 @@ function personaTooltipHandler({ chart, tooltip }) {
   const el = getPersonaTooltipEl();
   if (tooltip.opacity === 0) { el.style.opacity = '0'; return; }
 
-  const fmtUsd = v => '$' + new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
-  const lines = tooltip.dataPoints.map(dp => `<div><b>${dp.dataset.label}</b>: ${fmtUsd(dp.parsed.y)} USD</div>`).join('');
+  const lines = tooltip.dataPoints.map(dp => `<div><b>${dp.dataset.label}</b>: ${fmt(dp.parsed.y)} USD</div>`).join('');
   const date  = tooltip.dataPoints.length ? fmtTs(tooltip.dataPoints[0].parsed.x) : '';
 
   el.innerHTML = `${lines}<div style="color:#9AA0A6;font-size:11px;font-weight:600;margin-top:4px">${date}</div>`;
@@ -446,7 +445,7 @@ function personaChartOpts(tickValues) {
         position: 'right',
         ticks: {
           color: '#6E6F76', font: { size: 13 },
-          callback: v => '$' + new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v),
+          callback: v => fmt(v),
         },
         grid: { color: '#E7E7EA' }, border: { display: false },
       },
