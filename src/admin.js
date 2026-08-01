@@ -23,27 +23,36 @@ function nowLocal() {
   return { date, time, iso: `${date}T${time}` };
 }
 
+// El motivo real del rechazo importa: tras 10 intentos fallidos el backend responde 429 y
+// hasta la clave correcta rebota por unos minutos. Mostrando siempre "Clave incorrecta" el
+// admin reintentaba una clave que sí era la buena sin entender por qué no entraba.
 async function unlockAdmin() {
-  const val = document.getElementById('admin-key').value;
+  const input = document.getElementById('admin-key');
   const errEl = document.getElementById('key-err');
+  let msg;
+
   try {
     const r = await fetch(`${API_BASE_URL}/api/auth/verify`, {
       method: 'POST',
-      headers: { 'X-Admin-Key': val },
+      headers: { 'X-Admin-Key': input.value },
     });
-    if (!r.ok) throw new Error();
-    adminKey = val;
-    errEl.textContent = '';
-    document.getElementById('admin-lock').style.display = 'none';
-    document.getElementById('admin-panel').style.display = 'block';
-    initAdminForms();
+    if (r.ok) {
+      adminKey = input.value;
+      errEl.textContent = '';
+      document.getElementById('admin-lock').style.display = 'none';
+      document.getElementById('admin-panel').style.display = 'block';
+      initAdminForms();
+      return;
+    }
+    const detail = await r.json().catch(() => ({}));
+    msg = detail.detail || (r.status === 401 ? 'Clave incorrecta' : `Error ${r.status}`);
   } catch {
-    document.getElementById('admin-key').classList.add('err');
-    errEl.textContent = 'Clave incorrecta';
-    setTimeout(() => {
-      document.getElementById('admin-key').classList.remove('err');
-    }, 1500);
+    msg = 'No se pudo conectar con el servidor';
   }
+
+  input.classList.add('err');
+  errEl.textContent = msg;
+  setTimeout(() => input.classList.remove('err'), 1500);
 }
 
 function setTipo(tipo) {
