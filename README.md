@@ -178,9 +178,12 @@ networks:
 
 volumes:
   fondi-db:
+    name: fondi_db
 ```
 
 The `proxy` network must already exist (Traefik or another reverse proxy) and must be told to route to container port **8000**. Without the `fondi-db` volume, the SQLite database is wiped every time the container is recreated.
+
+`name: fondi_db` pins the real volume name. Without it Compose prefixes the project/stack name (`fondi_fondi-db`), so renaming the stack later makes it create a **new, empty** volume — the app starts up perfectly healthy showing a fund of zero, while the actual history sits in the old volume nobody is looking at. Note this also means the manual `docker run -v fondi-db:/data` above uses a *different* volume than the stack does; pick one.
 
 **After a new image is published, a plain restart/recreate is not enough** — Docker won't re-fetch an already-pulled `:latest` tag on its own. Pull explicitly (`docker compose pull`, or Portainer's "re-pull image" option) before recreating.
 

@@ -18,4 +18,8 @@ services:
     restart: unless-stopped
 
 volumes:
+  # `name` fija el nombre real del volumen: sin esto compose le antepone el del proyecto/stack
+  # (fondi_fondi-db) y renombrar el stack lo hace crear uno nuevo y vacío — la app levanta
+  # perfecta con el fondo en cero y la historia queda en el volumen viejo que nadie mira.
   fondi-db:
+    name: fondi_db
