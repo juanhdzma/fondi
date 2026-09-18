@@ -6,7 +6,7 @@ Web dashboard for managing a mutual-fund-style investment pool: several particip
 
 ![Resumen](docs/screenshots/desktop-resumen.png)
 
-> ## ⚠️ PRIVATE USE ONLY — NO REAL AUTH BOUNDARY
+> ## PRIVATE USE ONLY — NO REAL AUTH BOUNDARY
 > The Admin panel's password (`ADMIN_PASSWORD`) is checked server-side, so it isn't trivially bypassable from the browser, and failed attempts are rate-limited per IP (10 per 5 minutes) — but there's no session/token, and the read endpoints (`/api/all`, `/api/export`) require **no auth at all**: anyone who can reach the URL can read every contribution, the fund value, and each person's shares.
 >
 > **Do not expose this to the public internet** (no open port-forward, no public reverse proxy) without putting your own auth layer in front of it (e.g. a reverse proxy with basic auth, a VPN/Tailscale, etc.), and **always set your own `ADMIN_PASSWORD`** — it defaults to `admin` if unset.
@@ -63,15 +63,15 @@ Below 720px the top nav becomes a bottom tab bar. Inputs are sized to avoid iOS'
 
 ## How it fits together
 
-One image, one container: a multi-stage `Dockerfile` builds the Vite frontend, then a Python stage installs FastAPI and serves the built static files alongside the `/api/*` routes from a single `uvicorn` process — no nginx, no second container. Data lives in a SQLite file with three append-only tables (`historial_fondo`, `movimientos`, `participantes_config`) — nothing is ever edited or deleted, only new rows added.
+By default, one image and one container: a multi-stage `Dockerfile` builds the Vite frontend, then a Python stage installs FastAPI and serves the built static files alongside the `/api/*` routes from a single `uvicorn` process. Data lives in a SQLite file with three append-only tables (`historial_fondo`, `movimientos`, `participantes_config`) — nothing is ever edited or deleted, only new rows added.
 
 The frontend (`src/`) is plain JS, no framework: one module per UI section under `render/`, all reading from a single in-memory state object (`S` in `state.js`) populated from `GET /api/all`. Any admin write — a movement, a valuation, adding a participant — goes through the API and then refetches and re-renders everything; there's no optimistic UI or partial state patching by design, trading snappiness for simplicity at the data volumes this app deals with.
 
-See `CLAUDE.md` for the full data model, endpoint list, and the non-obvious parts of the share-price math.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module ownership, request contract and the future frontend/API split.
 
 ## Running locally
 
-Needs Node.js 20+ and Python 3.12+. The frontend and backend run as two separate processes in dev.
+Needs Node.js 20+ and Python 3.12. The frontend and backend run as two separate processes in dev.
 
 ```bash
 # Backend
@@ -87,14 +87,14 @@ npm run dev
 # Open http://localhost:8080
 ```
 
-The frontend talks to `http://localhost:8000` in dev (see `API_BASE_URL` in `src/config.js`) — CORS is enabled on the backend for this cross-origin setup. To test the UI without a running backend, set `MOCK_MODE = true` in `src/config.js`.
+The frontend talks to `http://localhost:8000` in dev (see `API_BASE_URL` in `src/config.js`) — CORS is enabled on the backend for this cross-origin setup. To build against a separately deployed API, set `VITE_API_BASE_URL=https://api.example.com` before `npm run build`. To test the UI without a running backend, set `MOCK_MODE = true` in `src/config.js`.
 
 `npm run build` generates `dist/` (what the Dockerfile copies into the image); `npm run preview` serves it locally to check before deploying.
 
 ### Structure
 
 ```
-index.html          Markup only, no inline logic or styles
+  index.html          Markup only, no inline event handlers
 src/
   main.js            Entry point — wires up event listeners and boots the app
   config.js           API_BASE_URL, MOCK_MODE / mock fixtures
@@ -109,8 +109,9 @@ src/
   ui/                   Tabs, chart date range, error banner, refresh
   *.test.js             vitest, next to what they cover (domain/, computed.js, utils/)
 backend/
-  app/main.py          FastAPI app: auth dependency, routes, static file mount
+  app/main.py          FastAPI app: auth dependency, routes, optional static file mount
   app/db.py            Schema + sqlite3 connection helper
+  app/domain.py        Authoritative share calculations
   app/xlsx.py          xlsx export/import format
   tests/               pytest + FastAPI TestClient
 ```
@@ -185,11 +186,22 @@ The `proxy` network must already exist (Traefik or another reverse proxy) and mu
 
 `name: fondi_db` pins the real volume name. Without it Compose prefixes the project/stack name (`fondi_fondi-db`), so renaming the stack later makes it create a **new, empty** volume — the app starts up perfectly healthy showing a fund of zero, while the actual history sits in the old volume nobody is looking at. Note this also means the manual `docker run -v fondi-db:/data` above uses a *different* volume than the stack does; pick one.
 
+### Separating frontend and API
+
+The default remains one container. If the frontend later needs its own host or service, build it with the API URL and turn off static serving in the backend:
+
+```bash
+VITE_API_BASE_URL=https://api.example.com docker compose build
+SERVE_STATIC=0 ALLOWED_ORIGINS=https://app.example.com docker compose up -d
+```
+
+Serve the resulting frontend with the existing reverse proxy or any static host. The API contract and SQLite volume stay unchanged.
+
 **After a new image is published, a plain restart/recreate is not enough** — Docker won't re-fetch an already-pulled `:latest` tag on its own. Pull explicitly (`docker compose pull`, or Portainer's "re-pull image" option) before recreating.
 
 ## Configuration
 
-All of it is environment variables on the backend; `.env.example` has the same list with the reasoning. None are required — the defaults run.
+The backend uses environment variables; `VITE_API_BASE_URL` is read while building the frontend. `.env.example` has the same list with the reasoning. None are required — the defaults run.
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -197,6 +209,8 @@ All of it is environment variables on the backend; `.env.example` has the same l
 | `TRUST_PROXY` | off | Read `X-Forwarded-For` when counting failed logins. Turn it on **only** behind a reverse proxy — see the warning at the top. |
 | `BACKUP_INTERVAL_H` | `24` | Hours between automatic DB snapshots. `0` disables them. |
 | `ALLOWED_ORIGINS` | `*` | Comma-separated CORS origins. Only matters for `npm run dev`, where frontend and backend are on different ports; production is same-origin. |
+| `SERVE_STATIC` | `1` | Set `0` when the frontend is hosted separately; FastAPI will not mount frontend files. |
+| `VITE_API_BASE_URL` | same origin | Build-time URL for a separately hosted frontend. |
 | `DB_PATH` | `/data/fondi.db` | SQLite file. Must be on the mounted volume, or the history dies with the container. |
 | `LOG_LEVEL` | `INFO` | Backend log level. |
 | `STATIC_DIR` | `../static` | Where the built frontend lives inside the image. If the directory doesn't exist, no static routes are mounted and only the API is served — which is what running the backend standalone for frontend dev relies on. |

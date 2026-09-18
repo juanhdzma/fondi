@@ -1,5 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 COPY package*.json ./
 RUN npm ci
 COPY . .
@@ -8,7 +10,7 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip==26.2.1 && pip install --no-cache-dir -r requirements.txt
 COPY backend/app ./app
 COPY --from=build /app/dist ./static
 ENV DB_PATH=/data/fondi.db

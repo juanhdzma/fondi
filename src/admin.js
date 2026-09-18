@@ -1,8 +1,7 @@
-import { API_BASE_URL } from './config.js';
 import { S } from './state.js';
 import { cuotasCirc, precioCuota, participantesActivos, calcParticipante, latest } from './computed.js';
 import { calcularCuotas, excedeSaldo } from './domain/cuotas.js';
-import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx } from './api/backend.js';
+import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx, verifyAdmin } from './api/backend.js';
 import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
 import { todayLocal } from './utils/dates.js';
 import { esc } from './utils/html.js';
@@ -45,22 +44,15 @@ async function unlockAdmin() {
   let msg;
 
   try {
-    const r = await fetch(`${API_BASE_URL}/api/auth/verify`, {
-      method: 'POST',
-      headers: { 'X-Admin-Key': input.value },
-    });
-    if (r.ok) {
-      adminKey = input.value;
-      errEl.textContent = '';
-      document.getElementById('admin-lock').style.display = 'none';
-      document.getElementById('admin-panel').style.display = 'block';
-      initAdminForms();
-      return;
-    }
-    const detail = await r.json().catch(() => ({}));
-    msg = detail.detail || (r.status === 401 ? 'Clave incorrecta' : `Error ${r.status}`);
-  } catch {
-    msg = 'No se pudo conectar con el servidor';
+    await verifyAdmin(input.value);
+    adminKey = input.value;
+    errEl.textContent = '';
+    document.getElementById('admin-lock').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    initAdminForms();
+    return;
+  } catch (err) {
+    msg = err.message || 'No se pudo conectar con el servidor';
   }
 
   input.classList.add('err');
@@ -72,6 +64,7 @@ function setTipo(tipo) {
   document.getElementById('f-tipo').value = tipo;
   document.querySelector('.tipo-btn.aporte').classList.toggle('sel', tipo === 'aporte');
   document.querySelector('.tipo-btn.retiro').classList.toggle('sel', tipo === 'retiro');
+  renderMovimientoOptions();
   saveFormSnapshot();
   previewMov();
 }
@@ -139,8 +132,12 @@ export function renderAdminParticipants() {
   const sel = document.getElementById('f-persona');
   if (sel) {
     const current = sel.value;
-    sel.innerHTML = nombres.map(n => `<option${n === current ? ' selected' : ''}>${esc(n)}</option>`).join('');
+    const selected = nombres.includes(current) ? current : (nombres[0] || '');
+    sel.innerHTML = nombres.map(n => `<option${n === selected ? ' selected' : ''}>${esc(n)}</option>`).join('');
+    formSnapshot['f-persona'] = selected;
   }
+
+  renderMovimientoOptions();
 
   const list = document.getElementById('participants-manage-list');
   if (list) {
@@ -152,6 +149,33 @@ export function renderAdminParticipants() {
         </div>`).join('')
       : '<div class="form-hint">Sin participantes — agrega el primero abajo.</div>';
   }
+}
+
+function renderMovimientoOptions() {
+  const persona = document.getElementById('f-persona').value;
+  const retiro = document.getElementById('f-tipo').value === 'retiro';
+  const saldo = persona ? calcParticipante(persona).valor_actual : 0;
+
+  document.getElementById('group-monto-cop').style.display = retiro ? 'none' : '';
+  document.getElementById('hint-saldo-persona').textContent = persona ? `Saldo actual: ${fmt(saldo)} USD` : '';
+  document.getElementById('btn-retirar-todo').style.display = retiro && saldo > 0 ? '' : 'none';
+  if (retiro) document.getElementById('hint-trm-mov').textContent = '';
+}
+
+function retirarTodo() {
+  const persona = document.getElementById('f-persona').value;
+  const saldo = calcParticipante(persona).valor_actual;
+  const ultima = latest();
+  const st = document.getElementById('st-mov');
+  const restante = ultima ? ultima.valor_total - saldo : 0;
+
+  if (!saldo || !ultima) { setStatus(st, 'err', 'No hay saldo disponible para retirar'); return; }
+  if (restante < -1e-6) { setStatus(st, 'err', 'El saldo supera el valor actual del fondo'); return; }
+
+  document.getElementById('f-monto').value = String(saldo).replace('.', ',');
+  document.getElementById('f-valor-mov').value = String(Math.max(0, restante)).replace('.', ',');
+  saveFormSnapshot();
+  previewMov();
 }
 
 async function agregarParticipante() {
@@ -211,6 +235,7 @@ function previewTrm() {
   if (!el) return;
 
   el.className = 'form-hint';
+  if (document.getElementById('f-tipo').value === 'retiro') { el.textContent = ''; return; }
   if (!cop || !usd) { el.textContent = ''; return; }
 
   const trm = cop / usd;
@@ -267,20 +292,21 @@ function previewFondo() {
 async function submitMov() {
   const persona    = document.getElementById('f-persona').value;
   const tipo       = document.getElementById('f-tipo').value;
-  const monto_cop  = parseMoneyInput(document.getElementById('f-monto-cop'));
+  const monto_cop  = tipo === 'retiro' ? 0 : parseMoneyInput(document.getElementById('f-monto-cop'));
   const monto_usd  = parseMoneyInput(document.getElementById('f-monto'));
-  const valorFondo = parseMoneyInput(document.getElementById('f-valor-mov'));
+  const valorInput = document.getElementById('f-valor-mov');
+  const valorFondo = parseMoneyInput(valorInput);
   const fecha      = document.getElementById('f-fecha').value + 'T' + (document.getElementById('f-hora').value || '00:00');
   const st         = document.getElementById('st-mov');
   const btn        = document.getElementById('btn-mov');
 
-  if (!monto_cop || monto_cop <= 0)  { setStatus(st, 'err', 'Ingresa el monto en COP'); return; }
+  if (tipo === 'aporte' && (!monto_cop || monto_cop <= 0)) { setStatus(st, 'err', 'Ingresa el monto en COP'); return; }
   if (!monto_usd || monto_usd <= 0)  { setStatus(st, 'err', 'Ingresa el monto en USD'); return; }
-  if (!valorFondo || valorFondo <= 0) { setStatus(st, 'err', 'Ingresa el valor del fondo después'); return; }
+  if (!valorInput.value || valorFondo < 0) { setStatus(st, 'err', 'Ingresa el valor del fondo después'); return; }
   if (!fecha)                         { setStatus(st, 'err', 'Fecha requerida'); return; }
 
-  const trm_dia = monto_cop / monto_usd;   // TRM calculada internamente
-  const { precioAntes, cuotas, cuotasNuevas, precioDespues } = calcularCuotas({
+  const trm_dia = monto_cop / monto_usd;
+  const { precioAntes, cuotas } = calcularCuotas({
     tipo, monto: monto_usd, valorFondo, cuotasActuales: cuotasCirc(),
   });
 
@@ -299,12 +325,9 @@ async function submitMov() {
     // misma transacción. Separados, si el segundo fallaba quedaba un movimiento que cambió
     // las cuotas con el precio de cuota viejo, sin forma de deshacerlo (log append-only).
     await postMovimiento({
-      fecha, persona, tipo, monto_usd, precio_cuota_dia: precioAntes, cuotas, monto_cop, trm_dia,
+      fecha, persona, tipo, monto_usd, monto_cop, trm_dia,
       fondo: {
-        fecha,
         valor_total_usd: valorFondo,
-        precio_cuota_usd: precioDespues,
-        cuotas_en_circulacion: cuotasNuevas,
         trm: S.trm || 0,
       },
     }, adminKey);
@@ -318,6 +341,7 @@ async function submitMov() {
     await fetchAll();
     restoreFormSnapshot();
     renderConsistencyCheck();
+    renderMovimientoOptions();
     showToast('Guardado');
   } catch (err) {
     setStatus(st, 'err', err.message);
@@ -368,12 +392,10 @@ async function submitFondo() {
     circ = val;
   }
 
-  const pc = val / circ;
-
   btn.disabled = true;
   setStatus(st, '', 'Guardando...');
   try {
-    await postFondo({ fecha, valor_total_usd: val, precio_cuota_usd: pc, cuotas_en_circulacion: circ, trm: S.trm || 0 }, adminKey);
+    await postFondo({ fecha, valor_total_usd: val, trm: S.trm || 0 }, adminKey);
     setStatus(st, '', '');
     document.getElementById('f-valor').value = '';
     saveFormSnapshot();
@@ -406,10 +428,12 @@ export function bindAdminEvents() {
   document.getElementById('f-monto-cop').addEventListener('input', e => { fmtMoneyInput(e.target, 0); previewTrm(); });
   document.getElementById('f-monto').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewTrm(); previewMov(); });
   document.getElementById('f-valor-mov').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewMov(); });
+  document.getElementById('f-persona').addEventListener('change', () => { renderMovimientoOptions(); previewMov(); });
   document.getElementById('f-valor').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewFondo(); });
   document.getElementById('f-fecha-fondo').addEventListener('input', previewFondo);
 
   document.getElementById('btn-mov').addEventListener('click', submitMov);
+  document.getElementById('btn-retirar-todo').addEventListener('click', retirarTodo);
   document.getElementById('btn-fondo').addEventListener('click', submitFondo);
 
   document.getElementById('btn-add-participante').addEventListener('click', agregarParticipante);

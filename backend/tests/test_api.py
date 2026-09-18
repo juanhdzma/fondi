@@ -55,7 +55,8 @@ def test_get_all_empty(client):
 def test_post_movimiento_requires_auth(client):
     payload = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     }
     r = client.post("/api/movimiento", json=payload)
     assert r.status_code == 401
@@ -67,7 +68,8 @@ def test_post_movimiento_requires_auth(client):
 def test_post_movimiento_then_get_all(client):
     payload = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     }
     r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
     assert r.status_code == 201
@@ -79,14 +81,13 @@ def test_post_movimiento_then_get_all(client):
 
 def test_post_fondo(client):
     payload = {
-        "fecha": "2026-01-10T00:00", "valor_total_usd": 400, "precio_cuota_usd": 1.0,
-        "cuotas_en_circulacion": 400, "trm": 3300,
+        "fecha": "2026-01-10T00:00", "valor_total_usd": 400, "trm": 3300,
     }
     r = client.post("/api/fondo", json=payload, headers={"X-Admin-Key": "s3cret"})
     assert r.status_code == 201
 
     r = client.get("/api/all")
-    assert len(r.json()["historial"]) == 1
+    assert r.json()["historial"] == [{"fecha": "2026-01-10T00:00", "valor_total": 400.0, "precio_cuota": 1.0, "cuotas_circ": 400.0, "trm": 3300.0}]
 
 
 def test_auth_verify(client):
@@ -109,7 +110,8 @@ def test_post_participante(client):
 def test_export_xlsx(client):
     client.post("/api/movimiento", headers={"X-Admin-Key": "s3cret"}, json={
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     })
 
     r = client.get("/api/export")
@@ -188,11 +190,8 @@ def test_auth_con_clave_no_ascii_da_401_no_500(client):
 def test_movimiento_con_fondo_es_atomico(client):
     payload = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
-        "fondo": {
-            "fecha": "2026-01-10T00:00", "valor_total_usd": 100, "precio_cuota_usd": 1.0,
-            "cuotas_en_circulacion": 100, "trm": 3300,
-        },
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     }
     r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
     assert r.status_code == 201
@@ -200,16 +199,36 @@ def test_movimiento_con_fondo_es_atomico(client):
     data = client.get("/api/all").json()
     assert len(data["movimientos"]) == 1
     assert len(data["historial"]) == 1
+    assert data["movimientos"][0]["cuotas"] == 100
+    assert data["historial"][0]["precio_cuota"] == 1
+
+
+def test_movimiento_calcula_cuotas_en_el_backend(client):
+    headers = {"X-Admin-Key": "s3cret"}
+    client.post("/api/movimiento", headers=headers, json={
+        "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
+    })
+
+    r = client.post("/api/movimiento", headers=headers, json={
+        "fecha": "2026-01-11T00:00", "persona": "Otro", "tipo": "aporte",
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 300, "trm": 3300},
+    })
+    assert r.status_code == 201
+
+    data = client.get("/api/all").json()
+    assert data["movimientos"][1]["cuotas"] == 50
+    assert data["historial"][1]["precio_cuota"] == 2
+    assert data["historial"][1]["cuotas_circ"] == 150
 
 
 def test_movimiento_con_fondo_invalido_no_guarda_nada(client):
     payload = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
-        "fondo": {
-            "fecha": "no-es-fecha", "valor_total_usd": 100, "precio_cuota_usd": 1.0,
-            "cuotas_en_circulacion": 100, "trm": 3300,
-        },
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": -1, "trm": 3300},
     }
     r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
     assert r.status_code == 422
@@ -229,7 +248,8 @@ def test_movimiento_con_fondo_invalido_no_guarda_nada(client):
 def test_movimiento_rechaza_datos_invalidos(client, campo, valor):
     payload = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     }
     payload[campo] = valor
 
@@ -243,7 +263,8 @@ def test_error_de_validacion_devuelve_texto_legible(client):
     # el admin veía "[object Object]" y no qué campo estaba mal.
     payload = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": -5, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "monto_usd": -5, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     }
     r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
     assert r.status_code == 422
@@ -261,16 +282,14 @@ def test_participante_rechaza_accion_desconocida(client):
 def test_retiro_total_deja_el_fondo_en_cero(client):
     client.post("/api/movimiento", headers={"X-Admin-Key": "s3cret"}, json={
         "fecha": "2026-01-09T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     })
 
     payload = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "retiro",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": -100, "monto_cop": 330000, "trm_dia": 3300,
-        "fondo": {
-            "fecha": "2026-01-10T00:00", "valor_total_usd": 0, "precio_cuota_usd": 1.0,
-            "cuotas_en_circulacion": 0, "trm": 3300,
-        },
+        "monto_usd": 100, "monto_cop": 0, "trm_dia": 0,
+        "fondo": {"valor_total_usd": 0, "trm": 3300},
     }
     r = client.post("/api/movimiento", json=payload, headers={"X-Admin-Key": "s3cret"})
     assert r.status_code == 201
@@ -302,26 +321,29 @@ def test_import_normaliza_tipo_y_rechaza_valores_desconocidos(client):
 def test_retiro_mayor_al_saldo_se_rechaza(client):
     aporte = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     }
     client.post("/api/movimiento", json=aporte, headers={"X-Admin-Key": "s3cret"})
+    client.post("/api/movimiento", json={**aporte, "persona": "Otro", "fondo": {"valor_total_usd": 200, "trm": 3300}}, headers={"X-Admin-Key": "s3cret"})
 
     # Un cero de más en el retiro: dejaría a Patico con -900 cuotas y sin forma de deshacerlo.
-    retiro = {**aporte, "tipo": "retiro", "monto_usd": 1000, "cuotas": -1000}
+    retiro = {**aporte, "tipo": "retiro", "monto_usd": 200, "fondo": {"valor_total_usd": 0, "trm": 3300}}
     r = client.post("/api/movimiento", json=retiro, headers={"X-Admin-Key": "s3cret"})
     assert r.status_code == 400
 
-    assert len(client.get("/api/all").json()["movimientos"]) == 1
+    assert len(client.get("/api/all").json()["movimientos"]) == 2
 
 
 def test_retiro_total_pasa(client):
     aporte = {
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     }
     client.post("/api/movimiento", json=aporte, headers={"X-Admin-Key": "s3cret"})
 
-    retiro = {**aporte, "tipo": "retiro", "cuotas": -100}
+    retiro = {**aporte, "tipo": "retiro", "monto_cop": 0, "trm_dia": 0, "fondo": {"valor_total_usd": 0, "trm": 3300}}
     r = client.post("/api/movimiento", json=retiro, headers={"X-Admin-Key": "s3cret"})
     assert r.status_code == 201
 
@@ -339,14 +361,12 @@ def test_auth_bloquea_despues_de_muchos_intentos(client):
 def test_export_reimportado_deja_la_db_igual(client):
     # El export es el único backup que sale de la máquina: tiene que poder volver a entrar
     # tal cual, incluida la validación de columnas requeridas del import.
-    client.post("/api/movimiento", headers={"X-Admin-Key": "s3cret"}, json={
+    r = client.post("/api/movimiento", headers={"X-Admin-Key": "s3cret"}, json={
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",
-        "monto_usd": 100, "precio_cuota_dia": 1.0, "cuotas": 100, "monto_cop": 330000, "trm_dia": 3300,
-        "fondo": {
-            "fecha": "2026-01-10T00:00", "valor_total_usd": 100, "precio_cuota_usd": 1.0,
-            "cuotas_en_circulacion": 100, "trm": 3300,
-        },
+        "monto_usd": 100, "monto_cop": 330000, "trm_dia": 3300,
+        "fondo": {"valor_total_usd": 100, "trm": 3300},
     })
+    assert r.status_code == 201
     client.post("/api/participante", headers={"X-Admin-Key": "s3cret"},
                 json={"fecha": "2026-01-10T00:00", "nombre": "Patico", "accion": "agregar"})
 
@@ -407,7 +427,7 @@ def test_movimiento_rechaza_montos_no_finitos(client, literal):
     # se guardaban con 201 y después /api/all no podía serializarse nunca más (500 permanente).
     body = (
         '{"fecha":"2026-01-10T00:00","persona":"Patico","tipo":"aporte","monto_usd":%s,'
-        '"precio_cuota_dia":1.0,"cuotas":100,"monto_cop":330000,"trm_dia":3300}' % literal
+        '"monto_cop":330000,"trm_dia":3300,"fondo":{"valor_total_usd":100,"trm":3300}}' % literal
     )
     r = client.post("/api/movimiento", content=body,
                     headers={"X-Admin-Key": "s3cret", "Content-Type": "application/json"})
@@ -415,20 +435,21 @@ def test_movimiento_rechaza_montos_no_finitos(client, literal):
     assert client.get("/api/all").status_code == 200
 
 
-def test_movimiento_rechaza_cuotas_no_finitas(client):
+def test_movimiento_rechaza_cuotas_enviadas_por_el_cliente(client):
     body = (
         '{"fecha":"2026-01-10T00:00","persona":"Patico","tipo":"aporte","monto_usd":100,'
-        '"precio_cuota_dia":1.0,"cuotas":NaN,"monto_cop":330000,"trm_dia":3300}'
+        '"cuotas":NaN,"monto_cop":330000,"trm_dia":3300,'
+        '"fondo":{"valor_total_usd":100,"trm":3300}}'
     )
     r = client.post("/api/movimiento", content=body,
                     headers={"X-Admin-Key": "s3cret", "Content-Type": "application/json"})
     assert r.status_code == 422
+    assert "cuotas" in r.json()["detail"]
 
 
 def test_fondo_rechaza_valores_no_finitos(client):
     body = (
-        '{"fecha":"2026-01-10T00:00","valor_total_usd":Infinity,"precio_cuota_usd":1.0,'
-        '"cuotas_en_circulacion":100,"trm":3300}'
+        '{"fecha":"2026-01-10T00:00","valor_total_usd":Infinity,"trm":3300}'
     )
     r = client.post("/api/fondo", content=body,
                     headers={"X-Admin-Key": "s3cret", "Content-Type": "application/json"})

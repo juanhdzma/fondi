@@ -1,6 +1,6 @@
 // En dev (`npm run dev`) el backend corre aparte en :8000; en el build de producción
 // ambos quedan en el mismo container/origen, así que las requests van relativas.
-export const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : '';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
 // ── Rampa tonal (un solo acento, distintas intensidades) — avatares y barra de participación ──
 export const PARTICIPANT_COLORS = ['#0C243B', '#1B3A5C', '#2F5478', '#4A6E93', '#7C93AF'];

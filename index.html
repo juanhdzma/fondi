@@ -161,6 +161,7 @@
           <div class="form-group">
             <label class="form-label" for="f-persona">Participante</label>
             <select class="form-input" id="f-persona"></select>
+            <div class="form-hint" id="hint-saldo-persona"></div>
           </div>
           <div class="form-group">
             <div class="form-label" id="lbl-tipo">Tipo</div>
@@ -170,7 +171,7 @@
             </div>
             <input type="hidden" id="f-tipo" value="aporte" />
           </div>
-          <div class="form-group">
+          <div class="form-group" id="group-monto-cop">
             <label class="form-label" for="f-monto-cop">Monto (COP)</label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
@@ -184,6 +185,7 @@
               <input class="form-input" type="text" inputmode="decimal" id="f-monto" placeholder="0,00" />
             </div>
             <div class="form-hint" id="hint-trm-mov"></div>
+            <button type="button" class="btn btn-dim" id="btn-retirar-todo" style="display:none;margin-top:8px">Retirar todo</button>
           </div>
           <div class="form-group">
             <label class="form-label" for="f-valor-mov">Valor del fondo después (USD) <span style="color:var(--red)">*</span></label>

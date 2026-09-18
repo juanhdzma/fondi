@@ -20,6 +20,10 @@ export function postMovimiento(payload, adminKey) {
   return postJSON('/api/movimiento', payload, adminKey);
 }
 
+export function verifyAdmin(adminKey) {
+  return postJSON('/api/auth/verify', {}, adminKey);
+}
+
 export function postFondo(payload, adminKey) {
   return postJSON('/api/fondo', payload, adminKey);
 }

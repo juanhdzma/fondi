@@ -4,7 +4,7 @@ import os
 import secrets
 import time
 from contextlib import asynccontextmanager, suppress
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from .db import backup_db, get_conn, init_db, replace_all
+from .domain import calcular_movimiento
 from .xlsx import InvalidWorkbook, build_workbook, parse_workbook
 
 # uvicorn solo configura handlers para sus propios loggers: sin esto el logger raíz se queda
@@ -31,6 +32,7 @@ FECHA_RE = r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?$"
 # Cambiala en el deploy real (ADMIN_PASSWORD en Portainer/.env).
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 STATIC_DIR = os.environ.get("STATIC_DIR", os.path.join(os.path.dirname(__file__), "..", "static"))
+SERVE_STATIC = os.environ.get("SERVE_STATIC", "1").strip().lower() not in ("0", "false", "no")
 # En producción front y back quedan en el mismo origen (mismo container/puerto) y esto no
 # se usa; en `npm run dev` el frontend corre en :8080 y este backend en :8000 — orígenes
 # distintos, así que el browser exige CORS (incluye preflight OPTIONS por el header
@@ -157,7 +159,7 @@ def require_admin(request: Request, x_admin_key: str = Header(default="")):
 # `inf` pasa cualquier gt/ge (inf > 0 es True) y `nan` no tiene constraint que lo frene: sin
 # esto un monto infinito se guardaba con 201 y a partir de ahí /api/all respondía 500 para
 # siempre (json no serializa inf), con el log append-only y sin forma de borrar la fila.
-SIN_INF_NAN = ConfigDict(allow_inf_nan=False)
+SIN_INF_NAN = ConfigDict(allow_inf_nan=False, extra="forbid")
 
 
 class Fondo(BaseModel):
@@ -166,8 +168,13 @@ class Fondo(BaseModel):
     fecha: str = Field(pattern=FECHA_RE)
     # ge=0 y no gt=0: un retiro total deja el fondo en 0 con 0 cuotas, y eso es válido.
     valor_total_usd: float = Field(ge=0)
-    precio_cuota_usd: float = Field(gt=0)
-    cuotas_en_circulacion: float = Field(ge=0)
+    trm: float = Field(ge=0)
+
+
+class FondoMovimiento(BaseModel):
+    model_config = SIN_INF_NAN
+
+    valor_total_usd: float = Field(ge=0)
     trm: float = Field(ge=0)
 
 
@@ -178,15 +185,9 @@ class Movimiento(BaseModel):
     persona: str = Field(min_length=1)
     tipo: Literal["aporte", "retiro"]
     monto_usd: float = Field(gt=0)
-    precio_cuota_dia: float = Field(gt=0)
-    cuotas: float
     monto_cop: float = Field(ge=0)
     trm_dia: float = Field(ge=0)
-    # Valuación del fondo que resulta de este movimiento. Va en el mismo request para que
-    # ambas filas entren en una sola transacción: un movimiento sin su valuación cambia las
-    # cuotas en circulación dejando el precio de cuota viejo, y todos los porcentajes de
-    # todos los participantes quedan mal sin forma de deshacerlo (el log es append-only).
-    fondo: Optional[Fondo] = None
+    fondo: FondoMovimiento
 
 
 class Participante(BaseModel):
@@ -230,11 +231,11 @@ def get_all():
     }
 
 
-def _insert_fondo(conn, f: Fondo):
+def _insert_fondo(conn, fecha, valor_total, precio_cuota, cuotas_circ, trm):
     conn.execute(
         "INSERT INTO historial_fondo (fecha, valor_total, precio_cuota, cuotas_circ, trm) "
         "VALUES (?, ?, ?, ?, ?)",
-        (f.fecha, f.valor_total_usd, f.precio_cuota_usd, f.cuotas_en_circulacion, f.trm),
+        (fecha, valor_total, precio_cuota, cuotas_circ, trm),
     )
 
 
@@ -244,32 +245,43 @@ def _insert_fondo(conn, f: Fondo):
 TOLERANCIA_CUOTAS = 1e-6
 
 
+def _cuotas_circulacion(conn):
+    return conn.execute("SELECT COALESCE(SUM(cuotas), 0) AS total FROM movimientos").fetchone()["total"]
+
+
 @app.post("/api/movimiento", status_code=201, dependencies=[Depends(require_admin)])
 def post_movimiento(m: Movimiento):
     with get_conn() as conn:
-        if m.cuotas < 0:
+        cuotas_actuales = _cuotas_circulacion(conn)
+        try:
+            calculado = calcular_movimiento(m.tipo, m.monto_usd, m.fondo.valor_total_usd, cuotas_actuales)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+
+        if calculado.cuotas < 0:
             actuales = conn.execute(
                 "SELECT COALESCE(SUM(cuotas), 0) AS total FROM movimientos WHERE persona = ?",
                 (m.persona,),
             ).fetchone()["total"]
-            if actuales + m.cuotas < -TOLERANCIA_CUOTAS:
+            if actuales + calculado.cuotas < -TOLERANCIA_CUOTAS:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"{m.persona} tiene {actuales:.4f} cuotas y el retiro pide {-m.cuotas:.4f}",
+                    detail=f"{m.persona} tiene {actuales:.4f} cuotas y el retiro pide {-calculado.cuotas:.4f}",
                 )
 
         conn.execute(
             "INSERT INTO movimientos (fecha, persona, tipo, monto, precio_cuota_dia, cuotas, monto_cop, trm_dia) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (m.fecha, m.persona, m.tipo, m.monto_usd, m.precio_cuota_dia, m.cuotas, m.monto_cop, m.trm_dia),
+            (m.fecha, m.persona, m.tipo, m.monto_usd, calculado.precio_antes, calculado.cuotas, m.monto_cop, m.trm_dia),
         )
-        if m.fondo is not None:
-            _insert_fondo(conn, m.fondo)
+        _insert_fondo(
+            conn, m.fecha, m.fondo.valor_total_usd, calculado.precio_despues,
+            calculado.cuotas_nuevas, m.fondo.trm,
+        )
 
     log.info(
         "movimiento persona=%s tipo=%s monto_usd=%s cuotas=%.4f fecha=%s valuacion=%s",
-        m.persona, m.tipo, m.monto_usd, m.cuotas, m.fecha,
-        m.fondo.valor_total_usd if m.fondo else "sin",
+        m.persona, m.tipo, m.monto_usd, calculado.cuotas, m.fecha, m.fondo.valor_total_usd,
     )
     return {"ok": True}
 
@@ -277,11 +289,18 @@ def post_movimiento(m: Movimiento):
 @app.post("/api/fondo", status_code=201, dependencies=[Depends(require_admin)])
 def post_fondo(f: Fondo):
     with get_conn() as conn:
-        _insert_fondo(conn, f)
+        cuotas = _cuotas_circulacion(conn)
+        if cuotas <= TOLERANCIA_CUOTAS:
+            tiene_historial = conn.execute("SELECT 1 FROM historial_fondo LIMIT 1").fetchone()
+            if tiene_historial:
+                raise HTTPException(status_code=400, detail="No hay cuotas en circulación — registrá primero un aporte")
+            cuotas = f.valor_total_usd
+        precio = f.valor_total_usd / cuotas if cuotas > 0 else 1
+        _insert_fondo(conn, f.fecha, f.valor_total_usd, precio, cuotas, f.trm)
 
     log.info(
         "valuacion valor_total=%s precio_cuota=%.6f cuotas_circ=%.4f fecha=%s",
-        f.valor_total_usd, f.precio_cuota_usd, f.cuotas_en_circulacion, f.fecha,
+        f.valor_total_usd, precio, cuotas, f.fecha,
     )
     return {"ok": True}
 
@@ -340,5 +359,5 @@ async def import_xlsx(file: UploadFile = File(...)):
 # tengan prioridad de match sobre el catch-all de archivos estáticos. Si el directorio no
 # existe (dev del backend sin build, o tests) simplemente no se monta, en vez de que
 # StaticFiles tire 500 en cada request que no matchea una ruta de arriba.
-if os.path.isdir(STATIC_DIR):
+if SERVE_STATIC and os.path.isdir(STATIC_DIR):
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

@@ -1,6 +1,9 @@
 services:
   fondi:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     container_name: fondi
     ports:
       - "8080:8000"
@@ -8,6 +11,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
       # En prod front y back son el mismo origen, así que no hace falta abrir CORS a nadie.
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - SERVE_STATIC=${SERVE_STATIC:-1}
       # Horas entre backups automáticos de la DB dentro del volumen (0 lo desactiva).
       - BACKUP_INTERVAL_H=${BACKUP_INTERVAL_H:-24}
       # Solo con un reverse proxy adelante: hace que el límite de intentos de clave cuente
