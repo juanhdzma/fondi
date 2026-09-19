@@ -3,7 +3,7 @@ import { S } from './state.js';
 import {
   latest, precioCuota, cuotasCirc, calcParticipante,
   participantesActivos, participantesTodos, participanteOculto,
-  historialParticipante, historialGananciaFondo, porcentajeRetiro,
+  historialParticipante, historialGananciaFondo, historialParaGrafica, porcentajeRetiro,
 } from './computed.js';
 
 const mov = (persona, tipo, monto, cuotas, fecha, extra = {}) =>
@@ -248,5 +248,17 @@ describe('historialGananciaFondo', () => {
     ];
 
     expect(historialGananciaFondo()[1].ganancia).toBeCloseTo(0, 10);
+  });
+});
+
+describe('historialParaGrafica', () => {
+  it('omite el snapshot creado junto a un retiro', () => {
+    S.historial = [
+      { fecha: '2026-01-01T00:00', valor_total: 1000 },
+      { fecha: '2026-01-02T00:00', valor_total: 400 },
+    ];
+    S.movimientos = [mov('Ana', 'retiro', 600, -600, '2026-01-02T00:00')];
+
+    expect(historialParaGrafica()).toEqual([S.historial[0]]);
   });
 });

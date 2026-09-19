@@ -123,6 +123,11 @@ export function historialGananciaFondo() {
   });
 }
 
+export function historialParaGrafica(source = S.historial) {
+  const retiros = new Set(S.movimientos.filter(m => m.tipo === 'retiro').map(m => m.fecha));
+  return source.filter(h => !retiros.has(h.fecha));
+}
+
 // Valor de la inversión del participante y su neto invertido en cada snapshot del
 // historial del fondo, usando sus cuotas/aportes acumulados a esa fecha (no los totales actuales)
 export function historialParticipante(nombre) {

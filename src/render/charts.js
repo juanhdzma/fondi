@@ -1,6 +1,6 @@
 import { Chart } from 'chart.js/auto';
 import { S, charts } from '../state.js';
-import { participanteColor, historialParticipante, historialGananciaFondo } from '../computed.js';
+import { participanteColor, historialParticipante, historialGananciaFondo, historialParaGrafica } from '../computed.js';
 import { fmt, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
 
@@ -303,7 +303,7 @@ const RANGE_LABELS = {
 };
 
 export function renderCharts() {
-  const data = filteredHistorialWithFill();
+  const data = filteredHistorialWithFill(S.range, historialParaGrafica());
   if (!data.length) return;
 
   // El primer punto puede venir de backward-fill (última valuación antes del rango, con fecha
@@ -326,7 +326,7 @@ export function renderCharts() {
   const pctCOPPoints = data.map((h, i) => ({ x: ts[i], y: (h.precio_cuota * (h.trm || S.trm || 1) / baseCOP0 - 1) * 100 }));
 
   // ── Ganancia acumulada del fondo — misma serie de fechas que `data`, filtrada/rellenada igual ──
-  const gananciaData = filteredHistorialWithFill(S.range, historialGananciaFondo());
+  const gananciaData = filteredHistorialWithFill(S.range, historialParaGrafica(historialGananciaFondo()));
   const gananciaPoints = gananciaData.map((h, i) => ({ x: ts[i], y: h.ganancia }));
 
   // ── Chart hero: un solo canvas, cambia según S.heroMetric ──
