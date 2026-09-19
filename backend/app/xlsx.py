@@ -24,7 +24,7 @@ REQUIRED_COLUMNS = {
 
 ENUM_COLUMNS = {
     "tipo": {"aporte", "retiro"},
-    "accion": {"agregar", "quitar"},
+    "accion": {"agregar", "quitar", "ocultar", "mostrar"},
 }
 
 # Acepta tanto nuestro propio formato de export (columnas = nombres de la tabla) como los

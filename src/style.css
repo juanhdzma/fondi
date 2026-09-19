@@ -138,13 +138,6 @@ button, input, select { font: inherit; }
   font-size: 14px; font-weight: 700; color: var(--text);
   margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--divider);
 }
-.section-title-with-action { display: flex; align-items: center; justify-content: space-between; }
-.btn-toggle-participants {
-  width: 32px; height: 32px; margin: -8px 0; padding: 7px;
-  background: transparent; border: none; border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer;
-}
-.btn-toggle-participants:hover { background: var(--accent-dim); color: var(--accent); }
-.btn-toggle-participants svg { display: block; width: 100%; height: 100%; }
 .section-label { font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; margin: 8px 0 8px; }
 .participants-grid {
   display: grid; grid-template-columns: repeat(2, 1fr);
@@ -341,6 +334,13 @@ button, input, select { font: inherit; }
   padding: 9px 0; border-bottom: 1px solid var(--divider);
   font-size: 14px;
 }
+.participant-actions { display: flex; gap: 8px; }
+.btn-toggle-participant {
+  background: transparent; border: none; cursor: pointer; color: var(--text-secondary);
+  width: 32px; height: 32px; padding: 7px; border-radius: var(--radius-sm);
+}
+.btn-toggle-participant:hover { background: var(--accent-dim); color: var(--accent); }
+.btn-toggle-participant svg { display: block; width: 100%; height: 100%; }
 .btn-remove-participant {
   background: var(--red-dim); border: none; cursor: pointer;
   color: var(--red); font-size: 14px; line-height: 1;

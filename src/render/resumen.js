@@ -41,8 +41,8 @@ export function renderResumen() {
   document.getElementById('stat-cuota-cop-value').textContent = `${COP(Math.round(l.precio_cuota * (S.trm || 1)))} COP`;
 
   // ── Sub-fila dentro de "Valor del fondo": aportado vs. ganancia acumulada ──
-  const totalAportado = sorted.reduce((s, p) => s + p.neto_invertido, 0);
-  const totalGanancia = sorted.reduce((s, p) => s + p.ganancia_monto, 0);
+  const totalAportado = S.movimientos.reduce((total, m) => total + (m.tipo === 'retiro' ? -m.monto : m.monto), 0);
+  const totalGanancia = l.valor_total - totalAportado;
   const gananciaPct   = totalAportado > 0 ? totalGanancia / totalAportado * 100 : 0;
   const clsGanancia   = totalGanancia > 0 ? 'pos' : totalGanancia < 0 ? 'neg' : '';
 

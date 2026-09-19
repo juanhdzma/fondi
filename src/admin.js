@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { cuotasCirc, precioCuota, participantesActivos, calcParticipante, latest } from './computed.js';
+import { cuotasCirc, precioCuota, participantesActivos, participanteOculto, calcParticipante, latest } from './computed.js';
 import { calcularCuotas, excedeSaldo } from './domain/cuotas.js';
 import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx, verifyAdmin } from './api/backend.js';
 import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
@@ -145,7 +145,12 @@ export function renderAdminParticipants() {
       ? nombres.map(n => `
         <div class="participant-row">
           <span>${esc(n)}</span>
-          <button type="button" class="btn-remove-participant" data-nombre="${esc(n)}" title="Quitar" aria-label="Quitar a ${esc(n)}">✕</button>
+          <span class="participant-actions">
+            <button type="button" class="btn-toggle-participant" data-nombre="${esc(n)}" title="${participanteOculto(n) ? 'Mostrar' : 'Ocultar'} en resumen y movimientos" aria-label="${participanteOculto(n) ? 'Mostrar' : 'Ocultar'} a ${esc(n)} en resumen y movimientos">
+              ${participanteOculto(n) ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 6.2A9.8 9.8 0 0 1 12 6c6.5 0 10 6 10 6a18.1 18.1 0 0 1-3 3.7M6.2 6.2C3.5 8.1 2 12 2 12s3.5 6 10 6c1.4 0 2.6-.3 3.7-.8"/><circle cx="12" cy="12" r="2.5"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>'}
+            </button>
+            <button type="button" class="btn-remove-participant" data-nombre="${esc(n)}" title="Quitar" aria-label="Quitar a ${esc(n)}">✕</button>
+          </span>
         </div>`).join('')
       : '<div class="form-hint">Sin participantes — agrega el primero abajo.</div>';
   }
@@ -178,16 +183,6 @@ function retirarTodo() {
   previewMov();
 }
 
-function toggleParticipantsVisibility() {
-  const list = document.getElementById('participants-manage-list');
-  const btn = document.getElementById('btn-toggle-participants');
-  list.hidden = !list.hidden;
-  const action = list.hidden ? 'Mostrar' : 'Ocultar';
-  btn.setAttribute('aria-expanded', String(!list.hidden));
-  btn.setAttribute('aria-label', `${action} participantes`);
-  btn.title = `${action} participantes`;
-}
-
 async function agregarParticipante() {
   const input  = document.getElementById('f-nuevo-participante');
   const nombre = input.value.trim();
@@ -211,6 +206,21 @@ async function agregarParticipante() {
       showToast('Agregado');
     } catch (err) {
       setStatus(st, 'err', err.message);
+    }
+  });
+}
+
+async function toggleParticipantVisibility(btn, nombre) {
+  const accion = participanteOculto(nombre) ? 'mostrar' : 'ocultar';
+  await conBoton(btn, async () => {
+    try {
+      await postParticipante({ fecha: nowLocal().iso, nombre, accion }, adminKey);
+      await fetchAll();
+      renderAdminParticipants();
+      restoreFormSnapshot();
+      showToast(accion === 'ocultar' ? 'Ocultado' : 'Visible');
+    } catch (err) {
+      setStatus(document.getElementById('st-participantes'), 'err', err.message);
     }
   });
 }
@@ -447,12 +457,13 @@ export function bindAdminEvents() {
   document.getElementById('btn-fondo').addEventListener('click', submitFondo);
 
   document.getElementById('btn-add-participante').addEventListener('click', agregarParticipante);
-  document.getElementById('btn-toggle-participants').addEventListener('click', toggleParticipantsVisibility);
   document.getElementById('f-nuevo-participante').addEventListener('keydown', e => {
     if (e.key === 'Enter') agregarParticipante();
   });
   document.getElementById('participants-manage-list').addEventListener('click', e => {
-    const btn = e.target.closest('.btn-remove-participant');
-    if (btn) quitarParticipante(btn, btn.dataset.nombre);
+    const visibility = e.target.closest('.btn-toggle-participant');
+    if (visibility) toggleParticipantVisibility(visibility, visibility.dataset.nombre);
+    const remove = e.target.closest('.btn-remove-participant');
+    if (remove) quitarParticipante(remove, remove.dataset.nombre);
   });
 }

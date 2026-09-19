@@ -73,6 +73,7 @@ export async function fetchTRM() {
     // TRM oficial Colombia — Superfinanciera vía datos.gov.co
     const r = await fetch('https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciadesde+DESC',
       { signal: AbortSignal.timeout(TRM_TIMEOUT_MS) });
+    if (!r.ok) throw new Error(`TRM ${r.status}`);
     const d = await r.json();
     S.trm = parseFloat(d[0]?.valor);
     if (!Number.isFinite(S.trm) || S.trm <= 0) throw new Error('TRM inválida');
@@ -80,9 +81,9 @@ export async function fetchTRM() {
     warning.hidden = true;
     badge.textContent = `TRM $${S.trm.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   } catch {
-    const cache = ultimaTrm();
-    S.trm = cache || 4000;
-    warning.hidden = !cache;
+    S.trm = ultimaTrm() || 4000;
+    try { localStorage.setItem(TRM_CACHE_KEY, String(S.trm)); } catch {}
+    warning.hidden = false;
     badge.textContent = `TRM ~${S.trm.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 }

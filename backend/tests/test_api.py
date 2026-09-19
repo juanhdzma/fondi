@@ -107,6 +107,12 @@ def test_post_participante(client):
     assert r.json()["participantes_config"] == [payload]
 
 
+def test_post_participante_permite_ocultar(client):
+    payload = {"fecha": "2026-01-10T00:00", "nombre": "Patico", "accion": "ocultar"}
+    r = client.post("/api/participante", json=payload, headers={"X-Admin-Key": "s3cret"})
+    assert r.status_code == 201
+
+
 def test_export_xlsx(client):
     client.post("/api/movimiento", headers={"X-Admin-Key": "s3cret"}, json={
         "fecha": "2026-01-10T00:00", "persona": "Patico", "tipo": "aporte",

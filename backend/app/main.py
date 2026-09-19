@@ -193,7 +193,7 @@ class Movimiento(BaseModel):
 class Participante(BaseModel):
     fecha: str = Field(pattern=FECHA_RE)
     nombre: str = Field(min_length=1)
-    accion: Literal["agregar", "quitar"]
+    accion: Literal["agregar", "quitar", "ocultar", "mostrar"]
 
 
 @app.get("/api/health")

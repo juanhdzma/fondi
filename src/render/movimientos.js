@@ -61,7 +61,8 @@ export function renderMovimientos() {
     resetPersonaChart();
   }
 
-  let movs = [...S.movimientos].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const visibles = new Set(participantesTodos());
+  let movs = S.movimientos.filter(m => visibles.has(m.persona)).sort((a, b) => b.fecha.localeCompare(a.fecha));
   if (filtro) movs = movs.filter(m => m.persona === filtro);
 
   if (!movs.length) {

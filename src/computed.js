@@ -24,10 +24,22 @@ export function cuotasCirc() {
 export function participantesActivos() {
   const estado = new Map();
   const log = [...S.participantesLog].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
-  for (const p of log) estado.set(p.nombre, p.accion);
+  for (const p of log) {
+    if (p.accion === 'agregar' || p.accion === 'quitar') estado.set(p.nombre, p.accion);
+  }
   return [...estado.entries()]
     .filter(([, accion]) => accion === 'agregar')
     .map(([nombre]) => nombre);
+}
+
+export function participanteOculto(nombre) {
+  let oculto = false;
+  const log = [...S.participantesLog].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+  for (const p of log) {
+    if (p.nombre === nombre && p.accion === 'ocultar') oculto = true;
+    if (p.nombre === nombre && p.accion === 'mostrar') oculto = false;
+  }
+  return oculto;
 }
 
 // Activos + cualquiera con movimientos históricos (aunque haya sido quitado después)
@@ -38,7 +50,7 @@ export function participantesTodos() {
   for (const m of S.movimientos) {
     if (!vistos.has(m.persona)) { vistos.add(m.persona); extra.push(m.persona); }
   }
-  return [...activos, ...extra];
+  return [...activos, ...extra].filter(nombre => !participanteOculto(nombre));
 }
 
 export function calcParticipante(nombre) {

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { S } from './state.js';
 import {
   latest, precioCuota, cuotasCirc, calcParticipante,
-  participantesActivos, participantesTodos,
+  participantesActivos, participantesTodos, participanteOculto,
   historialParticipante, historialGananciaFondo, porcentajeRetiro,
 } from './computed.js';
 
@@ -98,6 +98,18 @@ describe('participantesTodos', () => {
       mov('Ana', 'aporte', 300, 300, '2026-01-06'),
     ];
     expect(participantesTodos()).toEqual(['Ana']);
+  });
+
+  it('oculta a la persona de resumen y movimientos sin quitarla', () => {
+    S.participantesLog = [
+      { fecha: '2026-01-01', nombre: 'Ana', accion: 'agregar' },
+      { fecha: '2026-01-02', nombre: 'Ana', accion: 'ocultar' },
+    ];
+    S.movimientos = [mov('Ana', 'aporte', 500, 500, '2026-01-01')];
+
+    expect(participantesActivos()).toEqual(['Ana']);
+    expect(participanteOculto('Ana')).toBe(true);
+    expect(participantesTodos()).toEqual([]);
   });
 });
 
