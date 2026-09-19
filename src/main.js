@@ -2,7 +2,6 @@ import './style.css';
 import { fetchAll } from './api/backend.js';
 import { renderMovimientos } from './render/index.js';
 import { setTab, setRange, setHeroMetric, setPersonaRange } from './ui/tabs.js';
-import { refreshData } from './ui/refresh.js';
 import { bindAdminEvents } from './admin.js';
 
 // Refuerzo para pinch-zoom: Safari dispara sus propios eventos 'gesture*' para el gesto de
@@ -32,7 +31,6 @@ document.querySelectorAll('.hero-tab').forEach(btn =>
     btn.scrollIntoView({ inline: 'nearest', block: 'nearest' }));
 });
 
-document.getElementById('refresh-btn').addEventListener('click', refreshData);
 document.getElementById('filter-persona').addEventListener('change', renderMovimientos);
 
 bindAdminEvents();

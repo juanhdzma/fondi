@@ -178,6 +178,16 @@ function retirarTodo() {
   previewMov();
 }
 
+function toggleParticipantsVisibility() {
+  const list = document.getElementById('participants-manage-list');
+  const btn = document.getElementById('btn-toggle-participants');
+  list.hidden = !list.hidden;
+  const action = list.hidden ? 'Mostrar' : 'Ocultar';
+  btn.setAttribute('aria-expanded', String(!list.hidden));
+  btn.setAttribute('aria-label', `${action} participantes`);
+  btn.title = `${action} participantes`;
+}
+
 async function agregarParticipante() {
   const input  = document.getElementById('f-nuevo-participante');
   const nombre = input.value.trim();
@@ -437,6 +447,7 @@ export function bindAdminEvents() {
   document.getElementById('btn-fondo').addEventListener('click', submitFondo);
 
   document.getElementById('btn-add-participante').addEventListener('click', agregarParticipante);
+  document.getElementById('btn-toggle-participants').addEventListener('click', toggleParticipantsVisibility);
   document.getElementById('f-nuevo-participante').addEventListener('keydown', e => {
     if (e.key === 'Enter') agregarParticipante();
   });

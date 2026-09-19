@@ -70,19 +70,13 @@ button, input, select { font: inherit; }
 }
 .header-title { font-size: 16px; font-weight: 700; }
 .header-right { display: flex; align-items: center; gap: 8px; }
+.trm-status { display: flex; align-items: center; gap: 6px; }
 .trm-badge {
   font-size: 13px; font-weight: 600; color: var(--text-secondary);
   background: var(--bg);
   padding: 6px 12px; border-radius: 20px;
 }
-.refresh-btn {
-  background: var(--bg); border: none; cursor: pointer;
-  color: var(--text); font-size: 18px; line-height: 1;
-  width: 40px; height: 40px; border-radius: var(--radius-sm);
-  display: flex; align-items: center; justify-content: center;
-  transition: color .15s, transform .3s, background .15s;
-}
-.refresh-btn:hover { background: var(--accent-dim); color: var(--accent); }
+.trm-cache-warning { font-size: 11px; font-weight: 700; color: var(--red); }
 
 /* ── Header nav ── */
 /* Centrado absoluto respecto al header completo — justify-content:space-between
@@ -144,6 +138,13 @@ button, input, select { font: inherit; }
   font-size: 14px; font-weight: 700; color: var(--text);
   margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--divider);
 }
+.section-title-with-action { display: flex; align-items: center; justify-content: space-between; }
+.btn-toggle-participants {
+  width: 32px; height: 32px; margin: -8px 0; padding: 7px;
+  background: transparent; border: none; border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer;
+}
+.btn-toggle-participants:hover { background: var(--accent-dim); color: var(--accent); }
+.btn-toggle-participants svg { display: block; width: 100%; height: 100%; }
 .section-label { font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; margin: 8px 0 8px; }
 .participants-grid {
   display: grid; grid-template-columns: repeat(2, 1fr);

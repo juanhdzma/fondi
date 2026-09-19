@@ -55,19 +55,35 @@ export async function postImportXlsx(file, adminKey) {
 // el fetch se queda colgado el default del browser (decenas de segundos) — y como el
 // dashboard espera por él, la página entera se queda en skeleton por una TRM que tiene fallback.
 const TRM_TIMEOUT_MS = 4000;
+const TRM_CACHE_KEY = 'fondi:last-trm';
+
+function ultimaTrm() {
+  try {
+    const trm = Number(localStorage.getItem(TRM_CACHE_KEY));
+    return Number.isFinite(trm) && trm > 0 ? trm : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function fetchTRM() {
   const badge = document.getElementById('trm-badge');
+  const warning = document.getElementById('trm-cache-warning');
   try {
     // TRM oficial Colombia — Superfinanciera vía datos.gov.co
     const r = await fetch('https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciadesde+DESC',
       { signal: AbortSignal.timeout(TRM_TIMEOUT_MS) });
     const d = await r.json();
-    S.trm = parseFloat(d[0]?.valor) || 4000;
+    S.trm = parseFloat(d[0]?.valor);
+    if (!Number.isFinite(S.trm) || S.trm <= 0) throw new Error('TRM inválida');
+    try { localStorage.setItem(TRM_CACHE_KEY, String(S.trm)); } catch {}
+    warning.hidden = true;
     badge.textContent = `TRM $${S.trm.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   } catch {
-    S.trm = 4000;
-    badge.textContent = 'TRM ~$4.000';
+    const cache = ultimaTrm();
+    S.trm = cache || 4000;
+    warning.hidden = !cache;
+    badge.textContent = `TRM ~${S.trm.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 }
 
