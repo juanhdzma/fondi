@@ -79,6 +79,16 @@ export function calcParticipante(nombre) {
   };
 }
 
+export function porcentajeRetiro(movimiento) {
+  const index = S.movimientos.indexOf(movimiento);
+  const cuotasAntes = S.movimientos
+    .slice(0, index)
+    .filter(m => m.persona === movimiento.persona)
+    .reduce((total, m) => total + m.cuotas, 0);
+  const saldoAntes = cuotasAntes * movimiento.precio_cuota_dia;
+  return saldoAntes > 0 ? movimiento.monto / saldoAntes * 100 : 0;
+}
+
 // Color de acento asignado a un participante — mismo orden que en resumen.js
 export function participanteColor(nombre) {
   const sorted = participantesTodos()

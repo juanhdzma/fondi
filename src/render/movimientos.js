@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { participantesTodos, calcParticipante, participanteColor } from '../computed.js';
+import { participantesTodos, calcParticipante, participanteColor, porcentajeRetiro } from '../computed.js';
 import { fmt, fmtPct, COP, signStr } from '../utils/format.js';
 import { fmtDate } from '../utils/dates.js';
 import { esc } from '../utils/html.js';
@@ -77,7 +77,7 @@ export function renderMovimientos() {
       </div>
       <div class="mov-figures">
         <div class="mov-monto"><span class="badge badge-${esc(m.tipo)}">${esc(m.tipo)}</span>${fmt(m.monto)} USD</div>
-        <div class="mov-meta">${fmtCOP(m.monto_cop)} COP · TRM ${m.trm_dia ? fmtCOP(m.trm_dia) : '—'}</div>
+        <div class="mov-meta">${m.tipo === 'retiro' ? `Retiró ${fmtPct(porcentajeRetiro(m))}% de su saldo` : `${fmtCOP(m.monto_cop)} COP · TRM ${m.trm_dia ? fmtCOP(m.trm_dia) : '—'}`}</div>
       </div>
     </li>`).join('');
 }

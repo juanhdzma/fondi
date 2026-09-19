@@ -3,7 +3,7 @@ import { S } from './state.js';
 import {
   latest, precioCuota, cuotasCirc, calcParticipante,
   participantesActivos, participantesTodos,
-  historialParticipante, historialGananciaFondo,
+  historialParticipante, historialGananciaFondo, porcentajeRetiro,
 } from './computed.js';
 
 const mov = (persona, tipo, monto, cuotas, fecha, extra = {}) =>
@@ -169,6 +169,16 @@ describe('calcParticipante', () => {
     expect(p.ganancia_fondo_cop).toBeCloseTo(1000000, 6);
     expect(p.ganancia_trm_cop).toBeCloseTo(1000000, 6);
     expect(p.ganancia_fondo_cop + p.ganancia_trm_cop).toBeCloseTo(p.ganancia_cop, 6);
+  });
+});
+
+describe('porcentajeRetiro', () => {
+  it('usa el saldo de la persona justo antes del retiro', () => {
+    const aporte = mov('Ana', 'aporte', 1000, 1000, '2026-01-01');
+    const retiro = mov('Ana', 'retiro', 600, -500, '2026-02-01');
+    S.movimientos = [aporte, retiro];
+
+    expect(porcentajeRetiro(retiro)).toBe(50);
   });
 });
 
