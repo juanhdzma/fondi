@@ -4,6 +4,7 @@ const NF2 = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFr
 const NF0 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
 
 export const fmt = usd => '$' + NF2.format(usd);
+export const fmt0 = usd => '$' + NF0.format(usd);
 export const fmtN = n => NF2.format(Number(n || 0));
 export const fmtPct = n => NF2.format(n);
 export const COP = n => '$' + NF0.format(n);

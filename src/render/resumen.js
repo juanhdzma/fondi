@@ -1,7 +1,7 @@
 import { S } from '../state.js';
 import { PARTICIPANT_COLORS } from '../config.js';
 import { latest, calcParticipante, participantesTodos, participantesActivos, cuotasCirc } from '../computed.js';
-import { fmt, fmtPct, fmtN, COP, signStr } from '../utils/format.js';
+import { fmt, fmt0, fmtPct, fmtN, COP, signStr } from '../utils/format.js';
 import { esc } from '../utils/html.js';
 
 export function renderResumen() {
@@ -26,7 +26,7 @@ export function renderResumen() {
   }
 
   // ── Valor del fondo / precio de cuota: valor actual (el % de cambio lo pone renderCharts según el rango) ──
-  document.getElementById('stat-fondo-value').textContent = `${fmt(l.valor_total)} USD`;
+  document.getElementById('stat-fondo-value').textContent = `${fmt0(l.valor_total)} USD`;
   document.getElementById('stat-cuota-value').textContent = `${fmt(l.precio_cuota)} USD`;
 
   // ── Participantes: filas planas ──
@@ -46,9 +46,9 @@ export function renderResumen() {
   const gananciaPct   = totalAportado > 0 ? totalGanancia / totalAportado * 100 : 0;
   const clsGanancia   = totalGanancia > 0 ? 'pos' : totalGanancia < 0 ? 'neg' : '';
 
-  document.getElementById('stat-aportado-value').textContent = `${fmt(totalAportado)} USD`;
+  document.getElementById('stat-aportado-value').textContent = `${fmt0(totalAportado)} USD`;
   const ganEl = document.getElementById('stat-ganancia-value');
-  ganEl.textContent = `${signStr(totalGanancia)}${fmt(Math.abs(totalGanancia))} USD (${signStr(gananciaPct)}${fmtPct(Math.abs(gananciaPct))}%)`;
+  ganEl.textContent = `${signStr(totalGanancia)}${fmt0(Math.abs(totalGanancia))} USD (${signStr(gananciaPct)}${fmtPct(Math.abs(gananciaPct))}%)`;
   ganEl.className = clsGanancia;
 
   document.getElementById('participantes-count').textContent = participantesActivos().length;
@@ -71,7 +71,7 @@ export function renderResumen() {
         </div>
       </div>
       <div class="p-figures">
-        <div class="p-monto">${fmt(p.valor_actual)}</div>
+        <div class="p-monto">${fmt0(p.valor_actual)}</div>
         <div class="p-chg ${clsUSD}">${signStr(p.ganancia_pct)}${fmtPct(Math.abs(p.ganancia_pct))}%</div>
       </div>
     </div>`;
