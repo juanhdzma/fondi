@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light" />
-  <meta name="theme-color" content="#f5f5f7" />
+  <meta name="theme-color" content="#f1f4f3" />
   <link rel="icon" type="image/x-icon" href="/fondi.ico?v=2" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -52,7 +52,7 @@
         <h1>Resumen</h1>
         <p>Rendimiento y participación del fondo.</p>
       </div>
-      <div class="page-trm" aria-hidden="true">Valorado en USD</div>
+      <div class="page-trm" aria-hidden="true">Valores en USD</div>
     </div>
 
     <div class="overview-grid">
@@ -76,7 +76,7 @@
       </div>
 
       <div class="stat-rail">
-        <div class="stat">
+        <div class="stat stat-primary">
           <div class="stat-label">Valor del fondo</div>
           <div class="stat-value" id="stat-fondo-value">—</div>
           <div class="stat-chg" id="stat-fondo-chg"></div>
@@ -91,7 +91,7 @@
             </div>
           </div>
         </div>
-        <div class="stat">
+        <div class="stat stat-secondary">
           <div class="stat-label">Precio de cuota</div>
           <div class="stat-value" id="stat-cuota-value">—</div>
           <div class="stat-chg" id="stat-cuota-chg"></div>
@@ -109,7 +109,7 @@
       </div>
     </div>
 
-    <div class="section-label">Participantes · <span id="participantes-count">—</span> activos</div>
+    <div class="section-label">Participantes <span class="section-count"><span id="participantes-count">—</span> activos</span></div>
     <div class="participants-grid" id="participants-grid">
       <div class="p-row"><span class="skeleton" style="width:36px;height:36px;border-radius:11px;flex-shrink:0"></span><span class="skeleton" style="width:90px;height:13px"></span><span class="skeleton" style="width:70px;height:18px;margin-left:auto"></span></div>
       <div class="p-row"><span class="skeleton" style="width:36px;height:36px;border-radius:11px;flex-shrink:0"></span><span class="skeleton" style="width:90px;height:13px"></span><span class="skeleton" style="width:70px;height:18px;margin-left:auto"></span></div>
@@ -159,7 +159,7 @@
   <!-- ── ADMIN ── -->
   <div id="tab-admin" class="tab-content" role="tabpanel" aria-labelledby="nav-admin">
     <div id="admin-lock" class="admin-lock">
-      <div class="admin-title">Panel de administración</div>
+      <h1 class="admin-title">Panel de administración</h1>
       <div class="admin-sub">Ingresa la clave para continuar</div>
       <div class="input-row input-row-stack">
         <input class="input-base input-flex" type="password" id="admin-key"
@@ -171,7 +171,10 @@
 
     <div id="admin-panel" style="display:none">
       <div class="admin-header">
-        <div class="admin-header-title">Panel de administración</div>
+        <div>
+          <h1 class="admin-header-title">Panel de administración</h1>
+          <p>Registra cambios y protege la integridad del fondo.</p>
+        </div>
       </div>
       <div class="admin-content">
 
@@ -179,7 +182,7 @@
 
         <!-- Registrar movimiento -->
         <div class="card admin-card-primary">
-          <div class="section-title">Registrar movimiento</div>
+          <h2 class="section-title">Registrar movimiento</h2>
           <div class="form-group">
             <label class="form-label" for="f-persona">Participante</label>
             <select class="form-input" id="f-persona"></select>
@@ -210,7 +213,7 @@
             <button type="button" class="btn btn-dim" id="btn-retirar-todo" style="display:none;margin-top:8px">Retirar todo</button>
           </div>
           <div class="form-group">
-            <label class="form-label" for="f-valor-mov">Valor del fondo después (USD) <span style="color:var(--red)">*</span></label>
+            <label class="form-label" for="f-valor-mov">Valor del fondo después (USD) <span class="required">*</span></label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
               <input class="form-input" type="text" inputmode="decimal" id="f-valor-mov" placeholder="0,00" />
@@ -219,7 +222,7 @@
           </div>
           <div class="form-group">
             <div class="form-label" id="lbl-fecha-mov">Fecha y hora</div>
-            <div style="display:flex;gap:8px" role="group" aria-labelledby="lbl-fecha-mov">
+            <div class="datetime-row" role="group" aria-labelledby="lbl-fecha-mov">
               <input class="form-input" type="date" id="f-fecha" aria-label="Fecha" style="flex:1" />
               <input class="form-input" type="time" id="f-hora" aria-label="Hora" style="flex:1" />
             </div>
@@ -232,8 +235,8 @@
 
         <!-- Registrar valuación (sin movimiento) -->
         <div class="card">
-          <div class="section-title">Registrar valuación</div>
-          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:18px">Solo para actualizar el valor sin aporte ni retiro (ej. cierre de semana).</p>
+          <h2 class="section-title">Registrar valuación</h2>
+          <p class="section-note">Actualiza el valor sin registrar un aporte o retiro.</p>
           <div class="form-group">
             <label class="form-label" for="f-valor">Valor total del portafolio (USD)</label>
             <div class="money-wrap">
@@ -244,7 +247,7 @@
           </div>
           <div class="form-group">
             <div class="form-label" id="lbl-fecha-fondo">Fecha y hora</div>
-            <div style="display:flex;gap:8px" role="group" aria-labelledby="lbl-fecha-fondo">
+            <div class="datetime-row" role="group" aria-labelledby="lbl-fecha-fondo">
               <input class="form-input" type="date" id="f-fecha-fondo" aria-label="Fecha" style="flex:1" />
               <input class="form-input" type="time" id="f-hora-fondo" aria-label="Hora" style="flex:1" />
             </div>
@@ -257,7 +260,7 @@
 
         <!-- Gestionar participantes -->
         <div class="card">
-          <div class="section-title">Gestionar participantes</div>
+          <h2 class="section-title">Gestionar participantes</h2>
           <div id="participants-manage-list" style="margin-bottom:14px"></div>
           <div class="form-group">
             <label class="form-label" for="f-nuevo-participante">Nuevo participante</label>
@@ -272,17 +275,17 @@
         </div>
 
         <!-- Exportar / importar datos -->
-        <div class="card">
-          <div class="section-title">Datos</div>
+        <div class="card data-card">
+          <h2 class="section-title">Datos</h2>
           <div class="form-group">
             <div class="form-label">Exportar</div>
             <div class="form-footer" style="margin-top:0">
-              <a class="btn btn-green" id="btn-export-xlsx" href="#" style="text-decoration:none;text-align:center">Descargar xlsx</a>
+              <a class="btn btn-green btn-link" id="btn-export-xlsx" href="#">Descargar xlsx</a>
             </div>
           </div>
           <div class="form-group">
             <label class="form-label" for="f-import-xlsx">Importar</label>
-            <p class="form-hint" style="margin-bottom:8px">Reemplaza TODOS los datos actuales por los del archivo.</p>
+            <p class="form-hint import-warning">Reemplaza todos los datos actuales por los del archivo.</p>
             <input class="input-base" type="file" id="f-import-xlsx" accept=".xlsx" />
           </div>
           <div class="form-footer">
