@@ -1,8 +1,7 @@
 node_modules/
 dist/
 .DS_Store
-backend/.venv/
-backend/__pycache__/
-backend/**/__pycache__/
-backend/.pytest_cache/
+.venv/
+__pycache__/
+.pytest_cache/
 *.db
