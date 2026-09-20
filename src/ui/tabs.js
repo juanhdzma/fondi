@@ -8,6 +8,7 @@ export function setTab(tab) {
   document.querySelectorAll('.nav-btn').forEach(el => {
     el.classList.remove('active');
     el.setAttribute('aria-selected', String(el.dataset.tab === tab));
+    el.tabIndex = el.dataset.tab === tab ? 0 : -1;
   });
   document.getElementById('tab-' + tab).classList.add('active');
   document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
@@ -20,6 +21,7 @@ export function setRange(r) {
   document.querySelectorAll('.range-btn:not(.persona-range-btn)').forEach(b => {
     const active = b.dataset.r === r;
     b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', String(active));
     if (active) b.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   });
   resetLineCharts();
@@ -32,6 +34,7 @@ export function setPersonaRange(r) {
   document.querySelectorAll('.persona-range-btn').forEach(b => {
     const active = b.dataset.r === r;
     b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', String(active));
     if (active) b.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   });
   const nombre = document.getElementById('filter-persona').value;
@@ -40,6 +43,10 @@ export function setPersonaRange(r) {
 
 export function setHeroMetric(metric) {
   S.heroMetric = metric;
-  document.querySelectorAll('.hero-tab').forEach(b => b.classList.toggle('active', b.dataset.metric === metric));
+  document.querySelectorAll('.hero-tab').forEach(b => {
+    const active = b.dataset.metric === metric;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', String(active));
+  });
   renderCharts();
 }

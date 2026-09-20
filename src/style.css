@@ -13,6 +13,7 @@
   --accent-dim: rgba(12,36,59,0.08);
   --accent-hover: #081627;
   --green: #17803D;
+  --green-on-dim: #147A38;
   --green-dim: #E4F3E9;
   --red: #B4231F;
   --red-dim: #FBEAE9;
@@ -22,12 +23,6 @@
   --radius-sm: 12px;
   --focus: #0C243B;
   --shadow: 0 1px 2px rgba(16,24,40,.03);
-}
-
-html, body {
-  /* "manipulation" es shorthand de "pan-x pan-y pinch-zoom" menos double-tap — SÍ permite pinch.
-     Para bloquear pinch de verdad hay que omitirlo de la lista permitida. */
-  touch-action: pan-x pan-y;
 }
 
 /* Scrollbar oculta, el scroll sigue funcionando igual */
@@ -179,7 +174,7 @@ button, input, select { font: inherit; }
   display: inline-flex; padding: 2px 9px; border-radius: 20px;
   font-size: 12px; font-weight: 700;
 }
-.gain-badge.pos { color: var(--green); background: var(--green-dim); }
+.gain-badge.pos { color: var(--green-on-dim); background: var(--green-dim); }
 .gain-badge.neg { color: var(--red); background: var(--red-dim); }
 .gain-badge.zero { color: var(--text-secondary); background: var(--divider); }
 
@@ -211,7 +206,7 @@ button, input, select { font: inherit; }
   padding: 7px 12px; border-radius: 9px; border: none;
   background: transparent; color: var(--text-secondary);
   font-size: 13px; font-weight: 600;
-  cursor: pointer; transition: all 0.15s; min-height: 36px;
+  cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; min-height: 44px;
   flex-shrink: 0; white-space: nowrap;
 }
 .range-btn.active { background: var(--text); color: var(--bg-card); }
@@ -219,7 +214,7 @@ button, input, select { font: inherit; }
 .chart-wrap { position: relative; height: 200px; }
 
 /* ── Movimientos: filtros ── */
-.table-filters { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.table-filters { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-bottom: 14px; }
 .select-styled {
   background: var(--bg-card); border: 1px solid var(--divider);
   border-radius: var(--radius-sm); color: var(--text);
@@ -296,10 +291,10 @@ button, input, select { font: inherit; }
   flex: 1; padding: 10px; border: 1.5px solid var(--divider);
   border-radius: var(--radius-sm); background: transparent;
   font-size: 14px; font-weight: 700;
-  cursor: pointer; color: var(--text-secondary); transition: all 0.15s;
+  cursor: pointer; color: var(--text-secondary); transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   min-height: 42px;
 }
-.tipo-btn.aporte.sel { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+.tipo-btn.aporte.sel { background: var(--green-dim); border-color: var(--green); color: var(--green-on-dim); }
 .tipo-btn.retiro.sel { background: var(--red-dim);   border-color: var(--red);   color: var(--red); }
 .admin-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -385,6 +380,17 @@ button, input, select { font: inherit; }
   transition: opacity 0.2s, transform 0.2s;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; background-position: 50% 0; }
+  .toast { transition: opacity 0.2s ease; transform: translateX(-50%); }
+  .toast.show { transform: translateX(-50%); }
+  .btn { transition: opacity 0.15s ease; }
+  .btn:active { transform: none; }
+}
 @media (max-width: 720px) {
   .toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
 }
@@ -405,7 +411,7 @@ button, input, select { font: inherit; }
   /* iOS hace zoom automático al enfocar un input con font-size < 16px */
   .form-input, .input-base { font-size: 16px; }
   .chart-header { flex-wrap: wrap; gap: 8px; }
-  .range-btn { padding: 5px 9px; font-size: 12px; min-height: 28px; }
+  .range-btn { padding: 5px 9px; font-size: 12px; min-height: 44px; }
   .p-summary-grid { grid-template-columns: repeat(2, 1fr); gap: 14px 0; }
   .p-summary-grid > div { padding: 0 16px; }
   .p-summary-grid > div:first-child { padding-left: 0; }

@@ -62,8 +62,11 @@ async function unlockAdmin() {
 
 function setTipo(tipo) {
   document.getElementById('f-tipo').value = tipo;
-  document.querySelector('.tipo-btn.aporte').classList.toggle('sel', tipo === 'aporte');
-  document.querySelector('.tipo-btn.retiro').classList.toggle('sel', tipo === 'retiro');
+  document.querySelectorAll('.tipo-btn').forEach(btn => {
+    const active = btn.dataset.tipo === tipo;
+    btn.classList.toggle('sel', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
   renderMovimientoOptions();
   saveFormSnapshot();
   previewMov();

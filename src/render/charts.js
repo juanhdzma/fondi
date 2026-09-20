@@ -152,6 +152,7 @@ const tooltipFooterDate = items => items.length ? fmtTs(items[0].parsed.x) : '';
 
 function chartOpts(tickValues) {
   return {
+    animation: false,
     responsive: true,
     maintainAspectRatio: false,
     layout: { padding: { left: 4, right: 4, top: 4 } },
@@ -254,6 +255,7 @@ function makeGananciaDataset(rawPoints) {
 
 function cuotaChartOpts(tickValues) {
   return {
+    animation: false,
     responsive: true, maintainAspectRatio: false,
     layout: { padding: { left: 4, right: 4, top: 4 } },
     interaction: { mode: 'index', intersect: false },
@@ -302,6 +304,18 @@ const RANGE_LABELS = {
   '3M': '3 meses', '6M': '6 meses', '1A': '1 año', 'todo': 'todo el periodo',
 };
 
+function updateChartSummary(canvasId, summaryId, label, data, value, unit, range = S.range) {
+  const canvas = document.getElementById(canvasId);
+  const summary = document.getElementById(summaryId);
+  const first = data[0];
+  const last = data.at(-1);
+  const start = value(first);
+  const end = value(last);
+  const trend = end > start ? 'subió' : end < start ? 'bajó' : 'se mantuvo';
+  canvas.setAttribute('aria-label', `Gráfico de ${label}`);
+  summary.textContent = `${label} en ${RANGE_LABELS[range]}. ${trend} de ${fmt(start)} ${unit} a ${fmt(end)} ${unit}.`;
+}
+
 export function renderCharts() {
   const data = filteredHistorialWithFill(S.range, historialParaGrafica());
   if (!data.length) return;
@@ -331,6 +345,12 @@ export function renderCharts() {
 
   // ── Chart hero: un solo canvas, cambia según S.heroMetric ──
   const metric = S.heroMetric;
+  const chartSummary = metric === 'ganancia'
+    ? ['Ganancia acumulada', gananciaData, h => h.ganancia, 'USD']
+    : metric === 'total'
+      ? ['Valor total', data, h => h.valor_total, 'USD']
+      : ['Precio de cuota', data, h => h.precio_cuota, 'USD por cuota'];
+  updateChartSummary('chart-hero', 'chart-hero-summary', ...chartSummary);
   if (charts.hero && charts.heroMetric !== metric) { charts.hero.destroy(); charts.hero = null; }
 
   if (metric === 'cuota') {
@@ -429,6 +449,7 @@ function personaTooltipHandler({ chart, tooltip }) {
 // ── Línea: valor actual vs. invertido de un participante en el tiempo (tab Movimientos) ──
 function personaChartOpts(tickValues) {
   return {
+    animation: false,
     responsive: true, maintainAspectRatio: false,
     layout: { padding: { left: 4, right: 4, top: 4 } },
     interaction: { mode: 'index', intersect: false },
@@ -470,6 +491,7 @@ export function renderPersonaChart(nombre) {
   const invertidoPoints = data.map((h, i) => ({ x: ts[i], y: h.invertido }));
   const color = participanteColor(nombre);
   const tickValues = computeCalendarTicks(ts);
+  updateChartSummary('chart-persona', 'chart-persona-summary', `Evolución de la inversión de ${nombre}`, data, h => h.valor, 'USD', S.personaRange);
 
   const dsValor = { ...makeDataset(valorPoints, color), label: 'Valor actual' };
   const dsInvertido = { ...makeDataset(invertidoPoints, '#9CA3AF'), label: 'Invertido', fill: false, borderDash: [6, 4] };
