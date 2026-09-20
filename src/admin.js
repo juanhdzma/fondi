@@ -152,7 +152,7 @@ export function renderAdminParticipants() {
             <button type="button" class="btn-toggle-participant" data-nombre="${esc(n)}" title="${participanteOculto(n) ? 'Mostrar' : 'Ocultar'} en resumen y movimientos" aria-label="${participanteOculto(n) ? 'Mostrar' : 'Ocultar'} a ${esc(n)} en resumen y movimientos">
               ${participanteOculto(n) ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 6.2A9.8 9.8 0 0 1 12 6c6.5 0 10 6 10 6a18.1 18.1 0 0 1-3 3.7M6.2 6.2C3.5 8.1 2 12 2 12s3.5 6 10 6c1.4 0 2.6-.3 3.7-.8"/><circle cx="12" cy="12" r="2.5"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>'}
             </button>
-            <button type="button" class="btn-remove-participant" data-nombre="${esc(n)}" title="Quitar" aria-label="Quitar a ${esc(n)}">✕</button>
+            <button type="button" class="btn-remove-participant" data-nombre="${esc(n)}" title="Quitar" aria-label="Quitar a ${esc(n)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
           </span>
         </div>`).join('')
       : '<div class="form-hint">Sin participantes — agrega el primero abajo.</div>';
