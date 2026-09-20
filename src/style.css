@@ -158,7 +158,6 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
   font-weight: 760;
 }
 .page-heading p { margin-top: 8px; color: var(--text-secondary); font-size: 14px; }
-.page-trm { padding: 7px 11px; border-radius: 999px; background: rgba(255, 255, 255, 0.62); color: var(--text-secondary); font-size: 12px; font-weight: 650; }
 .page-heading-actions { align-items: flex-end; }
 
 .overview-grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 20px; align-items: stretch; }
@@ -229,7 +228,7 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .range-btn { min-height: 38px; padding: 5px 11px; border-radius: 9px; font-size: 12px; }
 .rl-short { display: none; }
 
-.stat-rail { display: grid; grid-template-rows: 1.15fr 0.85fr; gap: 14px; background: transparent; box-shadow: none; }
+.stat-rail { display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 14px; background: transparent; box-shadow: none; }
 .stat { min-height: 0; padding: 24px; display: flex; flex-direction: column; justify-content: center; border-radius: var(--radius); box-shadow: var(--shadow); }
 .stat-primary,
 .stat-secondary { background: var(--bg-card); color: var(--text); }
@@ -573,7 +572,7 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 @media (max-width: 620px) {
   .main { padding-top: 20px; }
   .page-heading { align-items: flex-start; }
-  .page-heading p, .page-trm { display: none; }
+  .page-heading p { display: none; }
   .page-heading-actions { flex-direction: column; gap: 14px; }
   .page-heading-actions .table-filters, .select-styled { width: 100%; }
   .select-styled { min-width: 0; }

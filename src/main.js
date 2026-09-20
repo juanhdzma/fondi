@@ -22,13 +22,13 @@ navButtons.forEach((btn, index) => {
 });
 
 document.querySelectorAll('.range-btn:not(.persona-range-btn)').forEach(btn =>
-  btn.addEventListener('click', () => setRange(btn.dataset.r)));
+  btn.addEventListener('click', event => setRange(btn.dataset.r, event.detail !== 0)));
 
 document.querySelectorAll('.persona-range-btn').forEach(btn =>
-  btn.addEventListener('click', () => setPersonaRange(btn.dataset.r)));
+  btn.addEventListener('click', event => setPersonaRange(btn.dataset.r, event.detail !== 0)));
 
 document.querySelectorAll('.hero-tab').forEach(btn =>
-  btn.addEventListener('click', () => setHeroMetric(btn.dataset.metric)));
+  btn.addEventListener('click', event => setHeroMetric(btn.dataset.metric, event.detail !== 0)));
 
 // El rango activo por default (Todo) puede quedar fuera de vista en la fila scrolleable.
 // Se espera a que cargue la tipografía: si se mide con la fuente de respaldo, el ancho
