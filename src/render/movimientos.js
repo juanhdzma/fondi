@@ -1,7 +1,7 @@
 import { S } from '../state.js';
 import { participantesTodos, calcParticipante, participanteColor, porcentajeRetiro } from '../computed.js';
 import { fmt, fmtPct, COP, signStr } from '../utils/format.js';
-import { fmtDate } from '../utils/dates.js';
+import { fmtDate, normDate } from '../utils/dates.js';
 import { esc } from '../utils/html.js';
 import { renderPersonaChart, resetPersonaChart } from './charts.js';
 
@@ -14,6 +14,13 @@ function populateFiltroPersona() {
 }
 
 const fmtCOP = n => n ? COP(n) : '—';
+const MONTH = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
+
+function fmtMonth(fecha) {
+  const key = normDate(fecha).slice(0, 7);
+  const label = MONTH.format(new Date(`${key}-01T12:00:00`));
+  return [key, label.charAt(0).toUpperCase() + label.slice(1)];
+}
 
 function renderPersonaPanel(nombre) {
   const p = calcParticipante(nombre);
@@ -66,19 +73,29 @@ export function renderMovimientos() {
   if (filtro) movs = movs.filter(m => m.persona === filtro);
 
   if (!movs.length) {
-    list.innerHTML = `<li style="text-align:center;color:var(--text-secondary);padding:40px">Sin movimientos</li>`;
+    list.innerHTML = `
+      <li class="empty">
+        <div class="empty-title">Sin movimientos</div>
+        <p class="empty-text">Los aportes y retiros aparecerán aquí.</p>
+      </li>`;
     return;
   }
 
-  list.innerHTML = movs.map(m => `
-    <li class="mov-card">
-      <div class="mov-who">
-        <div class="mov-persona">${esc(m.persona)}</div>
-        <div class="mov-fecha">${fmtDate(m.fecha)}</div>
-      </div>
-      <div class="mov-figures">
-        <div class="mov-monto"><span class="badge badge-${esc(m.tipo)}">${esc(m.tipo)}</span>${fmt(m.monto)} USD</div>
-        <div class="mov-meta">${m.tipo === 'retiro' ? `Retiró ${fmtPct(porcentajeRetiro(m))}% de su saldo` : `${fmtCOP(m.monto_cop)} COP · TRM ${m.trm_dia ? fmtCOP(m.trm_dia) : '—'}`}</div>
-      </div>
-    </li>`).join('');
+  let currentMonth = '';
+  list.innerHTML = movs.map(m => {
+    const [month, label] = fmtMonth(m.fecha);
+    const heading = month === currentMonth ? '' : `<li class="mov-month"><h2>${label}</h2></li>`;
+    currentMonth = month;
+    return `${heading}
+      <li class="mov-card">
+        <div class="mov-who">
+          <div class="mov-persona">${esc(m.persona)}</div>
+          <div class="mov-fecha">${fmtDate(m.fecha)}</div>
+        </div>
+        <div class="mov-figures">
+          <div class="mov-monto"><span class="badge badge-${esc(m.tipo)}">${esc(m.tipo)}</span>${fmt(m.monto)} USD</div>
+          <div class="mov-meta">${m.tipo === 'retiro' ? `Retiró ${fmtPct(porcentajeRetiro(m))}% de su saldo` : `${fmtCOP(m.monto_cop)} COP · TRM ${m.trm_dia ? fmtCOP(m.trm_dia) : '—'}`}</div>
+        </div>
+      </li>`;
+  }).join('');
 }
