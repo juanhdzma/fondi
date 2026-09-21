@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtMoneyInput, parseMoneyInput, parseMoneyValue, resolveContributionExchange } from './money-input.js';
+import { fmtMoneyInput, parseMoneyValue, resolveContributionExchange } from './money-input.js';
 
 // El input real solo se usa por .value/.selectionStart/.setSelectionRange, así que alcanza
 // con un doble sin DOM.
@@ -63,20 +63,6 @@ describe('fmtMoneyInput', () => {
     const el = fakeInput('1234', 0);
     fmtMoneyInput(el, 0);
     expect(el.selectionStart).toBe(0);
-  });
-});
-
-describe('parseMoneyInput', () => {
-  it('lee el formato es-CO: punto de miles, coma decimal', () => {
-    expect(parseMoneyInput(fakeInput('1.234.567,89'))).toBeCloseTo(1234567.89, 6);
-  });
-
-  it('vacío es 0', () => {
-    expect(parseMoneyInput(fakeInput(''))).toBe(0);
-  });
-
-  it('una coma suelta es 0 y no NaN', () => {
-    expect(parseMoneyInput(fakeInput(','))).toBe(0);
   });
 });
 

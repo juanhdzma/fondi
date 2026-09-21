@@ -14,8 +14,6 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogOverlay,
   AlertDialogPortal,
   AlertDialogTitle,
@@ -72,16 +70,16 @@ function ConfirmDialog({ open, onOpenChange, title, description, action, from = 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogPortal>
-        <AlertDialogOverlay className="fixed inset-0 z-50 bg-black/45" />
-        <AlertDialogContent from={from} className="fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md gap-5 rounded-2xl bg-white p-6 shadow-2xl outline-none">
-          <AlertDialogHeader className="grid gap-2 text-center sm:text-left">
-            <AlertDialogTitle className="text-lg font-semibold text-[#10201e]">{title}</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm leading-6 text-[#596561]">{description}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <AlertDialogOverlay className="dialog-overlay" />
+        <AlertDialogContent from={from} className="dialog-content">
+          <div className="dialog-header">
+            <AlertDialogTitle className="dialog-title">{title}</AlertDialogTitle>
+            <AlertDialogDescription className="dialog-description">{description}</AlertDialogDescription>
+          </div>
+          <div className="dialog-footer">
             <AlertDialogCancel className="btn btn-dim">Cancelar</AlertDialogCancel>
             <AlertDialogAction className="btn btn-danger" onClick={onConfirm}>{action}</AlertDialogAction>
-          </AlertDialogFooter>
+          </div>
         </AlertDialogContent>
       </AlertDialogPortal>
     </AlertDialog>

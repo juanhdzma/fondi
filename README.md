@@ -65,7 +65,7 @@ Below 720px the top nav becomes a bottom tab bar. Inputs are sized to avoid iOS'
 
 By default, one image and one container: a multi-stage `Dockerfile` builds the Vite frontend, then a Python stage installs FastAPI and serves the built static files alongside the `/api/*` routes from a single `uvicorn` process. Data lives in a SQLite file with three append-only tables (`historial_fondo`, `movimientos`, `participantes_config`) — nothing is ever edited or deleted, only new rows added.
 
-The frontend is a React + TypeScript app built with Vite and Tailwind CSS. Screen components read the small in-memory data snapshot (`S` in `state.ts`) populated from `GET /api/all`; controlled React state owns navigation and forms. Radix UI provides accessible destructive confirmations, animated with the copied Animate UI Alert Dialog primitive and Motion. Any admin write — a movement, a valuation, adding a participant — goes through the API and then refetches the authoritative snapshot; there's no optimistic data patching by design.
+The frontend is a React + TypeScript app built with Vite and the Fondi CSS system. Screen components read the small in-memory data snapshot (`S` in `state.ts`) populated from `GET /api/all`; controlled React state owns navigation and forms. Radix UI provides accessible destructive confirmations, animated with the copied Animate UI Alert Dialog primitive and Motion. Any admin write — a movement, a valuation, adding a participant — goes through the API and then refetches the authoritative snapshot; there's no optimistic data patching by design.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module ownership, request contract and the future frontend/API split.
 

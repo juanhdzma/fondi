@@ -5,17 +5,7 @@ import { PARTICIPANT_COLORS } from '../config.js';
 import { calcParticipante, cuotasCirc, latest, participantesActivos, participantesTodos } from '../computed.js';
 import { quickTransition, springTransition, surfaceMotion } from '../motion';
 import { COP, fmt, fmt0, fmtN, fmtPct, signStr } from '../utils/format.js';
-import { HeroChart, periodPct, RANGE_LABELS, rangeHistory } from './Charts';
-
-const ranges = [
-  ['1W', '1 semana', '1S'],
-  ['2W', '2 semanas', '2S'],
-  ['1M', '1 mes', '1M'],
-  ['3M', '3 meses', '3M'],
-  ['6M', '6 meses', '6M'],
-  ['1A', '1 año', '1A'],
-  ['todo', 'Todo', 'Todo'],
-];
+import { HeroChart, periodPct, RANGE_LABELS, RANGES, rangeHistory } from './Charts';
 
 const metrics = [
   ['ganancia', 'Ganancia'],
@@ -45,18 +35,9 @@ function LoadingParticipants() {
 }
 
 export function Summary({ loading }: { loading: boolean }) {
-  const [range, setRange] = useState(S.range);
-  const [metric, setMetric] = useState(S.heroMetric);
+  const [range, setRange] = useState('1M');
+  const [metric, setMetric] = useState('ganancia');
   const current = latest();
-
-  const selectRange = (value: string) => {
-    S.range = value;
-    setRange(value);
-  };
-  const selectMetric = (value: string) => {
-    S.heroMetric = value;
-    setMetric(value);
-  };
 
   const history = rangeHistory(range);
   const fundChange = periodPct(history, 'valor_total');
@@ -82,7 +63,7 @@ export function Summary({ loading }: { loading: boolean }) {
         <div className="chart-card">
           <div className="hero-toggle" role="group" aria-label="Métrica del gráfico">
             {metrics.map(([value, label]) => (
-              <button key={value} className={`hero-tab${metric === value ? ' active' : ''}`} aria-pressed={metric === value} onClick={() => selectMetric(value)}>
+              <button key={value} className={`hero-tab${metric === value ? ' active' : ''}`} aria-pressed={metric === value} onClick={() => setMetric(value)}>
                 {metric === value && <motion.span className="control-selection" layoutId="summary-metric" transition={springTransition} />}
                 <span className="control-label">{label}</span>
               </button>
@@ -94,8 +75,8 @@ export function Summary({ loading }: { loading: boolean }) {
             </motion.div>
           </AnimatePresence>
           <div className="range-btns" role="group" aria-label="Período del gráfico">
-            {ranges.map(([value, full, short]) => (
-              <button key={value} className={`range-btn${range === value ? ' active' : ''}`} aria-pressed={range === value} onClick={() => selectRange(value)}>
+            {RANGES.map(([value, full, short]) => (
+              <button key={value} className={`range-btn${range === value ? ' active' : ''}`} aria-pressed={range === value} onClick={() => setRange(value)}>
                 {range === value && <motion.span className="control-selection" layoutId="summary-range" transition={springTransition} />}
                 <span className="control-label rl-full">{full}</span><span className="control-label rl-short">{short}</span>
               </button>

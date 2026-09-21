@@ -6,7 +6,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 "Fondi" — dashboard for managing a mutual-fund-style investment pool: several participants contribute/withdraw USD at different times, and each one owns a fraction of the fund measured in "shares" (like a collective investment fund). Shows fund value, share price, individual ownership, and returns in USD and COP.
 
-React + TypeScript + Chart.js, bundled with Vite and styled through Tailwind CSS plus the existing Fondi component classes. `index.html` is only the Vite shell; `src/App.tsx` owns the app lifecycle and screen components live under `src/components/`.
+React + TypeScript + Chart.js, bundled with Vite and styled through the Fondi CSS system. `index.html` is only the Vite shell; `src/App.tsx` owns the app lifecycle and screen components live under `src/components/`.
 
 ## Commands
 

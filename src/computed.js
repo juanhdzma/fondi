@@ -63,31 +63,22 @@ export function calcParticipante(nombre) {
   const retiros_monto = retiros.reduce((s, m) => s + m.monto, 0);
   const pc            = precioCuota();
   const valor_actual  = cuotas * pc;
-  const neto_invertido= aportes_monto - retiros_monto;
   const precio_prom   = aportes_cuotas > 0 ? aportes_monto / aportes_cuotas : 0;
   const ganancia_pct  = precio_prom > 0 ? (pc - precio_prom) / precio_prom * 100 : 0;
   const ganancia_monto= valor_actual + retiros_monto - aportes_monto;
 
   // ── COP ──────────────────────────────────────────────────────────────────
   const cop_invertido  = aportes.reduce((s, m) => s + (m.monto_cop || 0), 0);
-  const cop_retirado   = retiros.reduce((s, m) => s + (m.monto_cop || 0), 0);
   const has_cop        = cop_invertido > 0;
   const trm_actual     = S.trm || 1;
   const valor_cop      = valor_actual * trm_actual;
-  const ganancia_cop   = valor_cop + cop_retirado - cop_invertido;
-  const ganancia_cop_pct = has_cop ? ganancia_cop / cop_invertido * 100 : 0;
   // TRM promedio de entrada (COP invertido / USD invertido)
   const trm_avg_entrada = aportes_monto > 0 ? cop_invertido / aportes_monto : 0;
-  // Desglose: cuánto ganó por fondo vs por TRM
-  const ganancia_fondo_cop = ganancia_monto * trm_actual;
-  const ganancia_trm_cop   = ganancia_cop - ganancia_fondo_cop;
 
   return {
-    nombre, cuotas, valor_actual, aportes_monto, retiros_monto, neto_invertido,
+    nombre, cuotas, valor_actual, aportes_monto, retiros_monto,
     precio_prom, ganancia_pct, ganancia_monto,
-    cop_invertido, cop_retirado, has_cop, valor_cop,
-    ganancia_cop, ganancia_cop_pct, trm_avg_entrada,
-    ganancia_fondo_cop, ganancia_trm_cop,
+    cop_invertido, has_cop, valor_cop, trm_avg_entrada,
   };
 }
 

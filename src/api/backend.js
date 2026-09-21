@@ -74,11 +74,11 @@ export async function fetchTRM() {
     S.trm = parseFloat(d[0]?.valor);
     if (!Number.isFinite(S.trm) || S.trm <= 0) throw new Error('TRM inválida');
     try { localStorage.setItem(TRM_CACHE_KEY, String(S.trm)); } catch {}
-    return { value: S.trm, cached: false };
+    return { cached: false };
   } catch {
     S.trm = ultimaTrm() || 4000;
     try { localStorage.setItem(TRM_CACHE_KEY, String(S.trm)); } catch {}
-    return { value: S.trm, cached: true };
+    return { cached: true };
   }
 }
 

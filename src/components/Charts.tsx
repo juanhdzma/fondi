@@ -5,15 +5,19 @@ import { historialGananciaFondo, historialParaGrafica, historialParticipante, pa
 import { fmt, fmtPct } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
 
-export const RANGE_LABELS: Record<string, string> = {
-  '1W': '1 semana',
-  '2W': '2 semanas',
-  '1M': '1 mes',
-  '3M': '3 meses',
-  '6M': '6 meses',
-  '1A': '1 año',
-  todo: 'todo el periodo',
-};
+export const RANGES = [
+  ['1W', '1 semana', '1S'],
+  ['2W', '2 semanas', '2S'],
+  ['1M', '1 mes', '1M'],
+  ['3M', '3 meses', '3M'],
+  ['6M', '6 meses', '6M'],
+  ['1A', '1 año', '1A'],
+  ['todo', 'Todo', 'Todo'],
+] as const;
+
+export const RANGE_LABELS = Object.fromEntries(
+  RANGES.map(([value, label]) => [value, value === 'todo' ? 'todo el periodo' : label]),
+) as Record<string, string>;
 
 type Row = Record<string, any> & { fecha: string };
 type Point = { x: number; y: number; interpolated?: boolean };
@@ -61,11 +65,6 @@ export function periodPct(data: Row[], key: string) {
 
 export function rangeHistory(range: string) {
   return filteredWithFill(range, historialParaGrafica() as Row[]);
-}
-
-function withoutWithdrawalSnapshots<T extends Row>(source: T[]) {
-  const withdrawals = new Set(S.movimientos.filter(movement => movement.tipo === 'retiro').map(movement => movement.fecha));
-  return source.filter(row => !withdrawals.has(row.fecha));
 }
 
 const toTimestamp = (date: string) => new Date(`${date.slice(0, 10)}T12:00:00`).getTime();
@@ -289,7 +288,7 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
     });
     const ticks = computeCalendarTicks(timestamps);
     const totalPoints = data.map((row, index) => ({ x: timestamps[index], y: row.valor_total }));
-    const gainRows = filteredWithFill(range, withoutWithdrawalSnapshots(historialGananciaFondo()) as Row[]);
+    const gainRows = filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[]);
     const gainPoints = gainRows.map((row, index) => ({ x: timestamps[index], y: row.ganancia }));
     const baseUsd = data[0]?.precio_cuota || 1;
     const baseCop = data[0] ? data[0].precio_cuota * (data[0].trm || S.trm || 1) : 1;
@@ -315,7 +314,7 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
   };
   const [label, unit] = labels[metric];
   const summaryRows = metric === 'ganancia'
-    ? filteredWithFill(range, withoutWithdrawalSnapshots(historialGananciaFondo()) as Row[])
+    ? filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[])
     : data;
   const start = labels[metric][2](summaryRows[0]);
   const end = labels[metric][2](summaryRows.at(-1)!);

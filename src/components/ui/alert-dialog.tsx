@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { AnimatePresence, motion, type HTMLMotionProps } from 'motion/react';
-import { AlertDialog as Primitive } from 'radix-ui';
+import * as Primitive from '@radix-ui/react-alert-dialog';
 
 type RootProps = React.ComponentProps<typeof Primitive.Root>;
 type ContextValue = { isOpen: boolean; setIsOpen: NonNullable<RootProps['onOpenChange']> };
@@ -28,7 +28,6 @@ function AlertDialog({ open, defaultOpen, onOpenChange, ...props }: RootProps) {
   );
 }
 
-const AlertDialogTrigger = Primitive.Trigger;
 const AlertDialogCancel = Primitive.Cancel;
 const AlertDialogAction = Primitive.Action;
 const AlertDialogTitle = Primitive.Title;
@@ -78,19 +77,13 @@ function AlertDialogContent({ from = 'top', transition = { type: 'spring', stiff
   );
 }
 
-const AlertDialogHeader = (props: React.ComponentProps<'div'>) => <div {...props} />;
-const AlertDialogFooter = (props: React.ComponentProps<'div'>) => <div {...props} />;
-
 export {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogOverlay,
   AlertDialogPortal,
   AlertDialogTitle,
-  AlertDialogTrigger,
 };

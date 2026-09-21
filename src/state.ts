@@ -31,15 +31,9 @@ export const S: {
   historial: FundSnapshot[];
   movimientos: Movement[];
   participantesLog: ParticipantEvent[];
-  range: string;
-  personaRange: string;
-  heroMetric: string;
 } = {
   trm: null,
   historial: [],
   movimientos: [],
   participantesLog: [],
-  range: '1M',
-  personaRange: 'todo',
-  heroMetric: 'ganancia',
 };

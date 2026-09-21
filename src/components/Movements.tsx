@@ -5,18 +5,9 @@ import { calcParticipante, participanteColor, participantesTodos, porcentajeReti
 import { quickTransition, springTransition, surfaceMotion } from '../motion';
 import { COP, fmt, fmtPct, signStr } from '../utils/format.js';
 import { fmtDate, normDate } from '../utils/dates.js';
-import { ParticipantChart } from './Charts';
+import { ParticipantChart, RANGES } from './Charts';
 
 const monthFormatter = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
-const ranges = [
-  ['1W', '1 semana', '1S'],
-  ['2W', '2 semanas', '2S'],
-  ['1M', '1 mes', '1M'],
-  ['3M', '3 meses', '3M'],
-  ['6M', '6 meses', '6M'],
-  ['1A', '1 año', '1A'],
-  ['todo', 'Todo', 'Todo'],
-];
 
 function month(date: string) {
   const key = normDate(date).slice(0, 7);
@@ -59,17 +50,12 @@ function ParticipantSummary({ name }: { name: string }) {
 export function Movements({ loading }: { loading: boolean }) {
   const names = participantesTodos();
   const [selected, setSelected] = useState('');
-  const [range, setRange] = useState(S.personaRange);
+  const [range, setRange] = useState('todo');
   const visible = new Set(names);
   const movements = S.movimientos
     .filter(movement => visible.has(movement.persona) && (!selected || movement.persona === selected))
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
   let previousMonth = '';
-
-  const selectRange = (value: string) => {
-    S.personaRange = value;
-    setRange(value);
-  };
 
   return (
     <>
@@ -96,8 +82,8 @@ export function Movements({ loading }: { loading: boolean }) {
               </motion.div>
             </AnimatePresence>
             <div className="range-btns" role="group" aria-label="Período de evolución">
-              {ranges.map(([value, full, short]) => (
-                <button key={value} className={`range-btn persona-range-btn${range === value ? ' active' : ''}`} aria-pressed={range === value} onClick={() => selectRange(value)}>
+              {RANGES.map(([value, full, short]) => (
+                <button key={value} className={`range-btn persona-range-btn${range === value ? ' active' : ''}`} aria-pressed={range === value} onClick={() => setRange(value)}>
                   {range === value && <motion.span className="control-selection" layoutId="participant-range" transition={springTransition} />}
                   <span className="control-label rl-full">{full}</span><span className="control-label rl-short">{short}</span>
                 </button>

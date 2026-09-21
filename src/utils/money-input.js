@@ -18,10 +18,6 @@ export function fmtMoneyInput(el, decimals) {
   el.setSelectionRange(pos, pos);
 }
 
-export function parseMoneyInput(el) {
-  return parseMoneyValue(el.value);
-}
-
 export function parseMoneyValue(value) {
   const raw = value.replace(/\./g, '').replace(',', '.');
   return parseFloat(raw) || 0;

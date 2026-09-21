@@ -150,7 +150,6 @@ describe('calcParticipante', () => {
     const p = calcParticipante('Ana');
     expect(p.cuotas).toBeCloseTo(500, 10);
     expect(p.valor_actual).toBeCloseTo(600, 10);
-    expect(p.neto_invertido).toBeCloseTo(400, 10);
     expect(p.ganancia_monto).toBeCloseTo(200, 10);
   });
 
@@ -167,7 +166,7 @@ describe('calcParticipante', () => {
     expect(p.precio_prom).toBeCloseTo(2000 / 1500, 10);
   });
 
-  it('desglosa la ganancia en COP entre fondo y TRM', () => {
+  it('calcula el valor actual y la TRM promedio en COP', () => {
     S.trm = 5000;
     S.historial = [{ fecha: '2026-02-01', valor_total: 1200, precio_cuota: 1.2, cuotas_circ: 1000, trm: 5000 }];
     S.movimientos = [mov('Ana', 'aporte', 1000, 1000, '2026-01-01', { monto_cop: 4000000, trm_dia: 4000 })];
@@ -176,11 +175,6 @@ describe('calcParticipante', () => {
     expect(p.has_cop).toBe(true);
     expect(p.valor_cop).toBeCloseTo(6000000, 6);
     expect(p.trm_avg_entrada).toBeCloseTo(4000, 10);
-    expect(p.ganancia_cop).toBeCloseTo(2000000, 6);
-    // 200 USD de ganancia del fondo a TRM de hoy, el resto es lo que aportó la subida del dólar.
-    expect(p.ganancia_fondo_cop).toBeCloseTo(1000000, 6);
-    expect(p.ganancia_trm_cop).toBeCloseTo(1000000, 6);
-    expect(p.ganancia_fondo_cop + p.ganancia_trm_cop).toBeCloseTo(p.ganancia_cop, 6);
   });
 });
 

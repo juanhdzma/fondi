@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 
@@ -49,6 +47,7 @@ body {
 }
 
 button, input, select { font: inherit; }
+img, svg { display: block; }
 input, select { accent-color: var(--accent); }
 input { caret-color: var(--accent); }
 ::placeholder { color: var(--text-secondary); opacity: 1; }
@@ -386,7 +385,6 @@ button { color: inherit; }
 .input-row-stack { flex-direction: column; }
 .input-row-stack .btn { width: 100%; }
 .form-hint { margin-top: 5px; color: var(--text-secondary); font-size: 12px; }
-.form-hint.warn { color: var(--red); }
 .form-hint.notice { color: var(--amber); }
 .form-hint:empty { margin-top: 0; }
 .err-msg { min-height: 18px; margin-top: 7px; color: var(--red); font-size: 13px; }
@@ -449,6 +447,13 @@ button { color: inherit; }
 .conversion-field { margin-top: 8px; }
 .withdraw-all { margin-top: 8px; }
 .motion-collapse { overflow: hidden; }
+
+.dialog-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.45); }
+.dialog-content { position: fixed; top: 50%; left: 50%; z-index: 50; display: grid; width: calc(100% - 2rem); max-width: 28rem; gap: 1.25rem; margin: 0; padding: 1.5rem; border: 0; border-radius: 1rem; outline: 0; background: #fff; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+.dialog-header { display: grid; gap: 0.5rem; text-align: center; }
+.dialog-title { color: var(--text); font-size: 1.125rem; font-weight: 600; }
+.dialog-description { color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5rem; }
+.dialog-footer { display: flex; flex-direction: column-reverse; gap: 0.5rem; }
 
 .skeleton { display: block; border-radius: 6px; background: linear-gradient(100deg, var(--surface-2) 30%, #f7f7f9 50%, var(--surface-2) 70%); background-size: 220% 100%; animation: skeleton 1.4s linear infinite; }
 @keyframes skeleton { to { background-position-x: -220%; } }
@@ -612,6 +617,11 @@ button { color: inherit; }
   .mov-card { padding: 13px 14px; flex-wrap: wrap; }
   .mov-meta { max-width: 210px; }
   .admin-lock { margin-top: 8vh; padding: 24px 20px; }
+}
+
+@media (min-width: 640px) {
+  .dialog-header { text-align: left; }
+  .dialog-footer { flex-direction: row; justify-content: flex-end; }
 }
 
 @media (max-width: 390px) {
