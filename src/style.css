@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 
@@ -433,6 +435,7 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-green { color: #fff; background: var(--accent); box-shadow: 0 8px 18px rgba(12, 47, 70, 0.18); }
 .btn-dim { color: var(--text); background: var(--surface-2); }
+.btn-danger { color: #fff; background: var(--red); }
 .btn-link { display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
 .form-footer { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
 .form-footer .btn { flex: 1 1 100%; }
@@ -445,6 +448,7 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .data-card .import-warning { margin-bottom: 9px; color: var(--red); }
 
 .participant-row { min-height: 46px; padding: 7px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--divider); font-size: 14px; }
+.participants-manage-list { margin-bottom: 14px; }
 .participant-actions { display: flex; gap: 6px; }
 .btn-toggle-participant,
 .btn-remove-participant { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 10px; cursor: pointer; transition: color 160ms ease, background-color 160ms ease, transform 120ms var(--ease-out); }
@@ -454,6 +458,8 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .btn-remove-participant svg { width: 100%; height: 100%; }
 .btn-toggle-participant:active,
 .btn-remove-participant:active { transform: scale(0.94); }
+.btn-toggle-participant:disabled,
+.btn-remove-participant:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .money-wrap { position: relative; display: flex; align-items: center; }
 .money-wrap .currency-pfx { position: absolute; left: 12px; z-index: 1; color: var(--text-secondary); font-size: 14px; pointer-events: none; user-select: none; transition: color 160ms ease, transform 160ms var(--ease-out); }
@@ -462,6 +468,7 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .money-wrap-suffix .form-input { padding-right: 82px; }
 .currency-sfx { position: absolute; right: 12px; color: var(--text-secondary); font-size: 11px; font-weight: 650; pointer-events: none; }
 .conversion-field { margin-top: 8px; }
+.withdraw-all { margin-top: 8px; }
 
 .skeleton { display: block; border-radius: 6px; background: linear-gradient(100deg, var(--surface-2) 30%, #f7f7f9 50%, var(--surface-2) 70%); background-size: 220% 100%; animation: skeleton 1.4s linear infinite; }
 @keyframes skeleton { to { background-position-x: -220%; } }
@@ -469,8 +476,25 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .empty-title { margin-bottom: 6px; font-size: 16px; font-weight: 700; }
 .empty-text { max-width: 48ch; margin: 0 auto; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
 .error-banner { display: none; margin-bottom: 16px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--red-dim); color: var(--red); font-size: 13px; font-weight: 620; transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
-.error-banner[style*="display: block"] { opacity: 1; transform: translateY(0); }
-@starting-style { .error-banner[style*="display: block"] { opacity: 0; transform: translateY(-8px); } }
+.error-banner.visible { display: block; opacity: 1; transform: translateY(0); }
+@starting-style { .error-banner.visible { opacity: 0; transform: translateY(-8px); } }
+
+#persona-tooltip {
+  position: absolute;
+  z-index: 50;
+  padding: 10px 12px;
+  border: 1px solid #e7e7ea;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.1);
+  color: #0c0d0f;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -110%);
+  transition: opacity 100ms ease;
+}
+.persona-tooltip-date { margin-top: 4px; color: #9aa0a6; font-size: 11px; font-weight: 600; }
 
 .toast {
   position: fixed;

@@ -19,7 +19,11 @@ export function fmtMoneyInput(el, decimals) {
 }
 
 export function parseMoneyInput(el) {
-  const raw = el.value.replace(/\./g, '').replace(',', '.');
+  return parseMoneyValue(el.value);
+}
+
+export function parseMoneyValue(value) {
+  const raw = value.replace(/\./g, '').replace(',', '.');
   return parseFloat(raw) || 0;
 }
 

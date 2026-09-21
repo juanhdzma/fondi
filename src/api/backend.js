@@ -1,7 +1,5 @@
 import { API_BASE_URL, MOCK_MODE, MOCK_HISTORIAL, MOCK_MOVIMIENTOS, MOCK_PARTICIPANTES_LOG } from '../config.js';
 import { S } from '../state.js';
-import { showBanner, hideBanner } from '../ui/banner.js';
-import { renderAll } from '../render/index.js';
 
 async function postJSON(path, body, adminKey) {
   const r = await fetch(`${API_BASE_URL}${path}`, {
@@ -67,8 +65,6 @@ function ultimaTrm() {
 }
 
 export async function fetchTRM() {
-  const badge = document.getElementById('trm-badge');
-  const warning = document.getElementById('trm-cache-warning');
   try {
     // TRM oficial Colombia — Superfinanciera vía datos.gov.co
     const r = await fetch('https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciadesde+DESC',
@@ -78,13 +74,11 @@ export async function fetchTRM() {
     S.trm = parseFloat(d[0]?.valor);
     if (!Number.isFinite(S.trm) || S.trm <= 0) throw new Error('TRM inválida');
     try { localStorage.setItem(TRM_CACHE_KEY, String(S.trm)); } catch {}
-    warning.hidden = true;
-    badge.textContent = `TRM $${S.trm.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return { value: S.trm, cached: false };
   } catch {
     S.trm = ultimaTrm() || 4000;
     try { localStorage.setItem(TRM_CACHE_KEY, String(S.trm)); } catch {}
-    warning.hidden = false;
-    badge.textContent = `TRM ~${S.trm.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return { value: S.trm, cached: true };
   }
 }
 
@@ -92,6 +86,7 @@ export async function fetchAll() {
   // La TRM va en paralelo, no antes: nunca rechaza (tiene fallback) y los datos del fondo no
   // dependen de ella, así que no tiene por qué demorar el render.
   const trmListo = fetchTRM();
+  let error = null;
   try {
     let historial, movimientos, participantesLog;
     if (MOCK_MODE) {
@@ -120,10 +115,9 @@ export async function fetchAll() {
     S.movimientos = movimientos;
     S.participantesLog = participantesLog;
 
-    hideBanner();
   } catch (err) {
-    showBanner(err.message);
+    error = err instanceof Error ? err.message : String(err);
   }
-  await trmListo;
-  renderAll();
+  const trm = await trmListo;
+  return { error, trm };
 }

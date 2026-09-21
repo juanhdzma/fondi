@@ -4,7 +4,9 @@ Fondi is a modular monolith by default: the Vite build and FastAPI API run in on
 
 ## Modules
 
-- `src/` owns rendering, local form validation and previews. `src/api/backend.js` is its only HTTP adapter.
+- `src/components/` owns React rendering, controlled forms, local validation and previews. `src/api/backend.js` is the frontend's only HTTP adapter.
+- `src/state.ts` holds the typed API snapshot. A successful write refetches that snapshot instead of patching financial data optimistically.
+- `src/components/ui/alert-dialog.tsx` is the only copied Animate UI primitive; it combines Radix focus management with Motion for destructive confirmations.
 - `backend/app/` owns authentication, persistence, imports and authoritative share calculations.
 - SQLite is owned exclusively by the backend. The frontend never reads the database or derives persisted values.
 - Participant configuration is append-only: `agregar`/`quitar` control new movements, while `ocultar`/`mostrar` control whether a person appears in Resumen and Movimientos.

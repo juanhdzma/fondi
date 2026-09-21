@@ -24,10 +24,10 @@ Participants primarily check the dashboard on phones. The administrator uses the
 
 ## Capabilities and Constraints
 
-- The frontend is a responsive vanilla JavaScript dashboard backed by the existing HTTP API.
+- The frontend is a responsive React and TypeScript application built with Vite and Tailwind CSS, backed by the existing HTTP API.
 - Financial writes are append-only and some operations are destructive, so previews, validation, and confirmations must remain prominent.
 - USD is the source currency; COP values and TRM provide local context.
-- This redesign may change only the UI. Backend behavior and API contracts stay unchanged.
+- Frontend implementation changes must preserve the established visual hierarchy, backend behavior, and API contracts.
 
 ## Brand Commitments
 

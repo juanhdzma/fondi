@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtMoneyInput, parseMoneyInput, resolveContributionExchange } from './money-input.js';
+import { fmtMoneyInput, parseMoneyInput, parseMoneyValue, resolveContributionExchange } from './money-input.js';
 
 // El input real solo se usa por .value/.selectionStart/.setSelectionRange, así que alcanza
 // con un doble sin DOM.
@@ -77,6 +77,12 @@ describe('parseMoneyInput', () => {
 
   it('una coma suelta es 0 y no NaN', () => {
     expect(parseMoneyInput(fakeInput(','))).toBe(0);
+  });
+});
+
+describe('parseMoneyValue', () => {
+  it('parses the controlled React input value', () => {
+    expect(parseMoneyValue('1.234,56')).toBe(1234.56);
   });
 });
 

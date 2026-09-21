@@ -2,7 +2,7 @@
 
 Web dashboard for managing a mutual-fund-style investment pool: several participants contribute/withdraw USD at different times, each owning a fraction of the fund measured in "shares." Shows fund value, share price, individual ownership, and returns in USD and COP.
 
-![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue) ![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20SQLite-009688) ![Frontend](https://img.shields.io/badge/frontend-vanilla%20JS-f7df1e) [![Build & push to GHCR](https://github.com/juanhdzma/fondi/actions/workflows/docker.yml/badge.svg)](https://github.com/juanhdzma/fondi/actions/workflows/docker.yml)
+![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue) ![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20SQLite-009688) ![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20TypeScript-3178c6) [![Build & push to GHCR](https://github.com/juanhdzma/fondi/actions/workflows/docker.yml/badge.svg)](https://github.com/juanhdzma/fondi/actions/workflows/docker.yml)
 
 ![Resumen](docs/screenshots/desktop-resumen.png)
 
@@ -51,7 +51,7 @@ Screenshots above use placeholder data for illustration, not a real fund's figur
 
 ### Mobile
 
-Below 720px the top nav becomes a bottom tab bar. Inputs are sized to avoid iOS's zoom-on-focus, and pinch-zoom is disabled.
+Below 720px the top nav becomes a bottom tab bar. Inputs are sized to avoid iOS's zoom-on-focus.
 
 <table>
 <tr>
@@ -65,7 +65,7 @@ Below 720px the top nav becomes a bottom tab bar. Inputs are sized to avoid iOS'
 
 By default, one image and one container: a multi-stage `Dockerfile` builds the Vite frontend, then a Python stage installs FastAPI and serves the built static files alongside the `/api/*` routes from a single `uvicorn` process. Data lives in a SQLite file with three append-only tables (`historial_fondo`, `movimientos`, `participantes_config`) — nothing is ever edited or deleted, only new rows added.
 
-The frontend (`src/`) is plain JS, no framework: one module per UI section under `render/`, all reading from a single in-memory state object (`S` in `state.js`) populated from `GET /api/all`. Any admin write — a movement, a valuation, adding a participant — goes through the API and then refetches and re-renders everything; there's no optimistic UI or partial state patching by design, trading snappiness for simplicity at the data volumes this app deals with.
+The frontend is a React + TypeScript app built with Vite and Tailwind CSS. Screen components read the small in-memory data snapshot (`S` in `state.ts`) populated from `GET /api/all`; controlled React state owns navigation and forms. Radix UI provides accessible destructive confirmations, animated with the copied Animate UI Alert Dialog primitive and Motion. Any admin write — a movement, a valuation, adding a participant — goes through the API and then refetches the authoritative snapshot; there's no optimistic data patching by design.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module ownership, request contract and the future frontend/API split.
 
@@ -94,20 +94,20 @@ The frontend talks to `http://localhost:8000` in dev (see `API_BASE_URL` in `src
 ### Structure
 
 ```
-  index.html          Markup only, no inline event handlers
+  index.html          Vite entry shell
 src/
-  main.js            Entry point — wires up event listeners and boots the app
-  config.js           API_BASE_URL, MOCK_MODE / mock fixtures
-  state.js             In-memory state (S) and Chart.js instances
-  computed.js            Derived state (share price, shares per participant, ...)
-  admin.js                 Admin panel: auth, forms, movement/valuation submission
-  style.css
-  api/backend.js       fetchAll/postMovimiento/postFondo/postParticipante/exportUrl/postImportXlsx — all I/O
-  domain/cuotas.js      The share math, pure and DOM-free so it can be unit tested
-  utils/                Formatters, dates, money inputs
-  render/               One module per UI section (summary, movements, charts)
-  ui/                   Tabs, chart date range, error banner, refresh
-  *.test.js             vitest, next to what they cover (domain/, computed.js, utils/)
+  main.tsx             React entry point and reduced-motion provider
+  App.tsx              Data refresh, navigation, error and toast state
+  components/          Summary, Movements, Admin and Chart.js React components
+    ui/alert-dialog.tsx  Copied Animate UI + Radix destructive confirmation primitive
+  config.js            API_BASE_URL, MOCK_MODE and mock fixtures
+  state.ts             Typed in-memory API snapshot
+  computed.js          Derived state (share price, shares per participant, ...)
+  style.css            Tailwind entry plus the Fondi visual system
+  api/backend.js       All HTTP I/O
+  domain/cuotas.js     Pure share math
+  utils/               Formatters, dates and money inputs
+  *.test.{js,ts}       Vitest tests next to the behavior they cover
 backend/
   app/main.py          FastAPI app: auth dependency, routes, optional static file mount
   app/db.py            Schema + sqlite3 connection helper
@@ -235,9 +235,10 @@ That file is a full restore: Admin → Datos → Importar replaces everything wi
 ```bash
 cd backend && python -m pytest   # API, auth, import/export, share-balance rules
 npm test                         # vitest — share math, per-participant figures, money input
+npm run typecheck                # TypeScript validation
 ```
 
-Covered on the frontend: the share math (`src/domain/`), everything derived per participant (`src/computed.js`) and the money inputs (`src/utils/`). The rest — `render/`, `admin.js`, `ui/` — is DOM-coupled and untested, so anything worth testing gets extracted into one of those three first rather than tested in place. No linter or type checker is configured.
+Covered on the frontend: share math (`src/domain/`), derived participant figures (`src/computed.js`), money inputs (`src/utils/`) and the chart's calendar/zero-crossing transforms. TypeScript checks the React component boundary; backend tests remain authoritative for every financial write.
 
 ## License
 
