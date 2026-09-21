@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { fetchAll } from './api/backend.js';
 import { S } from './state.js';
 import { Admin } from './components/Admin';
 import { Movements } from './components/Movements';
 import { Summary } from './components/Summary';
+import { quickTransition, springTransition, surfaceMotion } from './motion';
 import { nextTabIndex } from './utils/tabs';
 
 type Tab = 'resumen' | 'movimientos' | 'admin';
@@ -86,10 +88,11 @@ export function App() {
                   document.getElementById(`nav-${nextTab.id}`)?.focus();
                 }}
               >
+                {active && <motion.span className="nav-active" layoutId="active-navigation" transition={springTransition} />}
                 <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                   {item.icon}
                 </svg>
-                <span>{item.label}</span>
+                <span className="nav-label">{item.label}</span>
               </button>
             );
           })}
@@ -97,25 +100,48 @@ export function App() {
         <div className="header-right">
           <div className="trm-status">
             <div className="trm-badge">TRM {trmCached ? '~' : ''}${trm || '—'}</div>
-            {trmCached && <span className="trm-cache-warning" role="status">TRM cacheada</span>}
+            <AnimatePresence initial={false}>
+              {trmCached && (
+                <motion.span key="trm-cache" className="trm-cache-warning" role="status" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
+                  TRM cacheada
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </header>
 
       <main className="main">
-        <section id="tab-resumen" className={`tab-content${tab === 'resumen' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-resumen" hidden={tab !== 'resumen'}>
-          {error && <div className="error-banner visible" role="alert">Error cargando datos: {error}</div>}
+        <motion.section id="tab-resumen" className={`tab-content${tab === 'resumen' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-resumen" hidden={tab !== 'resumen'} variants={surfaceMotion} initial="hidden" animate={tab === 'resumen' ? 'visible' : 'hidden'} transition={quickTransition}>
+          <AnimatePresence initial={false}>
+            {error && <motion.div key="load-error" className="error-banner" role="alert" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>Error cargando datos: {error}</motion.div>}
+          </AnimatePresence>
           <Summary loading={loading} />
-        </section>
-        <section id="tab-movimientos" className={`tab-content${tab === 'movimientos' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-movimientos" hidden={tab !== 'movimientos'}>
+        </motion.section>
+        <motion.section id="tab-movimientos" className={`tab-content${tab === 'movimientos' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-movimientos" hidden={tab !== 'movimientos'} variants={surfaceMotion} initial="hidden" animate={tab === 'movimientos' ? 'visible' : 'hidden'} transition={quickTransition}>
           <Movements loading={loading} />
-        </section>
-        <section id="tab-admin" className={`tab-content${tab === 'admin' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-admin" hidden={tab !== 'admin'}>
+        </motion.section>
+        <motion.section id="tab-admin" className={`tab-content${tab === 'admin' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-admin" hidden={tab !== 'admin'} variants={surfaceMotion} initial="hidden" animate={tab === 'admin' ? 'visible' : 'hidden'} transition={quickTransition}>
           <Admin onRefresh={refresh} onToast={setToast} />
-        </section>
+        </motion.section>
       </main>
 
-      <div className={`toast${toast ? ' show' : ''}`} role="status" aria-live="polite">{toast}</div>
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key="toast"
+            className="toast"
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, filter: 'blur(4px)', transform: 'translateX(-50%) translateY(100%) scale(0.96)' }}
+            animate={{ opacity: 1, filter: 'blur(0px)', transform: 'translateX(-50%) translateY(0) scale(1)' }}
+            exit={{ opacity: 0, filter: 'blur(4px)', transform: 'translateX(-50%) translateY(100%) scale(0.96)' }}
+            transition={quickTransition}
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

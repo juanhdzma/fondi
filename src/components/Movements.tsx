@@ -1,7 +1,8 @@
 import { Fragment, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
 import { calcParticipante, participanteColor, participantesTodos, porcentajeRetiro } from '../computed.js';
+import { quickTransition, springTransition, surfaceMotion } from '../motion';
 import { COP, fmt, fmtPct, signStr } from '../utils/format.js';
 import { fmtDate, normDate } from '../utils/dates.js';
 import { ParticipantChart } from './Charts';
@@ -83,32 +84,32 @@ export function Movements({ loading }: { loading: boolean }) {
         </div>
       </div>
 
-      {selected && (
-        <div id="mov-persona-panel">
+      <AnimatePresence initial={false}>
+        {selected && (
+        <motion.div id="mov-persona-panel" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
           <div className="card" id="mov-persona-summary"><ParticipantSummary name={selected} /></div>
           <div className="chart-card">
             <div className="chart-header"><div className="chart-title">Evolución de tu inversión</div></div>
-            <motion.div
-              key={`${selected}-${range}`}
-              className="chart-wrap"
-              initial={{ opacity: 0.15, transform: 'translateY(8px) scale(0.97)' }}
-              animate={{ opacity: 1, transform: 'translateY(0) scale(1)' }}
-              transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <ParticipantChart name={selected} range={range} />
-            </motion.div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={`${selected}-${range}`} className="chart-wrap" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
+                <ParticipantChart name={selected} range={range} />
+              </motion.div>
+            </AnimatePresence>
             <div className="range-btns" role="group" aria-label="Período de evolución">
               {ranges.map(([value, full, short]) => (
                 <button key={value} className={`range-btn persona-range-btn${range === value ? ' active' : ''}`} aria-pressed={range === value} onClick={() => selectRange(value)}>
-                  <span className="rl-full">{full}</span><span className="rl-short">{short}</span>
+                  {range === value && <motion.span className="control-selection" layoutId="participant-range" transition={springTransition} />}
+                  <span className="control-label rl-full">{full}</span><span className="control-label rl-short">{short}</span>
                 </button>
               ))}
             </div>
           </div>
-        </div>
-      )}
+        </motion.div>
+        )}
+      </AnimatePresence>
 
-      <ul className="mov-list">
+      <AnimatePresence mode="wait" initial={false}>
+      <motion.ul key={`${selected}-${loading ? 'loading' : 'ready'}`} className="mov-list" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
         {loading ? <li className="empty">Cargando...</li> : !movements.length ? (
           <li className="empty"><div className="empty-title">Sin movimientos</div><p className="empty-text">Los aportes y retiros aparecerán aquí.</p></li>
         ) : movements.map((movement, index) => {
@@ -132,7 +133,8 @@ export function Movements({ loading }: { loading: boolean }) {
             </Fragment>
           );
         })}
-      </ul>
+      </motion.ul>
+      </AnimatePresence>
     </>
   );
 }

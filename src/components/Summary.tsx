@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
 import { PARTICIPANT_COLORS } from '../config.js';
 import { calcParticipante, cuotasCirc, latest, participantesActivos, participantesTodos } from '../computed.js';
+import { quickTransition, springTransition, surfaceMotion } from '../motion';
 import { COP, fmt, fmt0, fmtN, fmtPct, signStr } from '../utils/format.js';
 import { HeroChart, periodPct, RANGE_LABELS, rangeHistory } from './Charts';
 
@@ -82,23 +83,21 @@ export function Summary({ loading }: { loading: boolean }) {
           <div className="hero-toggle" role="group" aria-label="Métrica del gráfico">
             {metrics.map(([value, label]) => (
               <button key={value} className={`hero-tab${metric === value ? ' active' : ''}`} aria-pressed={metric === value} onClick={() => selectMetric(value)}>
-                {label}
+                {metric === value && <motion.span className="control-selection" layoutId="summary-metric" transition={springTransition} />}
+                <span className="control-label">{label}</span>
               </button>
             ))}
           </div>
-          <motion.div
-            key={`${range}-${metric}`}
-            className="chart-wrap"
-            initial={{ opacity: 0.15, transform: 'translateY(8px) scale(0.97)' }}
-            animate={{ opacity: 1, transform: 'translateY(0) scale(1)' }}
-            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-          >
-            <HeroChart range={range} metric={metric} />
-          </motion.div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={`${range}-${metric}`} className="chart-wrap" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
+              <HeroChart range={range} metric={metric} />
+            </motion.div>
+          </AnimatePresence>
           <div className="range-btns" role="group" aria-label="Período del gráfico">
             {ranges.map(([value, full, short]) => (
               <button key={value} className={`range-btn${range === value ? ' active' : ''}`} aria-pressed={range === value} onClick={() => selectRange(value)}>
-                <span className="rl-full">{full}</span><span className="rl-short">{short}</span>
+                {range === value && <motion.span className="control-selection" layoutId="summary-range" transition={springTransition} />}
+                <span className="control-label rl-full">{full}</span><span className="control-label rl-short">{short}</span>
               </button>
             ))}
           </div>
@@ -140,7 +139,7 @@ export function Summary({ loading }: { loading: boolean }) {
           const percentage = totalShares > 0 ? Math.max(0, participant.cuotas) / totalShares * 100 : 0;
           const gainTone = participant.ganancia_pct > 0 ? 'pos' : participant.ganancia_pct < 0 ? 'neg' : 'zero';
           return (
-            <div className="p-row" key={participant.nombre}>
+            <motion.div className="p-row" key={participant.nombre} variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: Math.min(index, 5) * 0.04 }} layout>
               <div className="p-avatar" style={{ background: tone }}>{participant.nombre.charAt(0).toUpperCase()}</div>
               <div className="p-main">
                 <div className="p-name">{participant.nombre}</div>
@@ -153,7 +152,7 @@ export function Summary({ loading }: { loading: boolean }) {
                 <div className="p-monto">{fmt0(participant.valor_actual)}</div>
                 <div className={`p-chg ${gainTone}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</div>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
