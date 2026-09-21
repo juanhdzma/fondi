@@ -22,3 +22,15 @@ export function parseMoneyInput(el) {
   const raw = el.value.replace(/\./g, '').replace(',', '.');
   return parseFloat(raw) || 0;
 }
+
+export function resolveContributionExchange({ usd, mode, cop, trm }) {
+  if (!Number.isFinite(usd) || usd <= 0) return { amountCOP: 0, exchangeRate: 0 };
+
+  if (mode === 'trm') {
+    if (!Number.isFinite(trm) || trm <= 0) return { amountCOP: 0, exchangeRate: 0 };
+    return { amountCOP: usd * trm, exchangeRate: trm };
+  }
+
+  if (!Number.isFinite(cop) || cop <= 0) return { amountCOP: 0, exchangeRate: 0 };
+  return { amountCOP: cop, exchangeRate: cop / usd };
+}

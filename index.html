@@ -195,21 +195,38 @@
             </div>
             <input type="hidden" id="f-tipo" value="aporte" />
           </div>
-          <div class="form-group" id="group-monto-cop">
-            <label class="form-label" for="f-monto-cop">Monto (COP)</label>
-            <div class="money-wrap">
-              <span class="currency-pfx">$</span>
-              <input class="form-input" type="text" inputmode="numeric" id="f-monto-cop" placeholder="0" />
-            </div>
-          </div>
           <div class="form-group">
             <label class="form-label" for="f-monto">Monto (USD)</label>
             <div class="money-wrap">
               <span class="currency-pfx">$</span>
               <input class="form-input" type="text" inputmode="decimal" id="f-monto" placeholder="0,00" />
             </div>
-            <div class="form-hint" id="hint-trm-mov"></div>
             <button type="button" class="btn btn-dim" id="btn-retirar-todo" style="display:none;margin-top:8px">Retirar todo</button>
+          </div>
+          <div class="form-group" id="group-conversion">
+            <div class="form-label" id="lbl-conversion">Conversión del aporte</div>
+            <div class="segmented" role="group" aria-labelledby="lbl-conversion">
+              <button type="button" class="segmented-btn conversion-btn sel" data-conversion="cop" aria-pressed="true">Monto COP</button>
+              <button type="button" class="segmented-btn conversion-btn" data-conversion="trm" aria-pressed="false">TRM aplicada</button>
+            </div>
+            <input type="hidden" id="f-conversion-mode" value="cop" />
+            <div class="conversion-field" id="conversion-cop">
+              <label class="sr-only" for="f-monto-cop">Monto pagado en COP</label>
+              <div class="money-wrap money-wrap-suffix">
+                <span class="currency-pfx">$</span>
+                <input class="form-input" type="text" inputmode="numeric" id="f-monto-cop" placeholder="0" />
+                <span class="currency-sfx">COP</span>
+              </div>
+            </div>
+            <div class="conversion-field" id="conversion-trm" hidden>
+              <label class="sr-only" for="f-trm">TRM aplicada al aporte</label>
+              <div class="money-wrap money-wrap-suffix">
+                <span class="currency-pfx">$</span>
+                <input class="form-input" type="text" inputmode="decimal" id="f-trm" placeholder="4.000,00" />
+                <span class="currency-sfx">COP/USD</span>
+              </div>
+            </div>
+            <div class="form-hint" id="hint-trm-mov" role="status" aria-live="polite"></div>
           </div>
           <div class="form-group">
             <label class="form-label" for="f-valor-mov">Valor del fondo después (USD) <span class="required">*</span></label>
@@ -220,11 +237,17 @@
             <div class="form-hint" id="hint-valor-mov"></div>
           </div>
           <div class="form-group">
-            <div class="form-label" id="lbl-fecha-mov">Fecha y hora</div>
-            <div class="datetime-row" role="group" aria-labelledby="lbl-fecha-mov">
-              <input class="form-input" type="date" id="f-fecha" aria-label="Fecha" style="flex:1" />
-              <input class="form-input" type="time" id="f-hora" aria-label="Hora" style="flex:1" />
+            <div class="form-label" id="lbl-fecha-mov">Momento</div>
+            <div class="segmented" role="group" aria-labelledby="lbl-fecha-mov">
+              <button type="button" class="segmented-btn datetime-btn sel" data-datetime-scope="mov" data-datetime-mode="now" aria-pressed="true">Ahora</button>
+              <button type="button" class="segmented-btn datetime-btn" data-datetime-scope="mov" data-datetime-mode="custom" aria-pressed="false">Otra fecha</button>
             </div>
+            <input type="hidden" id="f-datetime-mov" value="now" />
+            <div class="datetime-row" id="custom-datetime-mov" role="group" aria-label="Fecha y hora personalizadas" hidden>
+              <label class="datetime-field"><span>Fecha</span><input class="form-input" type="date" id="f-fecha" /></label>
+              <label class="datetime-field"><span>Hora</span><input class="form-input" type="time" id="f-hora" /></label>
+            </div>
+            <div class="form-hint" id="hint-datetime-mov">Se usará el momento exacto al guardar.</div>
           </div>
           <div class="form-footer">
             <button class="btn btn-green" id="btn-mov">Guardar</button>
@@ -245,11 +268,17 @@
             <div class="form-hint" id="hint-fondo"></div>
           </div>
           <div class="form-group">
-            <div class="form-label" id="lbl-fecha-fondo">Fecha y hora</div>
-            <div class="datetime-row" role="group" aria-labelledby="lbl-fecha-fondo">
-              <input class="form-input" type="date" id="f-fecha-fondo" aria-label="Fecha" style="flex:1" />
-              <input class="form-input" type="time" id="f-hora-fondo" aria-label="Hora" style="flex:1" />
+            <div class="form-label" id="lbl-fecha-fondo">Momento</div>
+            <div class="segmented" role="group" aria-labelledby="lbl-fecha-fondo">
+              <button type="button" class="segmented-btn datetime-btn sel" data-datetime-scope="fondo" data-datetime-mode="now" aria-pressed="true">Ahora</button>
+              <button type="button" class="segmented-btn datetime-btn" data-datetime-scope="fondo" data-datetime-mode="custom" aria-pressed="false">Otra fecha</button>
             </div>
+            <input type="hidden" id="f-datetime-fondo" value="now" />
+            <div class="datetime-row" id="custom-datetime-fondo" role="group" aria-label="Fecha y hora personalizadas" hidden>
+              <label class="datetime-field"><span>Fecha</span><input class="form-input" type="date" id="f-fecha-fondo" /></label>
+              <label class="datetime-field"><span>Hora</span><input class="form-input" type="time" id="f-hora-fondo" /></label>
+            </div>
+            <div class="form-hint" id="hint-datetime-fondo">Se usará el momento exacto al guardar.</div>
           </div>
           <div class="form-footer">
             <button class="btn btn-green" id="btn-fondo">Guardar valuación</button>

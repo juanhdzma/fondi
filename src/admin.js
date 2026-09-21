@@ -2,10 +2,10 @@ import { S } from './state.js';
 import { cuotasCirc, precioCuota, participantesActivos, participanteOculto, calcParticipante, latest } from './computed.js';
 import { calcularCuotas, excedeSaldo } from './domain/cuotas.js';
 import { fetchAll, postMovimiento, postFondo, postParticipante, exportUrl, postImportXlsx, verifyAdmin } from './api/backend.js';
-import { fmtMoneyInput, parseMoneyInput } from './utils/money-input.js';
+import { fmtMoneyInput, parseMoneyInput, resolveContributionExchange } from './utils/money-input.js';
 import { todayLocal } from './utils/dates.js';
 import { esc } from './utils/html.js';
-import { fmt, fmtN } from './utils/format.js';
+import { COP, fmt, fmtN } from './utils/format.js';
 import { showToast } from './ui/toast.js';
 
 let adminKey = '';
@@ -69,7 +69,53 @@ function setTipo(tipo) {
   });
   renderMovimientoOptions();
   saveFormSnapshot();
+  previewTrm();
   previewMov();
+}
+
+function renderConversionMode() {
+  const mode = document.getElementById('f-conversion-mode').value;
+  document.querySelectorAll('.conversion-btn').forEach(btn => {
+    const active = btn.dataset.conversion === mode;
+    btn.classList.toggle('sel', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+  document.getElementById('conversion-cop').hidden = mode !== 'cop';
+  document.getElementById('conversion-trm').hidden = mode !== 'trm';
+}
+
+function setConversionMode(mode) {
+  document.getElementById('f-conversion-mode').value = mode;
+  renderConversionMode();
+  saveFormSnapshot();
+  previewTrm();
+}
+
+function renderDateTimeMode(scope) {
+  const mode = document.getElementById(`f-datetime-${scope}`).value;
+  document.querySelectorAll(`.datetime-btn[data-datetime-scope="${scope}"]`).forEach(btn => {
+    const active = btn.dataset.datetimeMode === mode;
+    btn.classList.toggle('sel', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+  document.getElementById(`custom-datetime-${scope}`).hidden = mode !== 'custom';
+  document.getElementById(`hint-datetime-${scope}`).textContent = mode === 'now'
+    ? 'Se usará el momento exacto al guardar.'
+    : '';
+}
+
+function setDateTimeMode(scope, mode) {
+  document.getElementById(`f-datetime-${scope}`).value = mode;
+  renderDateTimeMode(scope);
+  saveFormSnapshot();
+}
+
+function selectedDateTime(scope) {
+  if (document.getElementById(`f-datetime-${scope}`).value === 'now') return nowLocal().iso;
+  const suffix = scope === 'mov' ? '' : '-fondo';
+  const date = document.getElementById(`f-fecha${suffix}`).value;
+  const time = document.getElementById(`f-hora${suffix}`).value || '00:00';
+  return date ? `${date}T${time}` : '';
 }
 
 // Safari a veces vacía los <input type="date">/<input type="time"> cuando su contenedor
@@ -77,8 +123,9 @@ function setTipo(tipo) {
 // Por eso el form no confía solo en que el navegador retenga el valor: lo espejamos acá y
 // lo reponemos después de esos dos momentos.
 const FORM_FIELDS = [
-  'f-persona', 'f-tipo', 'f-monto-cop', 'f-monto', 'f-valor-mov', 'f-fecha', 'f-hora',
-  'f-valor', 'f-fecha-fondo', 'f-hora-fondo',
+  'f-persona', 'f-tipo', 'f-monto', 'f-conversion-mode', 'f-monto-cop', 'f-trm',
+  'f-valor-mov', 'f-datetime-mov', 'f-fecha', 'f-hora',
+  'f-valor', 'f-datetime-fondo', 'f-fecha-fondo', 'f-hora-fondo',
 ];
 const formSnapshot = {};
 
@@ -94,6 +141,9 @@ export function restoreFormSnapshot() {
     const el = document.getElementById(id);
     if (el && formSnapshot[id] !== undefined && el.value !== formSnapshot[id]) el.value = formSnapshot[id];
   }
+  renderConversionMode();
+  renderDateTimeMode('mov');
+  renderDateTimeMode('fondo');
 }
 
 function initAdminForms() {
@@ -102,6 +152,9 @@ function initAdminForms() {
   document.getElementById('f-hora').value         = time;
   document.getElementById('f-fecha-fondo').value  = date;
   document.getElementById('f-hora-fondo').value   = time;
+  renderConversionMode();
+  renderDateTimeMode('mov');
+  renderDateTimeMode('fondo');
   previewFondo();
   renderAdminParticipants();
   saveFormSnapshot();
@@ -164,7 +217,7 @@ function renderMovimientoOptions() {
   const retiro = document.getElementById('f-tipo').value === 'retiro';
   const saldo = persona ? calcParticipante(persona).valor_actual : 0;
 
-  document.getElementById('group-monto-cop').style.display = retiro ? 'none' : '';
+  document.getElementById('group-conversion').style.display = retiro ? 'none' : '';
   document.getElementById('hint-saldo-persona').textContent = persona ? `Saldo actual: ${fmt(saldo)} USD` : '';
   document.getElementById('btn-retirar-todo').style.display = retiro && saldo > 0 ? '' : 'none';
   if (retiro) document.getElementById('hint-trm-mov').textContent = '';
@@ -254,19 +307,37 @@ const TRM_DESVIO_MAX = 0.15;
 function previewTrm() {
   const cop = parseMoneyInput(document.getElementById('f-monto-cop'));
   const usd = parseMoneyInput(document.getElementById('f-monto'));
+  const trmInput = parseMoneyInput(document.getElementById('f-trm'));
+  const mode = document.getElementById('f-conversion-mode').value;
   const el  = document.getElementById('hint-trm-mov');
   if (!el) return;
 
   el.className = 'form-hint';
   if (document.getElementById('f-tipo').value === 'retiro') { el.textContent = ''; return; }
-  if (!cop || !usd) { el.textContent = ''; return; }
+  if (!usd) {
+    el.textContent = mode === 'trm'
+      ? 'Ingresá la tasa real de esta compra; puede diferir de la TRM de hoy.'
+      : 'Ingresá lo pagado en COP y calculamos la TRM aplicada.';
+    return;
+  }
 
-  const trm = cop / usd;
-  const desvio = S.trm ? Math.abs(trm - S.trm) / S.trm : 0;
-  el.textContent = `TRM: ${fmt(trm)}`;
+  const { amountCOP, exchangeRate } = resolveContributionExchange({ usd, mode, cop, trm: trmInput });
+  if (!exchangeRate) {
+    el.textContent = mode === 'trm'
+      ? 'Ingresá la TRM aplicada al aporte.'
+      : 'Ingresá el monto pagado en COP.';
+    return;
+  }
+
+  const desvio = S.trm ? Math.abs(exchangeRate - S.trm) / S.trm : 0;
+  el.textContent = mode === 'trm'
+    ? `Equivale a ${COP(amountCOP)} COP`
+    : `TRM aplicada: ${fmt(exchangeRate)}`;
+  if (S.trm) el.textContent += ` · Hoy: ${fmt(S.trm)}`;
   if (desvio > TRM_DESVIO_MAX) {
-    el.className = 'form-hint warn';
-    el.textContent += ` — revisá los montos, la TRM de hoy es ${fmt(S.trm)}`;
+    const direction = exchangeRate > S.trm ? 'por encima' : 'por debajo';
+    el.className = 'form-hint notice';
+    el.textContent += ` · Confirmá: ${Math.round(desvio * 100)}% ${direction}; se guardará esta tasa.`;
   }
 }
 
@@ -315,20 +386,29 @@ function previewFondo() {
 async function submitMov() {
   const persona    = document.getElementById('f-persona').value;
   const tipo       = document.getElementById('f-tipo').value;
-  const monto_cop  = tipo === 'retiro' ? 0 : parseMoneyInput(document.getElementById('f-monto-cop'));
   const monto_usd  = parseMoneyInput(document.getElementById('f-monto'));
+  const mode       = document.getElementById('f-conversion-mode').value;
+  const copInput   = parseMoneyInput(document.getElementById('f-monto-cop'));
+  const trmInput   = parseMoneyInput(document.getElementById('f-trm'));
+  const exchange   = tipo === 'retiro'
+    ? { amountCOP: 0, exchangeRate: 0 }
+    : resolveContributionExchange({ usd: monto_usd, mode, cop: copInput, trm: trmInput });
+  const monto_cop  = exchange.amountCOP;
+  const trm_dia    = exchange.exchangeRate;
   const valorInput = document.getElementById('f-valor-mov');
   const valorFondo = parseMoneyInput(valorInput);
-  const fecha      = document.getElementById('f-fecha').value + 'T' + (document.getElementById('f-hora').value || '00:00');
+  const fecha      = selectedDateTime('mov');
   const st         = document.getElementById('st-mov');
   const btn        = document.getElementById('btn-mov');
 
-  if (tipo === 'aporte' && (!monto_cop || monto_cop <= 0)) { setStatus(st, 'err', 'Ingresa el monto en COP'); return; }
   if (!monto_usd || monto_usd <= 0)  { setStatus(st, 'err', 'Ingresa el monto en USD'); return; }
+  if (tipo === 'aporte' && !monto_cop) {
+    setStatus(st, 'err', mode === 'trm' ? 'Ingresa la TRM aplicada' : 'Ingresa el monto en COP');
+    return;
+  }
   if (!valorInput.value || valorFondo < 0) { setStatus(st, 'err', 'Ingresa el valor del fondo después'); return; }
-  if (!fecha)                         { setStatus(st, 'err', 'Fecha requerida'); return; }
+  if (!fecha)                         { setStatus(st, 'err', 'Selecciona una fecha'); return; }
 
-  const trm_dia = monto_cop / monto_usd;
   const { precioAntes, cuotas } = calcularCuotas({
     tipo, monto: monto_usd, valorFondo, cuotasActuales: cuotasCirc(),
   });
@@ -356,6 +436,7 @@ async function submitMov() {
     }, adminKey);
     setStatus(st, '', '');
     document.getElementById('f-monto-cop').value  = '';
+    document.getElementById('f-trm').value        = '';
     document.getElementById('f-monto').value      = '';
     document.getElementById('f-valor-mov').value  = '';
     previewTrm();
@@ -399,12 +480,12 @@ async function importXlsx() {
 
 async function submitFondo() {
   const val   = parseMoneyInput(document.getElementById('f-valor'));
-  const fecha = document.getElementById('f-fecha-fondo').value + 'T' + (document.getElementById('f-hora-fondo').value || '00:00');
+  const fecha = selectedDateTime('fondo');
   const st = document.getElementById('st-fondo');
   const btn = document.getElementById('btn-fondo');
 
   if (!val || val <= 0) { setStatus(st, 'err', 'Valor inválido'); return; }
-  if (!fecha) { setStatus(st, 'err', 'Fecha requerida'); return; }
+  if (!fecha) { setStatus(st, 'err', 'Selecciona una fecha'); return; }
 
   // Sin cuotas hay dos casos distintos: fondo nuevo (arranca en $1 por cuota) o fondo del que
   // ya salieron todos. En el segundo, valuar contra cuotas=valor inventa cuotas que ningún
@@ -447,8 +528,13 @@ export function bindAdminEvents() {
 
   document.querySelectorAll('.tipo-btn').forEach(btn =>
     btn.addEventListener('click', () => setTipo(btn.dataset.tipo)));
+  document.querySelectorAll('.conversion-btn').forEach(btn =>
+    btn.addEventListener('click', () => setConversionMode(btn.dataset.conversion)));
+  document.querySelectorAll('.datetime-btn').forEach(btn =>
+    btn.addEventListener('click', () => setDateTimeMode(btn.dataset.datetimeScope, btn.dataset.datetimeMode)));
 
   document.getElementById('f-monto-cop').addEventListener('input', e => { fmtMoneyInput(e.target, 0); previewTrm(); });
+  document.getElementById('f-trm').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewTrm(); });
   document.getElementById('f-monto').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewTrm(); previewMov(); });
   document.getElementById('f-valor-mov').addEventListener('input', e => { fmtMoneyInput(e.target, 2); previewMov(); });
   document.getElementById('f-persona').addEventListener('change', () => { renderMovimientoOptions(); previewMov(); });

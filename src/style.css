@@ -1,4 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 
 :root {
   color-scheme: light;
@@ -18,6 +19,7 @@
   --green-dim: #e1f2e8;
   --red: #b33a35;
   --red-dim: #fae9e7;
+  --amber: #7a5200;
   --text: #10201e;
   --text-secondary: #596561;
   --radius: 16px;
@@ -187,7 +189,8 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 
 .hero-toggle,
 .range-btns,
-.tipo-toggle {
+.tipo-toggle,
+.segmented {
   padding: 3px;
   display: flex;
   background: rgba(218, 226, 223, 0.72);
@@ -196,7 +199,8 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .hero-toggle { width: fit-content; max-width: 100%; margin: 0 auto 10px; }
 .hero-tab,
 .range-btn,
-.tipo-btn {
+.tipo-btn,
+.segmented-btn {
   border: 0;
   background: transparent;
   color: var(--text-secondary);
@@ -208,10 +212,12 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .hero-tab { min-height: 34px; padding: 5px 13px; border-radius: 9px; font-size: 13px; }
 .hero-tab.active,
 .range-btn.active,
-.tipo-btn.sel { color: var(--accent); background: #fff; box-shadow: var(--shadow-control); }
+.tipo-btn.sel,
+.segmented-btn.sel { color: var(--accent); background: #fff; box-shadow: var(--shadow-control); }
 .hero-tab:active,
 .range-btn:active,
-.tipo-btn:active { transform: scale(0.97); }
+.tipo-btn:active,
+.segmented-btn:active { transform: scale(0.97); }
 .hero-tab.active,
 .range-btn.active,
 .tipo-btn.sel { transform: scale(1); }
@@ -359,8 +365,9 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .form-group:focus-within .form-label { color: var(--accent); }
 .required { color: var(--red); }
 .section-note { max-width: 44ch; margin: -2px 0 20px; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
-.datetime-row { display: flex; gap: 8px; }
+.datetime-row { display: flex; gap: 8px; margin-top: 10px; }
 .datetime-row > * { flex: 1; }
+.datetime-field { min-width: 0; display: grid; gap: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 650; }
 .form-input,
 .input-base {
   width: 100%;
@@ -399,11 +406,15 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .input-row-stack .btn { width: 100%; }
 .form-hint { margin-top: 5px; color: var(--text-secondary); font-size: 12px; }
 .form-hint.warn { color: var(--red); }
+.form-hint.notice { color: var(--amber); }
 .form-hint:empty { margin-top: 0; }
 .err-msg { min-height: 18px; margin-top: 7px; color: var(--red); font-size: 13px; }
 
-.tipo-toggle { gap: 2px; }
+.tipo-toggle,
+.segmented { gap: 2px; }
 .tipo-btn { flex: 1; min-height: 40px; padding: 8px; border-radius: 9px; font-size: 13px; }
+.segmented { width: 100%; }
+.segmented-btn { flex: 1; min-height: 40px; padding: 8px 10px; border-radius: 9px; font-size: 13px; }
 .tipo-btn.aporte.sel { color: var(--green-on-dim); }
 .tipo-btn.retiro.sel { color: var(--red); }
 
@@ -448,6 +459,9 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 .money-wrap .currency-pfx { position: absolute; left: 12px; z-index: 1; color: var(--text-secondary); font-size: 14px; pointer-events: none; user-select: none; transition: color 160ms ease, transform 160ms var(--ease-out); }
 .money-wrap:focus-within .currency-pfx { color: var(--accent); transform: scale(1.06); }
 .money-wrap .form-input { padding-left: 27px; }
+.money-wrap-suffix .form-input { padding-right: 82px; }
+.currency-sfx { position: absolute; right: 12px; color: var(--text-secondary); font-size: 11px; font-weight: 650; pointer-events: none; }
+.conversion-field { margin-top: 8px; }
 
 .skeleton { display: block; border-radius: 6px; background: linear-gradient(100deg, var(--surface-2) 30%, #f7f7f9 50%, var(--surface-2) 70%); background-size: 220% 100%; animation: skeleton 1.4s linear infinite; }
 @keyframes skeleton { to { background-position-x: -220%; } }
@@ -483,7 +497,7 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
 @media (hover: hover) and (pointer: fine) {
   .nav-btn:hover:not(.active) { color: var(--accent); background: rgba(12, 47, 70, 0.07); }
   .nav-btn:hover .nav-icon { transform: scale(1.08); }
-  .hero-tab:hover:not(.active), .range-btn:hover:not(.active), .tipo-btn:hover:not(.sel) { color: var(--text); }
+  .hero-tab:hover:not(.active), .range-btn:hover:not(.active), .tipo-btn:hover:not(.sel), .segmented-btn:hover:not(.sel) { color: var(--text); }
   .btn:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
   .btn-green:hover:not(:disabled) { box-shadow: 0 10px 22px rgba(12, 47, 70, 0.24); }
   .input-base[type="file"]::file-selector-button:hover { background: var(--accent-dim); }
@@ -556,7 +570,7 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
   .admin-header { margin-bottom: 20px; }
   .admin-header-title { font-size: 30px; }
   .form-input, .input-base { font-size: 16px; }
-  .btn, .hero-tab, .range-btn, .tipo-btn { min-height: 44px; }
+  .btn, .hero-tab, .range-btn, .tipo-btn, .segmented-btn { min-height: 44px; }
   .range-btn { min-width: 44px; }
   .toast { bottom: calc(82px + env(safe-area-inset-bottom)); }
 }
@@ -622,8 +636,8 @@ body:has(.nav-btn:focus-visible) .tab-content.active * { animation: none; }
   .tab-content.active .admin-header,
   .tab-content.active .admin-content > .card { animation: surface-fade 160ms ease both; }
   .p-bar span { animation: none; }
-  .nav-icon, .nav-btn, .hero-tab, .range-btn, .tipo-btn, .btn, .btn-toggle-participant, .btn-remove-participant, .currency-pfx { transition: color 160ms ease, background-color 160ms ease, opacity 160ms ease; }
-  .nav-icon, .nav-btn.active .nav-icon, .nav-btn:hover .nav-icon, .nav-btn:active, .hero-tab:active, .range-btn:active, .tipo-btn:active, .btn:hover, .btn:active, .btn-toggle-participant:active, .btn-remove-participant:active, .money-wrap:focus-within .currency-pfx { transform: none; }
+  .nav-icon, .nav-btn, .hero-tab, .range-btn, .tipo-btn, .segmented-btn, .btn, .btn-toggle-participant, .btn-remove-participant, .currency-pfx { transition: color 160ms ease, background-color 160ms ease, opacity 160ms ease; }
+  .nav-icon, .nav-btn.active .nav-icon, .nav-btn:hover .nav-icon, .nav-btn:active, .hero-tab:active, .range-btn:active, .tipo-btn:active, .segmented-btn:active, .btn:hover, .btn:active, .btn-toggle-participant:active, .btn-remove-participant:active, .money-wrap:focus-within .currency-pfx { transform: none; }
   .toast { transform: translateX(-50%); transition: opacity 200ms ease; }
   .toast.show { transform: translateX(-50%); }
 }

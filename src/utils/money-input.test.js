@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtMoneyInput, parseMoneyInput } from './money-input.js';
+import { fmtMoneyInput, parseMoneyInput, resolveContributionExchange } from './money-input.js';
 
 // El input real solo se usa por .value/.selectionStart/.setSelectionRange, así que alcanza
 // con un doble sin DOM.
@@ -77,5 +77,14 @@ describe('parseMoneyInput', () => {
 
   it('una coma suelta es 0 y no NaN', () => {
     expect(parseMoneyInput(fakeInput(','))).toBe(0);
+  });
+});
+
+describe('resolveContributionExchange', () => {
+  it('deriva la TRM desde COP o el monto COP desde una TRM manual', () => {
+    expect(resolveContributionExchange({ usd: 100, mode: 'cop', cop: 390000, trm: 0 }))
+      .toEqual({ amountCOP: 390000, exchangeRate: 3900 });
+    expect(resolveContributionExchange({ usd: 100, mode: 'trm', cop: 0, trm: 4100 }))
+      .toEqual({ amountCOP: 410000, exchangeRate: 4100 });
   });
 });
