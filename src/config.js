@@ -2,8 +2,7 @@
 // ambos quedan en el mismo container/origen, así que las requests van relativas.
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
-// ── Rampa tonal (un solo acento, distintas intensidades) — avatares y barra de participación ──
-export const PARTICIPANT_COLORS = ['#0C243B', '#1B3A5C', '#2F5478', '#4A6E93', '#7C93AF'];
+export const PARTICIPANT_COLORS = ['#12324A', '#1F6572', '#8A611C', '#684D78', '#914B42', '#3E5F8A', '#5F6F3A'];
 
 // ── Mock data — cambiar a false cuando el backend esté listo ─
 export const MOCK_MODE = false;

@@ -42,9 +42,13 @@ export function participanteOculto(nombre) {
   return oculto;
 }
 
+export function participantesVisiblesActivos() {
+  return participantesActivos().filter(nombre => !participanteOculto(nombre));
+}
+
 // Activos + cualquiera con movimientos históricos (aunque haya sido quitado después)
 export function participantesTodos() {
-  const activos = participantesActivos();
+  const activos = participantesVisiblesActivos();
   const vistos = new Set(activos);
   const extra = [];
   for (const m of S.movimientos) {

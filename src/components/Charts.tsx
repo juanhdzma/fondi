@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Chart } from 'chart.js/auto';
 import { S } from '../state.js';
 import { historialGananciaFondo, historialParaGrafica, historialParticipante, participanteColor } from '../computed.js';
@@ -277,7 +277,7 @@ function quotaOptions(ticks: number[]) {
 
 export function HeroChart({ range, metric }: { range: string; metric: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const data = useMemo(() => rangeHistory(range), [range]);
+  const data = rangeHistory(range);
 
   useEffect(() => {
     if (!canvas.current || !data.length) return;
@@ -361,7 +361,7 @@ function personaTooltip({ chart, tooltip: model }: any) {
 
 export function ParticipantChart({ name, range }: { name: string; range: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const rows = useMemo(() => filteredWithFill(range, historialParticipante(name) as Row[]), [name, range]);
+  const rows = filteredWithFill(range, historialParticipante(name) as Row[]);
 
   useEffect(() => {
     if (!canvas.current || !rows.length) return;

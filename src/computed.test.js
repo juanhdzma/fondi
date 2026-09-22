@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { S } from './state.js';
 import {
   latest, precioCuota, cuotasCirc, calcParticipante,
-  participantesActivos, participantesTodos, participanteOculto,
+  participantesActivos, participantesTodos, participanteOculto, participantesVisiblesActivos,
   historialParticipante, historialGananciaFondo, historialParaGrafica, porcentajeRetiro,
 } from './computed.js';
 
@@ -109,6 +109,7 @@ describe('participantesTodos', () => {
 
     expect(participantesActivos()).toEqual(['Ana']);
     expect(participanteOculto('Ana')).toBe(true);
+    expect(participantesVisiblesActivos()).toEqual([]);
     expect(participantesTodos()).toEqual([]);
   });
 });

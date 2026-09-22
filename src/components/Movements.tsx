@@ -1,11 +1,12 @@
 import { Fragment, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
-import { calcParticipante, participanteColor, participantesTodos, porcentajeRetiro } from '../computed.js';
+import { calcParticipante, participanteColor, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
 import { quickTransition, springTransition, surfaceMotion } from '../motion';
 import { COP, fmt, fmtPct, signStr } from '../utils/format.js';
 import { fmtDate, normDate } from '../utils/dates.js';
 import { ParticipantChart, RANGES } from './Charts';
+import { ParticipantPicker } from './ParticipantPicker';
 
 const monthFormatter = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
 
@@ -20,10 +21,10 @@ function ParticipantSummary({ name }: { name: string }) {
   const tone = participant.ganancia_pct > 0 ? 'pos' : participant.ganancia_pct < 0 ? 'neg' : 'zero';
   const color = participanteColor(name);
   return (
-    <>
-      <div className="p-head" style={{ marginBottom: 18 }}>
+    <div className="participant-summary">
+      <div className="p-head">
         <div className="p-avatar" style={{ background: color }}>{name.charAt(0).toUpperCase()}</div>
-        <div className="p-name">{name}</div>
+        <div><div className="summary-label">Participante</div><div className="p-name">{name}</div></div>
       </div>
       <div className="p-summary-grid">
         <div>
@@ -43,17 +44,20 @@ function ParticipantSummary({ name }: { name: string }) {
           {participant.retiros_monto > 0 && <div className="summary-sub">{fmt(participant.retiros_monto)} USD retirados</div>}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
 export function Movements({ loading }: { loading: boolean }) {
   const names = participantesTodos();
+  const activeNames = new Set(participantesVisiblesActivos());
+  const inactiveNames = new Set(names.filter(name => !activeNames.has(name)));
   const [selected, setSelected] = useState('');
+  const selectedName = names.includes(selected) ? selected : '';
   const [range, setRange] = useState('todo');
   const visible = new Set(names);
   const movements = S.movimientos
-    .filter(movement => visible.has(movement.persona) && (!selected || movement.persona === selected))
+    .filter(movement => visible.has(movement.persona) && (!selectedName || movement.persona === selectedName))
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
   let previousMonth = '';
 
@@ -62,23 +66,19 @@ export function Movements({ loading }: { loading: boolean }) {
       <div className="page-heading page-heading-actions">
         <div><h1>Movimientos</h1><p>Aportes y retiros del fondo.</p></div>
         <div className="table-filters">
-          <label className="sr-only" htmlFor="filter-persona">Participante</label>
-          <select className="select-styled" id="filter-persona" value={selected} onChange={event => setSelected(event.target.value)}>
-            <option value="">Todos los participantes</option>
-            {names.map(name => <option key={name}>{name}</option>)}
-          </select>
+          <ParticipantPicker names={names} value={selectedName} onChange={setSelected} inactiveNames={inactiveNames} ariaLabel="Filtrar por participante" />
         </div>
       </div>
 
       <AnimatePresence initial={false}>
-        {selected && (
-        <motion.div id="mov-persona-panel" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
-          <div className="card" id="mov-persona-summary"><ParticipantSummary name={selected} /></div>
-          <div className="chart-card">
+        {selectedName && (
+        <motion.div id="mov-persona-panel" className="chart-card participant-overview" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
+          <ParticipantSummary name={selectedName} />
+          <div className="participant-chart-section">
             <div className="chart-header"><div className="chart-title">Evolución de tu inversión</div></div>
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={`${selected}-${range}`} className="chart-wrap" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-                <ParticipantChart name={selected} range={range} />
+              <motion.div key={`${selectedName}-${range}`} className="chart-wrap" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
+                <ParticipantChart name={selectedName} range={range} />
               </motion.div>
             </AnimatePresence>
             <div className="range-btns" role="group" aria-label="Período de evolución">
@@ -95,7 +95,7 @@ export function Movements({ loading }: { loading: boolean }) {
       </AnimatePresence>
 
       <AnimatePresence mode="wait" initial={false}>
-      <motion.ul key={`${selected}-${loading ? 'loading' : 'ready'}`} className="mov-list" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
+      <motion.ul key={`${selectedName}-${loading ? 'loading' : 'ready'}`} className="mov-list" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
         {loading ? <li className="empty">Cargando...</li> : !movements.length ? (
           <li className="empty"><div className="empty-title">Sin movimientos</div><p className="empty-text">Los aportes y retiros aparecerán aquí.</p></li>
         ) : movements.map((movement, index) => {

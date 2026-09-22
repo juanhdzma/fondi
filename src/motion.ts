@@ -28,24 +28,3 @@ export const surfaceMotion: Variants = {
     transform: 'translateY(-4px) scale(0.98)',
   },
 };
-
-export const collapseMotion: Variants = {
-  hidden: {
-    height: 0,
-    opacity: 0,
-    filter: 'blur(4px)',
-    transform: 'translateY(-8px) scale(0.97)',
-  },
-  visible: {
-    height: 'auto',
-    opacity: 1,
-    filter: 'blur(0px)',
-    transform: 'translateY(0) scale(1)',
-  },
-  exit: {
-    height: 0,
-    opacity: 0,
-    filter: 'blur(4px)',
-    transform: 'translateY(-8px) scale(0.97)',
-  },
-};

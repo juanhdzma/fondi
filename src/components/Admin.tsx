@@ -1,23 +1,14 @@
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
-import { calcParticipante, cuotasCirc, latest, participanteOculto, participantesActivos, precioCuota } from '../computed.js';
+import { calcParticipante, cuotasCirc, latest, participanteOculto, participantesActivos, participantesVisiblesActivos, precioCuota } from '../computed.js';
 import { calcularCuotas, excedeSaldo } from '../domain/cuotas.js';
 import { exportUrl, postFondo, postImportXlsx, postMovimiento, postParticipante, verifyAdmin } from '../api/backend.js';
 import { fmtMoneyInput, parseMoneyValue, resolveContributionExchange } from '../utils/money-input.js';
 import { todayLocal } from '../utils/dates.js';
 import { COP, fmt, fmtN } from '../utils/format.js';
-import { collapseMotion, quickTransition, springTransition, surfaceMotion } from '../motion';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogOverlay,
-  AlertDialogPortal,
-  AlertDialogTitle,
-} from './ui/alert-dialog';
+import { quickTransition, springTransition, surfaceMotion } from '../motion';
+import { ParticipantPicker } from './ParticipantPicker';
 
 type Props = { onRefresh: () => Promise<void>; onToast: (message: string) => void };
 type Tone = '' | 'ok' | 'err';
@@ -30,16 +21,18 @@ function localNow() {
   return { day, time, iso: `${day}T${time}` };
 }
 
-function MoneyInput({ id, value, onChange, decimals = 2, suffix, placeholder = '0,00' }: {
+function MoneyInput({ id, value, onChange, decimals = 2, suffix, placeholder = '0,00', action, onAction }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
   decimals?: number;
   suffix?: string;
   placeholder?: string;
+  action?: string;
+  onAction?: () => void;
 }) {
   return (
-    <div className={`money-wrap${suffix ? ' money-wrap-suffix' : ''}`}>
+    <div className={`money-wrap${suffix ? ' money-wrap-suffix' : ''}${action ? ' money-wrap-action' : ''}`}>
       <span className="currency-pfx">$</span>
       <input
         className="form-input"
@@ -54,45 +47,55 @@ function MoneyInput({ id, value, onChange, decimals = 2, suffix, placeholder = '
         }}
       />
       {suffix && <span className="currency-sfx">{suffix}</span>}
+      {action && <button className="money-action" type="button" onClick={onAction}>{action}</button>}
     </div>
   );
 }
 
-function ConfirmDialog({ open, onOpenChange, title, description, action, from = 'top', onConfirm }: {
+function ConfirmDialog({ open, onOpenChange, title, description, action, onConfirm }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description: string;
   action: string;
-  from?: 'top' | 'bottom' | 'left' | 'right';
   onConfirm: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogPortal>
-        <AlertDialogOverlay className="dialog-overlay" />
-        <AlertDialogContent from={from} className="dialog-content">
-          <div className="dialog-header">
-            <AlertDialogTitle className="dialog-title">{title}</AlertDialogTitle>
-            <AlertDialogDescription className="dialog-description">{description}</AlertDialogDescription>
-          </div>
-          <div className="dialog-footer">
-            <AlertDialogCancel className="btn btn-dim">Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="btn btn-danger" onClick={onConfirm}>{action}</AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialogPortal>
-    </AlertDialog>
+    <dialog ref={dialogRef} className="dialog-content" aria-labelledby={titleId} aria-describedby={descriptionId} onCancel={() => onOpenChange(false)} onClose={() => onOpenChange(false)}>
+      <div className="dialog-layout">
+        <div className="dialog-header">
+          <h2 className="dialog-title" id={titleId}>{title}</h2>
+          <p className="dialog-description" id={descriptionId}>{description}</p>
+        </div>
+        <div className="dialog-footer">
+          <button className="btn btn-dim" type="button" onClick={() => onOpenChange(false)}>Cancelar</button>
+          <button className="btn btn-danger" type="button" onClick={onConfirm}>{action}</button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
 export function Admin({ onRefresh, onToast }: Props) {
   const initialNow = useMemo(localNow, []);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [keyInput, setKeyInput] = useState('');
   const [adminKey, setAdminKey] = useState('');
   const [authError, setAuthError] = useState('');
   const [busy, setBusy] = useState('');
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
+  const [task, setTask] = useState<'fund' | 'movement'>('fund');
   const [type, setType] = useState<'aporte' | 'retiro'>('aporte');
   const [person, setPerson] = useState('');
   const [usd, setUsd] = useState('');
@@ -113,7 +116,8 @@ export function Admin({ onRefresh, onToast }: Props) {
   const [confirmImport, setConfirmImport] = useState(false);
 
   const activeParticipants = participantesActivos();
-  const selectedPerson = activeParticipants.includes(person) ? person : activeParticipants[0] || '';
+  const operationParticipants = participantesVisiblesActivos();
+  const selectedPerson = operationParticipants.includes(person) ? person : operationParticipants[0] || '';
   const participantBalance = selectedPerson ? calcParticipante(selectedPerson).valor_actual : 0;
   const amountUsd = parseMoneyValue(usd);
   const amountCop = parseMoneyValue(cop);
@@ -276,7 +280,10 @@ export function Admin({ onRefresh, onToast }: Props) {
   };
 
   const requestImport = () => {
-    if (!importFile) return status('import', 'Elige un archivo', 'err');
+    if (!importFile) {
+      importInputRef.current?.click();
+      return;
+    }
     setConfirmImport(true);
   };
 
@@ -330,7 +337,7 @@ export function Admin({ onRefresh, onToast }: Props) {
 
   return (
     <>
-      <motion.div className="admin-header" variants={surfaceMotion} initial="hidden" animate="visible" transition={quickTransition}><div><h1 className="admin-header-title">Panel de administración</h1><p>Registra cambios y protege la integridad del fondo.</p></div></motion.div>
+      <motion.div className="admin-header" variants={surfaceMotion} initial="hidden" animate="visible" transition={quickTransition}><h1 className="admin-header-title">Administración</h1></motion.div>
       <div className="admin-content">
         <AnimatePresence initial={false}>
           {latestSnapshot && inconsistency > 0.01 && (
@@ -338,95 +345,123 @@ export function Admin({ onRefresh, onToast }: Props) {
           )}
         </AnimatePresence>
 
-        <motion.div className="card admin-card-primary" variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.04 }}>
-          <h2 className="section-title">Registrar movimiento</h2>
-          <div className="form-group">
-            <label className="form-label" htmlFor="f-persona">Participante</label>
-            <select className="form-input" id="f-persona" value={selectedPerson} onChange={event => setPerson(event.target.value)}>
-              {activeParticipants.map(name => <option key={name}>{name}</option>)}
-            </select>
-            <div className="form-hint">{selectedPerson ? `Saldo actual: ${fmt(participantBalance)} USD` : ''}</div>
-          </div>
-          <div className="form-group">
-            <div className="form-label" id="lbl-tipo">Tipo</div>
-            <div className="tipo-toggle" role="group" aria-labelledby="lbl-tipo">
-              {(['aporte', 'retiro'] as const).map(value => <button key={value} type="button" className={`tipo-btn ${value}${type === value ? ' sel' : ''}`} aria-pressed={type === value} onClick={() => setType(value)}>{type === value && <motion.span className="control-selection" layoutId="movement-type" transition={springTransition} />}<span className="control-label">{value === 'aporte' ? 'Aporte' : 'Retiro'}</span></button>)}
+        <div className="admin-task-selector" role="group" aria-label="Tarea administrativa">
+          <button type="button" className={task === 'fund' ? 'active' : ''} aria-pressed={task === 'fund'} onClick={() => setTask('fund')}>
+            <span>Actualizar fondo</span><small>Registrar valuación</small>
+          </button>
+          <button type="button" className={task === 'movement' ? 'active' : ''} aria-pressed={task === 'movement'} onClick={() => setTask('movement')}>
+            <span>Nuevo movimiento</span><small>Aporte o retiro</small>
+          </button>
+        </div>
+
+        <motion.div className="card admin-card-primary" hidden={task !== 'movement'} variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.04 }}>
+          <h2 className="section-title">Nuevo movimiento</h2>
+          <div className="movement-form-grid">
+            <div className="form-group">
+              <div className="form-label" id="lbl-persona">Participante</div>
+              <ParticipantPicker names={operationParticipants} value={selectedPerson} onChange={setPerson} includeAll={false} labelledBy="lbl-persona" />
+              <div className="form-hint">{selectedPerson ? `Saldo actual: ${fmt(participantBalance)} USD` : 'No hay participantes visibles activos.'}</div>
+            </div>
+            <div className="form-group">
+              <div className="form-label" id="lbl-tipo">Tipo</div>
+              <div className="tipo-toggle" role="group" aria-labelledby="lbl-tipo">
+                {(['aporte', 'retiro'] as const).map(value => <button key={value} type="button" className={`tipo-btn ${value}${type === value ? ' sel' : ''}`} aria-pressed={type === value} onClick={() => setType(value)}>{type === value && <motion.span className="control-selection" layoutId="movement-type" transition={springTransition} />}<span className="control-label">{value === 'aporte' ? 'Aporte' : 'Retiro'}</span></button>)}
+              </div>
             </div>
           </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="f-monto">Monto (USD)</label>
-            <MoneyInput id="f-monto" value={usd} onChange={setUsd} />
-            <AnimatePresence initial={false}>
-              {type === 'retiro' && participantBalance > 0 && <motion.button key="withdraw-all" type="button" className="btn btn-dim withdraw-all" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition} onClick={() => { setUsd(String(participantBalance).replace('.', ',')); setFundAfter(String(Math.max(0, (latest()?.valor_total || 0) - participantBalance)).replace('.', ',')); }}>Retirar todo</motion.button>}
-            </AnimatePresence>
+          <div className="movement-form-grid">
+            <div className="form-group">
+              <label className="form-label" htmlFor="f-monto">Monto (USD)</label>
+              <MoneyInput
+                id="f-monto"
+                value={usd}
+                onChange={setUsd}
+                action={type === 'retiro' && participantBalance > 0 ? 'Retirar todo' : undefined}
+                onAction={() => {
+                  setUsd(String(participantBalance).replace('.', ','));
+                  setFundAfter(String(Math.max(0, (latest()?.valor_total || 0) - participantBalance)).replace('.', ','));
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="f-valor-mov">Valor del fondo después (USD) <span className="required">*</span></label>
+              <MoneyInput id="f-valor-mov" value={fundAfter} onChange={setFundAfter} />
+              <div className="form-hint">{movementHint}</div>
+            </div>
           </div>
-          <AnimatePresence initial={false}>
           {type === 'aporte' && (
-            <motion.div key="contribution-conversion" className="form-group motion-collapse" variants={collapseMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-              <div className="form-label" id="lbl-conversion">Conversión del aporte</div>
-              <div className="segmented" role="group" aria-labelledby="lbl-conversion">
-                <button type="button" className={`segmented-btn${conversionMode === 'cop' ? ' sel' : ''}`} aria-pressed={conversionMode === 'cop'} onClick={() => setConversionMode('cop')}>{conversionMode === 'cop' && <motion.span className="control-selection" layoutId="conversion-mode" transition={springTransition} />}<span className="control-label">Monto COP</span></button>
-                <button type="button" className={`segmented-btn${conversionMode === 'trm' ? ' sel' : ''}`} aria-pressed={conversionMode === 'trm'} onClick={() => setConversionMode('trm')}>{conversionMode === 'trm' && <motion.span className="control-selection" layoutId="conversion-mode" transition={springTransition} />}<span className="control-label">TRM aplicada</span></button>
+            <div className="form-group conversion-group">
+              <div className="conversion-controls">
+                <div>
+                  <div className="form-label" id="lbl-conversion">Conversión del aporte</div>
+                  <div className="segmented" role="group" aria-labelledby="lbl-conversion">
+                    <button type="button" className={`segmented-btn${conversionMode === 'cop' ? ' sel' : ''}`} aria-pressed={conversionMode === 'cop'} onClick={() => setConversionMode('cop')}>{conversionMode === 'cop' && <motion.span className="control-selection" layoutId="conversion-mode" transition={springTransition} />}<span className="control-label">Monto COP</span></button>
+                    <button type="button" className={`segmented-btn${conversionMode === 'trm' ? ' sel' : ''}`} aria-pressed={conversionMode === 'trm'} onClick={() => setConversionMode('trm')}>{conversionMode === 'trm' && <motion.span className="control-selection" layoutId="conversion-mode" transition={springTransition} />}<span className="control-label">TRM aplicada</span></button>
+                  </div>
+                </div>
+                <div className="conversion-field">
+                  <label className="sr-only" htmlFor={conversionMode === 'cop' ? 'f-monto-cop' : 'f-trm'}>{conversionMode === 'cop' ? 'Monto pagado en COP' : 'TRM aplicada al aporte'}</label>
+                  {conversionMode === 'cop'
+                    ? <MoneyInput id="f-monto-cop" value={cop} onChange={setCop} decimals={0} suffix="COP" placeholder="0" />
+                    : <MoneyInput id="f-trm" value={exchangeRate} onChange={setExchangeRate} suffix="COP/USD" placeholder="4.000,00" />}
+                </div>
               </div>
-              <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={conversionMode} className="conversion-field" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-                <label className="sr-only" htmlFor={conversionMode === 'cop' ? 'f-monto-cop' : 'f-trm'}>{conversionMode === 'cop' ? 'Monto pagado en COP' : 'TRM aplicada al aporte'}</label>
-                {conversionMode === 'cop'
-                  ? <MoneyInput id="f-monto-cop" value={cop} onChange={setCop} decimals={0} suffix="COP" placeholder="0" />
-                  : <MoneyInput id="f-trm" value={exchangeRate} onChange={setExchangeRate} suffix="COP/USD" placeholder="4.000,00" />}
-              </motion.div>
-              </AnimatePresence>
               <div className={`form-hint${deviation > 0.15 ? ' notice' : ''}`} role="status" aria-live="polite">{trmHint}</div>
-            </motion.div>
+            </div>
           )}
-          </AnimatePresence>
-          <div className="form-group">
-            <label className="form-label" htmlFor="f-valor-mov">Valor del fondo después (USD) <span className="required">*</span></label>
-            <MoneyInput id="f-valor-mov" value={fundAfter} onChange={setFundAfter} />
-            <div className="form-hint">{movementHint}</div>
+          <div className="form-actions-row">
+            <DateTimeField mode={movementDateMode} setMode={setMovementDateMode} date={movementDate} setDate={setMovementDate} time={movementTime} setTime={setMovementTime} />
+            <div className="form-footer primary-form-footer"><StatusText status={statuses.movement} /><button className="btn btn-green" disabled={busy === 'movement' || !selectedPerson} onClick={() => void submitMovement()}>{busy === 'movement' ? 'Guardando...' : 'Guardar movimiento'}</button></div>
           </div>
-          <DateTimeField id="mov" mode={movementDateMode} setMode={setMovementDateMode} date={movementDate} setDate={setMovementDate} time={movementTime} setTime={setMovementTime} />
-          <div className="form-footer"><button className="btn btn-green" disabled={busy === 'movement' || !selectedPerson} onClick={() => void submitMovement()}>{busy === 'movement' ? 'Guardando...' : 'Guardar'}</button><StatusText status={statuses.movement} /></div>
         </motion.div>
 
-        <motion.div className="card" variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.08 }}>
-          <h2 className="section-title">Registrar valuación</h2>
-          <p className="section-note">Actualiza el valor sin registrar un aporte o retiro.</p>
+        <motion.div className="card admin-card-primary" hidden={task !== 'fund'} variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.04 }}>
+          <h2 className="section-title">Actualizar fondo</h2>
           <div className="form-group"><label className="form-label" htmlFor="f-valor">Valor total del portafolio (USD)</label><MoneyInput id="f-valor" value={fundValue} onChange={setFundValue} /><div className="form-hint">{fundHint}</div></div>
-          <DateTimeField id="fondo" mode={fundDateMode} setMode={setFundDateMode} date={fundDate} setDate={setFundDate} time={fundTime} setTime={setFundTime} />
-          <div className="form-footer"><button className="btn btn-green" disabled={busy === 'fund'} onClick={() => void submitFund()}>{busy === 'fund' ? 'Guardando...' : 'Guardar valuación'}</button><StatusText status={statuses.fund} /></div>
-        </motion.div>
-
-        <motion.div className="card" variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.12 }}>
-          <h2 className="section-title">Gestionar participantes</h2>
-          <div className="participants-manage-list">
-            {activeParticipants.length ? activeParticipants.map(name => {
-              const hidden = participanteOculto(name);
-              return (
-                <motion.div className="participant-row" key={name} layout variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
-                  <span>{name}</span>
-                  <span className="participant-actions">
-                    <button type="button" className="btn-toggle-participant" disabled={busy === 'participants'} title={`${hidden ? 'Mostrar' : 'Ocultar'} en resumen y movimientos`} aria-label={`${hidden ? 'Mostrar' : 'Ocultar'} a ${name} en resumen y movimientos`} onClick={() => void toggleVisibility(name)}><EyeIcon hidden={hidden} /></button>
-                    <button type="button" className="btn-remove-participant" disabled={busy === 'participants'} title="Quitar" aria-label={`Quitar a ${name}`} onClick={() => setRemoveName(name)}><CloseIcon /></button>
-                  </span>
-                </motion.div>
-              );
-            }) : <div className="form-hint">Sin participantes — agrega el primero abajo.</div>}
+          <div className="form-actions-row">
+            <DateTimeField mode={fundDateMode} setMode={setFundDateMode} date={fundDate} setDate={setFundDate} time={fundTime} setTime={setFundTime} />
+            <div className="form-footer primary-form-footer"><StatusText status={statuses.fund} /><button className="btn btn-green" disabled={busy === 'fund'} onClick={() => void submitFund()}>{busy === 'fund' ? 'Guardando...' : 'Guardar valuación'}</button></div>
           </div>
-          <div className="form-group"><label className="form-label" htmlFor="f-nuevo-participante">Nuevo participante</label><div className="input-row"><input className="input-base input-flex" id="f-nuevo-participante" placeholder="Nombre" value={newParticipant} onChange={event => setNewParticipant(event.target.value)} onKeyDown={event => pressEnter(event, () => void addParticipant())} /><button className="btn btn-green" disabled={busy === 'participants'} onClick={() => void addParticipant()}>Agregar</button></div></div>
-          <div className="form-footer"><StatusText status={statuses.participants} /></div>
         </motion.div>
 
-        <motion.div className="card data-card" variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.16 }}>
-          <h2 className="section-title">Datos</h2>
-          <div className="form-group"><div className="form-label">Exportar</div><div className="form-footer data-export"><a className="btn btn-green btn-link" href={exportUrl()}>Descargar xlsx</a></div></div>
-          <div className="form-group"><label className="form-label" htmlFor="f-import-xlsx">Importar</label><p className="form-hint import-warning">Reemplaza todos los datos actuales por los del archivo.</p><input key={importFile?.name || 'empty'} className="input-base" type="file" id="f-import-xlsx" accept=".xlsx" onChange={event => setImportFile(event.target.files?.[0] || null)} /></div>
-          <div className="form-footer"><button className="btn btn-green" disabled={busy === 'import'} onClick={requestImport}>{busy === 'import' ? 'Importando...' : 'Importar'}</button><StatusText status={statuses.import} /></div>
-        </motion.div>
+        <motion.section className="card admin-secondary" aria-label="Otras tareas" variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.08 }}>
+          <details className="admin-section">
+            <summary><span>Participantes</span><small>Agregar, ocultar o quitar</small></summary>
+            <div className="admin-section-body">
+              <div className="participants-manage-list">
+                {activeParticipants.length ? activeParticipants.map(name => {
+                  const hidden = participanteOculto(name);
+                  return (
+                    <motion.div className="participant-row" key={name} layout variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
+                      <span>{name}</span>
+                      <span className="participant-actions">
+                        <button type="button" className="btn-toggle-participant" disabled={busy === 'participants'} title={`${hidden ? 'Mostrar' : 'Ocultar'} en resumen y movimientos`} aria-label={`${hidden ? 'Mostrar' : 'Ocultar'} a ${name} en resumen y movimientos`} onClick={() => void toggleVisibility(name)}><EyeIcon hidden={hidden} /></button>
+                        <button type="button" className="btn-remove-participant" disabled={busy === 'participants'} title="Quitar" aria-label={`Quitar a ${name}`} onClick={() => setRemoveName(name)}><CloseIcon /></button>
+                      </span>
+                    </motion.div>
+                  );
+                }) : <div className="form-hint">Sin participantes — agrega el primero abajo.</div>}
+              </div>
+              <div className="form-group"><label className="form-label" htmlFor="f-nuevo-participante">Nuevo participante</label><div className="input-row"><input className="input-base input-flex" id="f-nuevo-participante" placeholder="Nombre" value={newParticipant} onChange={event => setNewParticipant(event.target.value)} onKeyDown={event => pressEnter(event, () => void addParticipant())} /><button className="btn btn-green" disabled={busy === 'participants'} onClick={() => void addParticipant()}>Agregar</button></div></div>
+              <div className="form-footer"><StatusText status={statuses.participants} /></div>
+            </div>
+          </details>
+
+          <details className="admin-section">
+            <summary><span>Respaldo y restauración</span><small>Exportar o reemplazar datos</small></summary>
+            <div className="admin-section-body">
+              <a className="btn btn-dim btn-link" href={exportUrl()}>Descargar respaldo</a>
+              <p className="form-hint download-note">Safari puede pedir permiso la primera vez.</p>
+              <input ref={importInputRef} key={importFile?.name || 'empty'} hidden type="file" accept=".xlsx" onChange={event => { const file = event.target.files?.[0] || null; setImportFile(file); if (file) setConfirmImport(true); }} />
+              <div className="form-footer restore-action"><button className="btn btn-danger" disabled={busy === 'import'} onClick={requestImport}>{busy === 'import' ? 'Restaurando...' : 'Elegir archivo y restaurar'}</button><StatusText status={statuses.import} /></div>
+              <p className="form-hint import-warning">Reemplaza todos los datos actuales; el backend crea un backup antes.</p>
+            </div>
+          </details>
+        </motion.section>
       </div>
 
-      <ConfirmDialog open={Boolean(removeName)} onOpenChange={open => { if (!open) setRemoveName(''); }} title={`Quitar a ${removeName}`} description="La persona deja de estar disponible para nuevos movimientos, pero su historial y sus cuotas se mantienen." action="Quitar" from="right" onConfirm={() => void removeParticipant()} />
-      <ConfirmDialog open={confirmImport} onOpenChange={setConfirmImport} title="Reemplazar todos los datos" description="La importación reemplaza las tres tablas completas por el contenido del archivo. El backend creará un backup antes de continuar." action="Importar archivo" from="bottom" onConfirm={() => void importData()} />
+      <ConfirmDialog open={Boolean(removeName)} onOpenChange={open => { if (!open) setRemoveName(''); }} title={`Quitar a ${removeName}`} description="La persona deja de estar disponible para nuevos movimientos, pero su historial y sus cuotas se mantienen." action="Quitar" onConfirm={() => void removeParticipant()} />
+      <ConfirmDialog open={confirmImport} onOpenChange={setConfirmImport} title="Reemplazar todos los datos" description="La importación reemplaza las tres tablas completas por el contenido del archivo. El backend creará un backup antes de continuar." action="Importar archivo" onConfirm={() => void importData()} />
     </>
   );
 }
@@ -443,8 +478,7 @@ function StatusText({ status }: { status?: Status }) {
   );
 }
 
-function DateTimeField({ id, mode, setMode, date, setDate, time, setTime }: {
-  id: string;
+function DateTimeField({ mode, setMode, date, setDate, time, setTime }: {
   mode: 'now' | 'custom';
   setMode: (mode: 'now' | 'custom') => void;
   date: string;
@@ -453,17 +487,13 @@ function DateTimeField({ id, mode, setMode, date, setDate, time, setTime }: {
   setTime: (time: string) => void;
 }) {
   return (
-    <div className="form-group">
-      <div className="form-label" id={`lbl-fecha-${id}`}>Momento</div>
-      <div className="segmented" role="group" aria-labelledby={`lbl-fecha-${id}`}>
-        <button type="button" className={`segmented-btn${mode === 'now' ? ' sel' : ''}`} aria-pressed={mode === 'now'} onClick={() => setMode('now')}>{mode === 'now' && <motion.span className="control-selection" layoutId={`date-mode-${id}`} transition={springTransition} />}<span className="control-label">Ahora</span></button>
-        <button type="button" className={`segmented-btn${mode === 'custom' ? ' sel' : ''}`} aria-pressed={mode === 'custom'} onClick={() => setMode('custom')}>{mode === 'custom' && <motion.span className="control-selection" layoutId={`date-mode-${id}`} transition={springTransition} />}<span className="control-label">Otra fecha</span></button>
+    <details className="date-options" onToggle={event => setMode(event.currentTarget.open ? 'custom' : 'now')}>
+      <summary>{mode === 'custom' ? 'Fecha personalizada' : 'Cambiar fecha y hora'}</summary>
+      <div className="datetime-row" role="group" aria-label="Fecha y hora personalizadas">
+        <label className="datetime-field"><span>Fecha</span><input className="form-input" type="date" value={date} onChange={event => setDate(event.target.value)} /></label>
+        <label className="datetime-field"><span>Hora</span><input className="form-input" type="time" value={time} onChange={event => setTime(event.target.value)} /></label>
       </div>
-      <AnimatePresence initial={false}>
-        {mode === 'custom' && <motion.div key="custom-date" className="datetime-row motion-collapse" role="group" aria-label="Fecha y hora personalizadas" variants={collapseMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}><label className="datetime-field"><span>Fecha</span><input className="form-input" type="date" value={date} onChange={event => setDate(event.target.value)} /></label><label className="datetime-field"><span>Hora</span><input className="form-input" type="time" value={time} onChange={event => setTime(event.target.value)} /></label></motion.div>}
-      </AnimatePresence>
-      <div className="form-hint">{mode === 'now' ? 'Se usará el momento exacto al guardar.' : ''}</div>
-    </div>
+    </details>
   );
 }
 
