@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
-import { calcParticipante, participanteColor, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
+import { calcParticipante, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
 import { quickTransition, springTransition, surfaceMotion } from '../motion';
 import { COP, fmt, fmtPct, signStr } from '../utils/format.js';
 import { fmtDate, normDate } from '../utils/dates.js';
@@ -19,13 +19,8 @@ function month(date: string) {
 function ParticipantSummary({ name }: { name: string }) {
   const participant = calcParticipante(name);
   const tone = participant.ganancia_pct > 0 ? 'pos' : participant.ganancia_pct < 0 ? 'neg' : 'zero';
-  const color = participanteColor(name);
   return (
     <div className="participant-summary">
-      <div className="p-head">
-        <div className="p-avatar" style={{ background: color }}>{name.charAt(0).toUpperCase()}</div>
-        <div><div className="summary-label">Participante</div><div className="p-name">{name}</div></div>
-      </div>
       <div className="p-summary-grid">
         <div>
           <div className="summary-label">Valor actual</div>

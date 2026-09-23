@@ -154,6 +154,29 @@ const tooltip = {
   footerMarginTop: 4,
 };
 
+const tappedTooltips = new WeakMap<Chart, string>();
+
+export function nextTooltipTap(previous: string, point?: { datasetIndex: number; index: number }) {
+  if (!point) return '';
+  const next = `${point.datasetIndex}:${point.index}`;
+  return next === previous ? '' : next;
+}
+
+function dismissTooltip(chart: Chart) {
+  tappedTooltips.delete(chart);
+  chart.setActiveElements([]);
+  chart.tooltip?.setActiveElements([], { x: 0, y: 0 });
+  chart.update('none');
+}
+
+function dismissTooltipOutside(chart: Chart, canvas: HTMLCanvasElement) {
+  const dismiss = (event: PointerEvent) => {
+    if (event.target !== canvas) dismissTooltip(chart);
+  };
+  document.addEventListener('pointerdown', dismiss);
+  return () => document.removeEventListener('pointerdown', dismiss);
+}
+
 function pointRadius(count: number) {
   if (count <= 10) return 2.2;
   if (count <= 25) return 1.5;
@@ -218,10 +241,16 @@ function gainDataset(rawPoints: Point[]) {
 function standardOptions(ticks: number[]) {
   return {
     animation: false as const,
+    events: ['mousemove', 'mouseout', 'click'],
     responsive: true,
     maintainAspectRatio: false,
     layout: { padding: { left: 4, right: 4, top: 4 } },
     interaction: { mode: 'index' as const, intersect: false },
+    onClick: (_event: any, elements: Array<{ datasetIndex: number; index: number }>, chart: Chart) => {
+      const next = nextTooltipTap(tappedTooltips.get(chart) ?? '', elements[0]);
+      if (!next) dismissTooltip(chart);
+      else tappedTooltips.set(chart, next);
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -302,7 +331,11 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
         : { datasets: [dataset(totalPoints, '#0C243B')], options: standardOptions(ticks) };
 
     const chart = new Chart(canvas.current, { type: 'line', data: { datasets: config.datasets as any }, options: config.options as any });
-    return () => chart.destroy();
+    const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
+    return () => {
+      stopOutsideDismiss();
+      chart.destroy();
+    };
   }, [data, metric, range]);
 
   if (!data.length) return <div className="empty"><div className="empty-title">Sin historial</div><p className="empty-text">El gráfico aparecerá después de la primera valuación.</p></div>;
@@ -390,7 +423,9 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
       },
       options,
     });
+    const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
     return () => {
+      stopOutsideDismiss();
       chart.destroy();
       document.getElementById('persona-tooltip')?.remove();
     };

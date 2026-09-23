@@ -352,9 +352,7 @@ button { color: inherit; }
   margin-bottom: 18px;
   padding: 22px 24px 18px;
 }
-.participant-summary { padding: 2px 2px 20px; display: grid; grid-template-columns: 180px minmax(0, 1fr); align-items: center; gap: 24px; border-bottom: 1px solid var(--divider); }
-.p-head { display: flex; align-items: center; gap: 11px; }
-.p-head .summary-label { margin-bottom: 2px; }
+.participant-summary { padding: 2px 2px 20px; border-bottom: 1px solid var(--divider); }
 .p-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 0; text-align: center; }
 .p-summary-grid > div { padding: 0 20px; }
 .p-summary-grid > div:first-child { padding-left: 0; }
@@ -688,7 +686,6 @@ button { color: inherit; }
   .current-totals-grid > div:nth-child(n+3) { padding-top: 14px; border-top: 1px solid var(--divider); }
   .card { padding: 20px 16px; }
   #mov-persona-panel { padding: 16px 14px 13px; }
-  .participant-summary { grid-template-columns: 1fr; gap: 18px; }
   .p-summary-grid { grid-template-columns: repeat(2, 1fr); gap: 14px 0; }
   .p-summary-grid > div { padding: 0 12px; }
   .p-summary-grid > div:first-child { padding-left: 0; }

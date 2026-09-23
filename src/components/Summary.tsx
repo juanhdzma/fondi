@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
 import { PARTICIPANT_COLORS } from '../config.js';
@@ -58,6 +58,34 @@ export function Summary({ loading }: { loading: boolean }) {
   const contributed = S.movimientos.reduce((total, movement) => total + (movement.tipo === 'retiro' ? -movement.monto : movement.monto), 0);
   const gain = current ? current.valor_total - contributed : 0;
   const gainPercentage = contributed > 0 ? gain / contributed * 100 : 0;
+
+  useEffect(() => {
+    const clearHighlight = (event: PointerEvent) => {
+      if (!(event.target as Element).closest('[data-participant-highlight]')) setHighlightedParticipant('');
+    };
+    document.addEventListener('pointerdown', clearHighlight);
+    return () => document.removeEventListener('pointerdown', clearHighlight);
+  }, []);
+
+  const participantInteraction = (name: string) => ({
+    'data-participant-highlight': true,
+    onPointerEnter: (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType === 'mouse') setHighlightedParticipant(name);
+    },
+    onPointerLeave: (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType === 'mouse') setHighlightedParticipant('');
+    },
+    onFocus: (event: React.FocusEvent<HTMLButtonElement>) => {
+      if (event.currentTarget.matches(':focus-visible')) setHighlightedParticipant(name);
+    },
+    onBlur: () => setHighlightedParticipant(''),
+    onPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.pointerType !== 'mouse') setHighlightedParticipant(currentName => currentName === name ? '' : name);
+    },
+    onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (event.detail === 0) setHighlightedParticipant(currentName => currentName === name ? '' : name);
+    },
+  });
 
   return (
     <>
@@ -141,11 +169,8 @@ export function Summary({ loading }: { loading: boolean }) {
                     className={highlightedParticipant && highlightedParticipant !== participant.nombre ? 'dimmed' : ''}
                     style={{ width: `${percentage}%`, background: PARTICIPANT_COLORS[index % PARTICIPANT_COLORS.length] }}
                     aria-label={`${participant.nombre}, ${percentage.toFixed(0)}% del fondo`}
-                    onPointerEnter={() => setHighlightedParticipant(participant.nombre)}
-                    onPointerLeave={() => setHighlightedParticipant('')}
-                    onFocus={() => setHighlightedParticipant(participant.nombre)}
-                    onBlur={() => setHighlightedParticipant('')}
-                    onClick={() => setHighlightedParticipant(participant.nombre)}
+                    aria-pressed={highlightedParticipant === participant.nombre}
+                    {...participantInteraction(participant.nombre)}
                   ><span>{participant.nombre}</span><b>{percentage.toFixed(0)}%</b></button>
                 );
               })}
@@ -168,11 +193,7 @@ export function Summary({ loading }: { loading: boolean }) {
               layout
               aria-label={`Resaltar a ${participant.nombre}, ${percentage.toFixed(0)}% del fondo`}
               aria-pressed={highlightedParticipant === participant.nombre}
-              onPointerEnter={() => setHighlightedParticipant(participant.nombre)}
-              onPointerLeave={() => setHighlightedParticipant('')}
-              onFocus={() => setHighlightedParticipant(participant.nombre)}
-              onBlur={() => setHighlightedParticipant('')}
-              onClick={() => setHighlightedParticipant(participant.nombre)}
+              {...participantInteraction(participant.nombre)}
             >
               <div className="p-avatar" style={{ background: tone }}>{participant.nombre.charAt(0).toUpperCase()}</div>
               <div className="p-main">
