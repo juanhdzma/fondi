@@ -32,7 +32,7 @@ describe('chart data helpers', () => {
   });
 });
 
-describe('downsample', () => {
+describe('grouping and downsampling', () => {
   const day = (date: string) => new Date(`${date}T12:00:00`).getTime();
 
   it('picks the grain from the visible span', () => {
@@ -46,9 +46,18 @@ describe('downsample', () => {
     expect(new Date(bucketStart(day('2026-09-26'), 'month')).getDate()).toBe(1);
   });
 
-  it('keeps the first point and the last real snapshot of each week', () => {
-    const points = ['2026-09-01', '2026-09-02', '2026-09-04', '2026-09-08', '2026-09-10'].map((date, index) => ({ ts: day(date), valor: index }));
-    expect(downsample(points, 'week').map(point => point.valor)).toEqual([0, 2, 4]);
-    expect(downsample(points, 'day')).toBe(points);
+  it('leaves series under the budget untouched', () => {
+    const points = [1, 2, 3, 4].map(ts => ({ ts, valor: ts }));
+    expect(downsample(points, point => point.valor, 10)).toBe(points);
+  });
+
+  it('keeps real points, the endpoints and a sharp valley when over budget', () => {
+    const points = Array.from({ length: 100 }, (_, index) => ({ ts: index, valor: index === 57 ? -500 : 100 }));
+    const kept = downsample(points, point => point.valor, 10);
+    expect(kept).toHaveLength(10);
+    expect(kept[0]).toBe(points[0]);
+    expect(kept.at(-1)).toBe(points[99]);
+    expect(kept.every(point => points.includes(point))).toBe(true);
+    expect(kept.some(point => point.valor === -500)).toBe(true);
   });
 });

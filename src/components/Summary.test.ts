@@ -1,22 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { donutArcs } from './Summary';
+import { waffleCells } from './Summary';
 
-describe('donutArcs', () => {
-  it('splits the circumference proportionally and keeps tiny shares visible', () => {
-    const arcs = donutArcs([{ weight: 99.9 }, { weight: 0.1 }]);
-    const circumference = 2 * Math.PI * 15.915;
-    expect(arcs[0].offset).toBeCloseTo(0.4);
-    expect(arcs[0].length).toBeCloseTo(0.999 * circumference - 0.8);
-    expect(arcs[1].length).toBe(0.6);
+const count = (cells: Array<{ key: string }>, key: string) => cells.filter(cell => cell.key === key).length;
+
+describe('waffleCells', () => {
+  it('fills exactly 100 cells in proportion', () => {
+    const cells = waffleCells([{ key: 'a', weight: 89.6 }, { key: 'b', weight: 10.4 }]);
+    expect(cells).toHaveLength(100);
+    expect(count(cells, 'a')).toBe(90);
+    expect(count(cells, 'b')).toBe(10);
   });
 
-  it('draws a single slice as a full ring with no gap', () => {
-    const [arc] = donutArcs([{ weight: 100 }]);
-    expect(arc.offset).toBe(0);
-    expect(arc.length).toBeCloseTo(2 * Math.PI * 15.915);
+  it('gives a tiny share at least one cell and still sums 100', () => {
+    const cells = waffleCells([{ key: 'a', weight: 99.9 }, { key: 'b', weight: 0.1 }]);
+    expect(cells).toHaveLength(100);
+    expect(count(cells, 'b')).toBe(1);
   });
 
   it('returns nothing for an empty fund', () => {
-    expect(donutArcs([{ weight: 0 }])).toEqual([]);
+    expect(waffleCells([{ key: 'a', weight: 0 }])).toEqual([]);
   });
 });

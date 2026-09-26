@@ -15,25 +15,25 @@ import { SetupSteps } from './States';
 
 type Participant = ReturnType<typeof calcParticipante>;
 
-const DONUT_RADIUS = 15.915;
-const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
-const DONUT_GAP = 0.8;
-const DONUT_MIN_ARC = 0.6;
-
-export function donutArcs<T extends { weight: number }>(slices: T[]) {
-  const total = slices.reduce((sum, slice) => sum + slice.weight, 0);
-  if (!total) return [];
-  const gap = slices.length > 1 ? DONUT_GAP : 0;
-  let offset = 0;
-  return slices.map(slice => {
-    const span = slice.weight / total * DONUT_CIRCUMFERENCE;
-    const arc = { ...slice, offset: offset + gap / 2, length: Math.max(DONUT_MIN_ARC, span - gap) };
-    offset += span;
-    return arc;
-  });
-}
-
 const SHARE_TOLERANCE = 1e-6;
+const WAFFLE_CELLS = 100;
+
+// Reparte las 100 celdas por el mayor residuo, así suman exactamente 100; cualquier
+// participación mayor a cero se lleva al menos una celda para no desaparecer.
+export function waffleCells<T extends { weight: number }>(slices: T[], total = WAFFLE_CELLS) {
+  const sum = slices.reduce((acc, slice) => acc + slice.weight, 0);
+  if (!sum) return [];
+  const raw = slices.map(slice => slice.weight / sum * total);
+  const counts = raw.map(value => value > 0 ? Math.max(1, Math.floor(value)) : 0);
+  const byRemainder = raw.map((value, index) => index).sort((a, b) => (raw[b] - Math.floor(raw[b])) - (raw[a] - Math.floor(raw[a])));
+  let left = total - counts.reduce((acc, count) => acc + count, 0);
+  for (let step = 0; left > 0; step++, left--) counts[byRemainder[step % byRemainder.length]]++;
+  while (left < 0) {
+    counts[counts.indexOf(Math.max(...counts))]--;
+    left++;
+  }
+  return slices.flatMap((slice, index) => Array<T>(counts[index]).fill(slice));
+}
 
 function TrmChip({ cached }: { cached: boolean }) {
   if (!S.trm) return null;
@@ -117,7 +117,6 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
     ...participants.map(participant => ({ key: participant.nombre, weight: share(participant), color: participanteColor(participant.nombre) })),
     ...(hiddenPercentage > 0.5 ? [{ key: '', weight: hiddenPercentage, color: 'var(--surface-2)' }] : []),
   ];
-  const highlighted = participants.find(participant => participant.nombre === highlightedParticipant);
 
   useEffect(() => {
     const clearHighlight = (event: PointerEvent) => {
@@ -229,27 +228,23 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
             <div className="empty"><div className="empty-title">Sin participantes visibles</div><div className="empty-text">Puedes volver a mostrarlos desde el panel Admin.</div></div>
           ) : (
             <>
-              <div className="donut" role="img" aria-label={`Distribución de la participación: ${participants.map(participant => `${participant.nombre} ${share(participant).toFixed(0)}%`).join(', ')}`}>
-                <svg viewBox="0 0 42 42" aria-hidden="true">
-                  {donutArcs(slices).map(arc => (
-                    <circle
-                      key={arc.key || 'hidden'}
-                      className={`donut-arc${arc.key ? dim(arc.key) : ''}`}
-                      cx="21" cy="21" r={DONUT_RADIUS}
-                      stroke={arc.color}
-                      strokeDasharray={`${arc.length} ${DONUT_CIRCUMFERENCE - arc.length}`}
-                      strokeDashoffset={DONUT_CIRCUMFERENCE / 4 - arc.offset}
-                      data-participant-highlight={arc.key ? true : undefined}
-                      onPointerEnter={event => { if (arc.key && event.pointerType === 'mouse') setHighlightedParticipant(arc.key); }}
-                      onPointerLeave={event => { if (event.pointerType === 'mouse') setHighlightedParticipant(''); }}
-                      onPointerUp={event => { if (arc.key && event.pointerType !== 'mouse') setHighlightedParticipant(currentName => currentName === arc.key ? '' : arc.key); }}
-                    />
-                  ))}
-                </svg>
-                <span className="donut-center">
-                  <b>{highlighted ? `${share(highlighted).toFixed(0)}%` : participants.length}</b>
-                  <small>{highlighted ? highlighted.nombre : participants.length === 1 ? 'participante' : 'participantes'}</small>
-                </span>
+              <div className="waffle" role="img" aria-label={`Distribución de la participación: ${participants.map(participant => `${participant.nombre} ${share(participant).toFixed(0)}%`).join(', ')}`}>
+                {waffleCells(slices).map((cell, index) => (
+                  <span
+                    key={index}
+                    className={`waffle-cell${cell.key ? dim(cell.key) : ''}`}
+                    style={{ background: cell.color }}
+                    data-participant-highlight={cell.key ? true : undefined}
+                    onPointerEnter={event => { if (cell.key && event.pointerType === 'mouse') setHighlightedParticipant(cell.key); }}
+                    onPointerLeave={event => { if (event.pointerType === 'mouse') setHighlightedParticipant(''); }}
+                    onPointerUp={event => { if (cell.key && event.pointerType !== 'mouse') setHighlightedParticipant(currentName => currentName === cell.key ? '' : cell.key); }}
+                  />
+                ))}
+              </div>
+              <div className="waffle-legend" aria-hidden="true">
+                {slices.map(slice => (
+                  <span key={slice.key || 'hidden'} className={slice.key ? dim(slice.key).trim() : ''}><i style={{ background: slice.color }} />{slice.key || 'Oculto'} {slice.weight.toFixed(0)}%</span>
+                ))}
               </div>
               <div className="p-cards">
                 {participants.map((participant, index) => (

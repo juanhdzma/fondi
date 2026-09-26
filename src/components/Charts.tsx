@@ -278,16 +278,33 @@ export function bucketStart(ts: number, grain: Grain) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() - back).getTime();
 }
 
-// Resume la serie a un punto por semana o mes quedándose con el último snapshot real de cada
-// período (no un promedio): se pierde detalle, pero cada punto seleccionable dice lo que el
-// fondo valía ese día.
-export function downsample<T extends { ts: number }>(points: T[], grain: Grain) {
-  if (grain === 'day' || points.length < 3) return points;
+const MAX_LINE_POINTS = 150;
+
+// Largest-Triangle-Three-Buckets: por encima del presupuesto, deja en cada tramo el snapshot real
+// que más forma aporta (picos y valles incluidos), así la línea no se aplana y cada punto
+// seleccionable sigue diciendo lo que el fondo valía ese día.
+export function downsample<T extends { ts: number }>(points: T[], value: (point: T) => number, budget = MAX_LINE_POINTS) {
+  if (budget < 3 || points.length <= budget) return points;
   const kept = [points[0]];
-  for (let index = 1; index < points.length; index++) {
-    const next = points[index + 1];
-    if (!next || bucketStart(next.ts, grain) !== bucketStart(points[index].ts, grain)) kept.push(points[index]);
+  const size = (points.length - 2) / (budget - 2);
+  let previous = points[0];
+  for (let bucket = 0; bucket < budget - 2; bucket++) {
+    const start = Math.floor(bucket * size) + 1;
+    const end = Math.floor((bucket + 1) * size) + 1;
+    const next = points.slice(end, Math.min(Math.floor((bucket + 2) * size) + 1, points.length - 1));
+    const target = next.length ? next : [points[points.length - 1]];
+    const avgTs = target.reduce((sum, point) => sum + point.ts, 0) / target.length;
+    const avgValue = target.reduce((sum, point) => sum + value(point), 0) / target.length;
+    let best = points[start];
+    let bestArea = -1;
+    for (const point of points.slice(start, end)) {
+      const area = Math.abs((previous.ts - avgTs) * (value(point) - value(previous)) - (previous.ts - point.ts) * (avgValue - value(previous)));
+      if (area > bestArea) [best, bestArea] = [point, area];
+    }
+    kept.push(best);
+    previous = best;
   }
+  kept.push(points[points.length - 1]);
   return kept;
 }
 
@@ -300,18 +317,18 @@ export function heroSeries(range: string): HeroPoint[] {
     const value = toTimestamp(row.fecha);
     return { ...(row as any), ts: index === 0 && cutoff && value < cutoff ? cutoff : value };
   });
-  return downsample(points, spanGrain(points));
+  return downsample(points, point => point.valor);
 }
 
 // La línea de aportado usa todas las valuaciones, incluida la del día de un retiro que
 // historialParaGrafica() omite de la línea de valor: sin ella el escalón bajaba una semana tarde.
-function contributedSeries(range: string, grain: Grain) {
+function contributedSeries(range: string) {
   const rows = filteredWithFill(range, historialGananciaFondo() as any) as Row[];
   const cutoff = rangeCutoff(range)?.getTime();
-  return downsample(rows.map((row, index) => {
+  return rows.map((row, index) => {
     const value = toTimestamp(row.fecha);
     return { ts: index === 0 && cutoff && value < cutoff ? cutoff : value, aportado: Number(row.aportado) };
-  }), grain);
+  });
 }
 
 const monthYearFormatter = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
@@ -385,7 +402,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
     const muted = cssVar('--muted');
     const grain = spanGrain(points);
     const events = eventsIn(points, grain);
-    const contributed = contributedSeries(range, grain);
+    const contributed = contributedSeries(range);
     const values = [...points.map(point => point.valor), ...contributed.map(point => point.aportado)];
     const [low, high] = [Math.min(...values), Math.max(...values)];
     const pad = (high - low) * 0.08;
@@ -557,7 +574,7 @@ export function ParticipantChart({ name, range, onHover }: { name: string; range
   const hoverRef = useRef(onHover);
   hoverRef.current = onHover;
   const theme = useTheme();
-  const rows = filteredWithFill(range, historialParticipante(name) as Row[]);
+  const rows = useMemo(() => filteredWithFill(range, historialParticipante(name) as Row[]), [name, range, S.historial, S.movimientos]);
 
   useEffect(() => {
     if (!canvas.current || !rows.length) return;
