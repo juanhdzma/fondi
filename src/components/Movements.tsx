@@ -36,7 +36,7 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
         <span className="p-avatar" style={{ background: participanteColor(name) }}>{name.charAt(0).toUpperCase()}</span>
         <div>
           <h2>{name}</h2>
-          <span>{empty ? 'Sin saldo en el fondo' : `${share.toFixed(0)}% del fondo`}{first ? ` · ${empty ? 'participó' : 'participa'} desde ${fmtDateShort(first)} ${normDate(first).slice(0, 4)}` : ''}</span>
+          <span>{!first ? 'Todavía no ha aportado' : empty ? 'Sin saldo en el fondo' : `${share.toFixed(0)}% del fondo`}{first ? ` · ${empty ? 'participó' : 'participa'} desde ${fmtDateShort(first)} ${normDate(first).slice(0, 4)}` : ''}</span>
         </div>
       </div>
       <div className="person-grid">
@@ -46,7 +46,7 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
             {hover ? (
               <dd><b>{fmt(hover.valor)}</b><small>{COP(Math.round(hover.valor * hover.trm))}</small></dd>
             ) : empty ? (
-              <dd><b>Sin saldo</b><small>Retiró todo su dinero del fondo</small></dd>
+              <dd><b>Sin saldo</b><small>{first ? 'Retiró todo su dinero del fondo' : 'Todavía no ha aportado'}</small></dd>
             ) : (
               <dd><b>{fmt(participant.valor_actual)}</b><small>{COP(Math.round(participant.valor_cop))}</small></dd>
             )}
