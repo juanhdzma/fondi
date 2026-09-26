@@ -121,7 +121,7 @@ export function App() {
           <Movements loading={loading} />
         </motion.section>
         <motion.section id="tab-admin" className={`tab-content${tab === 'admin' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-admin" hidden={tab !== 'admin'} variants={surfaceMotion} initial="hidden" animate={tab === 'admin' ? 'visible' : 'hidden'} transition={quickTransition}>
-          <Admin onRefresh={refresh} onToast={setToast} />
+          <Admin onRefresh={refresh} />
         </motion.section>
       </main>
 

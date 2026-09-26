@@ -1,16 +1,17 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
-import { calcParticipante, cuotasCirc, latest, participanteOculto, participantesActivos, participantesVisiblesActivos, precioCuota } from '../computed.js';
-import { calcularCuotas, excedeSaldo } from '../domain/cuotas.js';
+import { calcParticipante, cuotasCirc, latest, participanteColor, participanteOculto, participantesActivos, participantesVisiblesActivos, precioCuota } from '../computed.js';
+import { calcularCuotas, excedeSaldo, participacion } from '../domain/cuotas.js';
 import { exportUrl, postFondo, postImportXlsx, postMovimiento, postParticipante, verifyAdmin } from '../api/backend.js';
 import { fmtMoneyInput, parseMoneyValue, resolveContributionExchange } from '../utils/money-input.js';
-import { todayLocal } from '../utils/dates.js';
-import { COP, fmt, fmtN } from '../utils/format.js';
-import { quickTransition, springTransition, surfaceMotion } from '../motion';
+import { fmtDateShort, todayLocal } from '../utils/dates.js';
+import { COP, fmt, fmtN, fmtPct, fmtQuota } from '../utils/format.js';
+import { quickTransition, springTransition, staggered, surfaceMotion } from '../motion';
 import { ParticipantPicker } from './ParticipantPicker';
+import { PageHeading } from './PageHeading';
 
-type Props = { onRefresh: () => Promise<void>; onToast: (message: string) => void };
+type Props = { onRefresh: () => Promise<void> };
 type Tone = '' | 'ok' | 'err';
 type Status = { message: string; tone: Tone };
 
@@ -87,7 +88,7 @@ function ConfirmDialog({ open, onOpenChange, title, description, action, onConfi
   );
 }
 
-export function Admin({ onRefresh, onToast }: Props) {
+export function Admin({ onRefresh }: Props) {
   const initialNow = useMemo(localNow, []);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [keyInput, setKeyInput] = useState('');
@@ -96,6 +97,8 @@ export function Admin({ onRefresh, onToast }: Props) {
   const [busy, setBusy] = useState('');
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
   const [task, setTask] = useState<'fund' | 'movement'>('fund');
+  const [step, setStep] = useState(1);
+  const [panel, setPanel] = useState('');
   const [type, setType] = useState<'aporte' | 'retiro'>('aporte');
   const [person, setPerson] = useState('');
   const [usd, setUsd] = useState('');
@@ -140,6 +143,10 @@ export function Admin({ onRefresh, onToast }: Props) {
     setStatuses(current => ({ ...current, [section]: { message, tone } }));
   };
 
+  useEffect(() => {
+    setStatuses(current => current.movement?.tone === 'err' ? { ...current, movement: { message: '', tone: '' } } : current);
+  }, [usd, cop, exchangeRate, fundAfter, type, person, conversionMode]);
+
   const run = async (name: string, action: () => Promise<void>) => {
     if (busy) return;
     setBusy(name);
@@ -176,17 +183,32 @@ export function Admin({ onRefresh, onToast }: Props) {
     return fundDate ? `${fundDate}T${fundTime || '00:00'}` : '';
   };
 
-  const submitMovement = async () => {
-    const date = movementDateTime();
-    if (!amountUsd || amountUsd <= 0) return status('movement', 'Ingresa el monto en USD', 'err');
-    if (type === 'aporte' && !exchange.amountCOP) return status('movement', conversionMode === 'trm' ? 'Ingresa la TRM aplicada' : 'Ingresa el monto en COP', 'err');
-    if (!fundAfter || totalAfter < 0) return status('movement', 'Ingresa el valor del fondo después', 'err');
-    if (!date) return status('movement', 'Selecciona una fecha', 'err');
+  const amountsError = () => {
+    if (!amountUsd || amountUsd <= 0) return 'Ingresa el monto en USD';
+    if (type === 'aporte' && !exchange.amountCOP) return conversionMode === 'trm' ? 'Ingresa la TRM aplicada' : 'Ingresa el monto en COP';
+    if (!fundAfter || totalAfter < 0) return 'Ingresa el valor del fondo después';
     const shares = calcularCuotas({ tipo: type, monto: amountUsd, valorFondo: totalAfter, cuotasActuales: cuotasCirc() });
     const available = selectedPerson ? calcParticipante(selectedPerson).cuotas : 0;
-    if (excedeSaldo({ cuotas: shares.cuotas, cuotasDisponibles: available })) {
-      return status('movement', `${selectedPerson} solo tiene ${fmt(available * shares.precioAntes)} disponibles`, 'err');
+    if (excedeSaldo({ cuotas: shares.cuotas, cuotasDisponibles: available })) return `${selectedPerson} solo tiene ${fmt(available * shares.precioAntes)} disponibles`;
+    return '';
+  };
+
+  const goToStep = (next: number) => {
+    if (next >= 2 && !selectedPerson) return status('movement', 'Elige un participante', 'err');
+    if (next >= 3) {
+      const error = amountsError();
+      if (error) return status('movement', error, 'err');
     }
+    status('movement', '');
+    setStep(next);
+  };
+
+  const submitMovement = async () => {
+    const date = movementDateTime();
+    const error = amountsError();
+    if (error) return status('movement', error, 'err');
+    if (!date) return status('movement', 'Selecciona una fecha', 'err');
+    const saved = `${type === 'aporte' ? 'Aporte' : 'Retiro'} de ${selectedPerson} por ${fmt(amountUsd)} guardado`;
 
     await run('movement', async () => {
       status('movement', 'Guardando...');
@@ -204,9 +226,9 @@ export function Admin({ onRefresh, onToast }: Props) {
         setCop('');
         setExchangeRate('');
         setFundAfter('');
-        status('movement', '');
+        setStep(1);
         await onRefresh();
-        onToast('Guardado');
+        status('movement', saved, 'ok');
       } catch (error) {
         status('movement', error instanceof Error ? error.message : String(error), 'err');
       }
@@ -223,9 +245,8 @@ export function Admin({ onRefresh, onToast }: Props) {
       try {
         await postFondo({ fecha: date, valor_total_usd: totalValue, trm: S.trm || 0 }, adminKey);
         setFundValue('');
-        status('fund', '');
         await onRefresh();
-        onToast('Actualizado');
+        status('fund', `Valuación de ${fmt(totalValue)} guardada`, 'ok');
       } catch (error) {
         status('fund', error instanceof Error ? error.message : String(error), 'err');
       }
@@ -241,9 +262,8 @@ export function Admin({ onRefresh, onToast }: Props) {
       try {
         await postParticipante({ fecha: localNow().iso, nombre: name, accion: 'agregar' }, adminKey);
         setNewParticipant('');
-        status('participants', '');
         await onRefresh();
-        onToast('Agregado');
+        status('participants', `${name} agregado`, 'ok');
       } catch (error) {
         status('participants', error instanceof Error ? error.message : String(error), 'err');
       }
@@ -256,7 +276,7 @@ export function Admin({ onRefresh, onToast }: Props) {
       try {
         await postParticipante({ fecha: localNow().iso, nombre: name, accion: action }, adminKey);
         await onRefresh();
-        onToast(action === 'ocultar' ? 'Ocultado' : 'Visible');
+        status('participants', `${name} ahora está ${action === 'ocultar' ? 'oculto' : 'visible'}`, 'ok');
       } catch (error) {
         status('participants', error instanceof Error ? error.message : String(error), 'err');
       }
@@ -270,9 +290,8 @@ export function Admin({ onRefresh, onToast }: Props) {
       status('participants', 'Guardando...');
       try {
         await postParticipante({ fecha: localNow().iso, nombre: name, accion: 'quitar' }, adminKey);
-        status('participants', '');
         await onRefresh();
-        onToast('Actualizado');
+        status('participants', `${name} quitado de la lista`, 'ok');
       } catch (error) {
         status('participants', error instanceof Error ? error.message : String(error), 'err');
       }
@@ -296,9 +315,8 @@ export function Admin({ onRefresh, onToast }: Props) {
       try {
         await postImportXlsx(file, adminKey);
         setImportFile(null);
-        status('import', '');
         await onRefresh();
-        onToast('Importado');
+        status('import', 'Datos restaurados', 'ok');
       } catch (error) {
         status('import', error instanceof Error ? error.message : String(error), 'err');
       }
@@ -312,13 +330,14 @@ export function Admin({ onRefresh, onToast }: Props) {
   if (!adminKey) {
     return (
       <motion.div className="admin-lock" variants={surfaceMotion} initial="hidden" animate="visible" transition={springTransition}>
-        <h1 className="admin-title">Panel de administración</h1>
-        <div className="admin-sub">Ingresa la clave para continuar</div>
-        <div className="input-row input-row-stack">
-          <input className={`input-base input-flex${authError ? ' err' : ''}`} type="password" autoComplete="current-password" aria-label="Clave de acceso" placeholder="Clave de acceso" value={keyInput} onChange={event => setKeyInput(event.target.value)} onKeyDown={event => pressEnter(event, () => void unlock())} />
+        <div className="admin-lock-kicker"><Icon name="lock" /> Administración</div>
+        <h1 className="admin-title">Ingresa la clave.</h1>
+        <div className={`admin-lock-field${authError ? ' err' : ''}`}>
+          <input type="password" autoComplete="current-password" aria-label="Clave de acceso" placeholder="••••••••" value={keyInput} onChange={event => setKeyInput(event.target.value)} onKeyDown={event => pressEnter(event, () => void unlock())} />
           <button className="btn btn-green" disabled={busy === 'auth'} onClick={() => void unlock()}>{busy === 'auth' ? 'Verificando...' : 'Entrar'}</button>
         </div>
         <div className="err-msg" role="alert">{authError}</div>
+        <p className="admin-lock-hint">Tras 10 intentos fallidos se bloquea 5 minutos.</p>
       </motion.div>
     );
   }
@@ -335,9 +354,20 @@ export function Admin({ onRefresh, onToast }: Props) {
     ? latest() ? 'No hay cuotas en circulación — registrá primero un aporte' : `Primer registro — cuota inicial = $${totalValue.toFixed(2)} USD`
     : `Nueva cuota → $${valuationQuota.toFixed(2)} (${valuationQuota >= currentQuota ? '+' : ''}${((valuationQuota - currentQuota) / currentQuota * 100).toFixed(2)}%)`;
 
+  const personShares = selectedPerson ? calcParticipante(selectedPerson).cuotas : 0;
+  const shareChange = sharePreview ? participacion({ cuotasPersona: personShares, cuotasTotal: cuotasCirc(), cuotasMovimiento: sharePreview.cuotas }) : null;
+  const hiddenCount = activeParticipants.filter(name => participanteOculto(name)).length;
+  const whenLabel = movementDateMode === 'now' ? 'Ahora' : movementDate ? `${fmtDateShort(movementDate)} ${movementDate.slice(0, 4)}, ${movementTime || '00:00'}` : '—';
+  const steps = ['Quién', 'Montos', 'Confirmar'];
+
   return (
     <>
-      <motion.div className="admin-header" variants={surfaceMotion} initial="hidden" animate="visible" transition={quickTransition}><h1 className="admin-header-title">Administración</h1></motion.div>
+      <PageHeading title="Administración">
+        <div className="admin-actions" role="group" aria-label="Tarea administrativa">
+          <button type="button" className={`btn ${task === 'movement' ? 'btn-green' : 'btn-dim'}`} aria-pressed={task === 'movement'} onClick={() => setTask('movement')}><Icon name="plus" /> Movimiento</button>
+          <button type="button" className={`btn ${task === 'fund' ? 'btn-green' : 'btn-dim'}`} aria-pressed={task === 'fund'} onClick={() => setTask('fund')}><Icon name="trend" /> Actualizar valor</button>
+        </div>
+      </PageHeading>
       <div className="admin-content">
         <AnimatePresence initial={false}>
           {latestSnapshot && inconsistency > 0.01 && (
@@ -345,118 +375,173 @@ export function Admin({ onRefresh, onToast }: Props) {
           )}
         </AnimatePresence>
 
-        <div className="admin-task-selector" role="group" aria-label="Tarea administrativa">
-          <button type="button" className={task === 'fund' ? 'active' : ''} aria-pressed={task === 'fund'} onClick={() => setTask('fund')}>
-            <span>Actualizar fondo</span><small>Registrar valuación</small>
-          </button>
-          <button type="button" className={task === 'movement' ? 'active' : ''} aria-pressed={task === 'movement'} onClick={() => setTask('movement')}>
-            <span>Nuevo movimiento</span><small>Aporte o retiro</small>
-          </button>
-        </div>
+        {task === 'movement' ? (
+          <motion.section key="movement" className="card admin-card-primary" aria-labelledby="movement-title" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(0)}>
+            <h2 className="section-title" id="movement-title">Nuevo movimiento</h2>
+            <ol className="stepper">
+              {steps.map((label, index) => {
+                const number = index + 1;
+                return (
+                  <li key={label} className={number < step ? 'done' : number === step ? 'current' : ''}>
+                    <button type="button" disabled={number > step} aria-current={number === step ? 'step' : undefined} onClick={() => { status('movement', ''); setStep(number); }}>
+                      <span className="step-dot">{number < step ? <Icon name="check" /> : number}</span>
+                      {label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
 
-        <motion.div className="card admin-card-primary" hidden={task !== 'movement'} variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.04 }}>
-          <h2 className="section-title">Nuevo movimiento</h2>
-          <div className="movement-form-grid">
-            <div className="form-group">
-              <div className="form-label" id="lbl-persona">Participante</div>
-              <ParticipantPicker names={operationParticipants} value={selectedPerson} onChange={setPerson} includeAll={false} labelledBy="lbl-persona" />
-              <div className="form-hint">{selectedPerson ? `Saldo actual: ${fmt(participantBalance)}` : 'No hay participantes visibles activos.'}</div>
-            </div>
-            <div className="form-group">
-              <div className="form-label" id="lbl-tipo">Tipo</div>
-              <div className="tipo-toggle" role="group" aria-labelledby="lbl-tipo">
-                {(['aporte', 'retiro'] as const).map(value => <button key={value} type="button" className={`tipo-btn ${value}${type === value ? ' sel' : ''}`} aria-pressed={type === value} onClick={() => setType(value)}>{type === value && <motion.span className="control-selection" layoutId="movement-type" transition={springTransition} />}<span className="control-label">{value === 'aporte' ? 'Aporte' : 'Retiro'}</span></button>)}
-              </div>
-            </div>
-          </div>
-          <div className="movement-form-grid">
-            <div className="form-group">
-              <label className="form-label" htmlFor="f-monto">Monto (USD)</label>
-              <MoneyInput
-                id="f-monto"
-                value={usd}
-                onChange={setUsd}
-                action={type === 'retiro' && participantBalance > 0 ? 'Retirar todo' : undefined}
-                onAction={() => {
-                  setUsd(String(participantBalance).replace('.', ','));
-                  setFundAfter(String(Math.max(0, (latest()?.valor_total || 0) - participantBalance)).replace('.', ','));
-                }}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="f-valor-mov">Valor del fondo después (USD) <span className="required">*</span></label>
-              <MoneyInput id="f-valor-mov" value={fundAfter} onChange={setFundAfter} />
-              <div className="form-hint">{movementHint}</div>
-            </div>
-          </div>
-          {type === 'aporte' && (
-            <div className="form-group conversion-group">
-              <div className="conversion-controls">
-                <div>
-                  <div className="form-label" id="lbl-conversion">Conversión del aporte</div>
-                  <div className="segmented" role="group" aria-labelledby="lbl-conversion">
-                    <button type="button" className={`segmented-btn${conversionMode === 'cop' ? ' sel' : ''}`} aria-pressed={conversionMode === 'cop'} onClick={() => setConversionMode('cop')}>{conversionMode === 'cop' && <motion.span className="control-selection" layoutId="conversion-mode" transition={springTransition} />}<span className="control-label">Monto COP</span></button>
-                    <button type="button" className={`segmented-btn${conversionMode === 'trm' ? ' sel' : ''}`} aria-pressed={conversionMode === 'trm'} onClick={() => setConversionMode('trm')}>{conversionMode === 'trm' && <motion.span className="control-selection" layoutId="conversion-mode" transition={springTransition} />}<span className="control-label">TRM aplicada</span></button>
+            {step === 1 && (
+              <div className="movement-form-grid">
+                <div className="form-group">
+                  <div className="form-label" id="lbl-persona">Participante</div>
+                  <ParticipantPicker names={operationParticipants} value={selectedPerson} onChange={setPerson} includeAll={false} labelledBy="lbl-persona" />
+                  <div className="form-hint">{selectedPerson ? `Saldo actual: ${fmt(participantBalance)}` : 'No hay participantes visibles activos.'}</div>
+                </div>
+                <div className="form-group">
+                  <div className="form-label" id="lbl-tipo">Tipo</div>
+                  <div className="tipo-toggle" role="group" aria-labelledby="lbl-tipo">
+                    {(['aporte', 'retiro'] as const).map(value => <button key={value} type="button" className={`tipo-btn ${value}${type === value ? ' sel' : ''}`} aria-pressed={type === value} onClick={() => setType(value)}>{type === value && <motion.span className="control-selection" layoutId="movement-type" transition={springTransition} />}<span className="control-label">{value === 'aporte' ? 'Aporte' : 'Retiro'}</span></button>)}
                   </div>
                 </div>
-                <div className="conversion-field">
-                  <label className="sr-only" htmlFor={conversionMode === 'cop' ? 'f-monto-cop' : 'f-trm'}>{conversionMode === 'cop' ? 'Monto pagado en COP' : 'TRM aplicada al aporte'}</label>
-                  {conversionMode === 'cop'
-                    ? <MoneyInput id="f-monto-cop" value={cop} onChange={setCop} decimals={0} suffix="COP" placeholder="0" />
-                    : <MoneyInput id="f-trm" value={exchangeRate} onChange={setExchangeRate} suffix="COP/USD" placeholder="4.000,00" />}
+              </div>
+            )}
+
+            {step === 2 && (
+              <>
+                <p className="step-context">{selectedPerson} · {type === 'aporte' ? 'Aporte' : 'Retiro'}</p>
+                <div className="movement-form-grid">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="f-monto">Monto (USD)</label>
+                    <MoneyInput
+                      id="f-monto"
+                      value={usd}
+                      onChange={setUsd}
+                      action={type === 'retiro' && participantBalance > 0 ? 'Retirar todo' : undefined}
+                      onAction={() => {
+                        setUsd(String(participantBalance).replace('.', ','));
+                        setFundAfter(String(Math.max(0, (latest()?.valor_total || 0) - participantBalance)).replace('.', ','));
+                      }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="f-valor-mov">Valor del fondo después (USD) <span className="required">*</span></label>
+                    <MoneyInput id="f-valor-mov" value={fundAfter} onChange={setFundAfter} />
+                    <div className="form-hint">{movementHint || (latest() ? `Antes del movimiento: ${fmt(latest()!.valor_total)}` : '')}</div>
+                  </div>
                 </div>
-              </div>
-              <div className={`form-hint${deviation > 0.15 ? ' notice' : ''}`} role="status" aria-live="polite">{trmHint}</div>
-            </div>
-          )}
-          <div className="form-actions-row">
-            <DateTimeField mode={movementDateMode} setMode={setMovementDateMode} date={movementDate} setDate={setMovementDate} time={movementTime} setTime={setMovementTime} />
-            <div className="form-footer primary-form-footer"><StatusText status={statuses.movement} /><button className="btn btn-green" disabled={busy === 'movement' || !selectedPerson} onClick={() => void submitMovement()}>{busy === 'movement' ? 'Guardando...' : 'Guardar movimiento'}</button></div>
-          </div>
-        </motion.div>
+                {type === 'aporte' && (
+                  <div className="form-group conversion-group">
+                    <div className="conversion-controls">
+                      <div>
+                        <div className="form-label" id="lbl-conversion">Conversión del aporte</div>
+                        <div className="segmented" role="group" aria-labelledby="lbl-conversion">
+                          <button type="button" className={`segmented-btn${conversionMode === 'cop' ? ' sel' : ''}`} aria-pressed={conversionMode === 'cop'} onClick={() => setConversionMode('cop')}>{conversionMode === 'cop' && <motion.span className="control-selection" layoutId="conversion-mode" transition={springTransition} />}<span className="control-label">Monto COP</span></button>
+                          <button type="button" className={`segmented-btn${conversionMode === 'trm' ? ' sel' : ''}`} aria-pressed={conversionMode === 'trm'} onClick={() => setConversionMode('trm')}>{conversionMode === 'trm' && <motion.span className="control-selection" layoutId="conversion-mode" transition={springTransition} />}<span className="control-label">TRM aplicada</span></button>
+                        </div>
+                      </div>
+                      <div className="conversion-field">
+                        <label className="sr-only" htmlFor={conversionMode === 'cop' ? 'f-monto-cop' : 'f-trm'}>{conversionMode === 'cop' ? 'Monto pagado en COP' : 'TRM aplicada al aporte'}</label>
+                        {conversionMode === 'cop'
+                          ? <MoneyInput id="f-monto-cop" value={cop} onChange={setCop} decimals={0} suffix="COP" placeholder="0" />
+                          : <MoneyInput id="f-trm" value={exchangeRate} onChange={setExchangeRate} suffix="COP/USD" placeholder="4.000,00" />}
+                      </div>
+                    </div>
+                    <div className={`form-hint${deviation > 0.15 ? ' notice' : ''}`} role="status" aria-live="polite">{trmHint}</div>
+                  </div>
+                )}
+              </>
+            )}
 
-        <motion.div className="card admin-card-primary" hidden={task !== 'fund'} variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.04 }}>
-          <h2 className="section-title">Actualizar fondo</h2>
-          <div className="form-group"><label className="form-label" htmlFor="f-valor">Valor total del portafolio (USD)</label><MoneyInput id="f-valor" value={fundValue} onChange={setFundValue} /><div className="form-hint">{fundHint}</div></div>
-          <div className="form-actions-row">
+            {step === 3 && sharePreview && (
+              <>
+                <div className="receipt" role="group" aria-label="Resumen del movimiento">
+                  <div className="receipt-row"><b>{type === 'aporte' ? 'APORTE' : 'RETIRO'}</b><span>{whenLabel}</span></div>
+                  <hr />
+                  <div className="receipt-row"><span>Participante</span><span>{selectedPerson}</span></div>
+                  <div className="receipt-row"><span>Monto</span><span>{fmt(amountUsd)}</span></div>
+                  {type === 'aporte' && <div className="receipt-row"><span>Pagado</span><span>{COP(exchange.amountCOP)}</span></div>}
+                  {type === 'aporte' && <div className="receipt-row"><span>TRM aplicada</span><span>{fmtN(exchange.exchangeRate)}</span></div>}
+                  <div className="receipt-row"><span>Fondo después</span><span>{fmt(totalAfter)}</span></div>
+                  <hr />
+                  <div className="receipt-row"><span>Precio de cuota</span><span>{fmtQuota(sharePreview.precioAntes)}</span></div>
+                  <div className="receipt-row"><span>Cuotas</span><b>{sharePreview.cuotas >= 0 ? '+' : '−'}{fmtN(Math.abs(sharePreview.cuotas))}</b></div>
+                  {shareChange && <div className="receipt-row"><span>Participación</span><b>{fmtPct(shareChange.antes)}% → {fmtPct(shareChange.despues)}%</b></div>}
+                  <div className="receipt-row"><span>Nueva cuota</span><span>{fmtQuota(sharePreview.precioDespues)}</span></div>
+                </div>
+                <DateTimeField mode={movementDateMode} setMode={setMovementDateMode} date={movementDate} setDate={setMovementDate} time={movementTime} setTime={setMovementTime} />
+              </>
+            )}
+
+            <div className="step-footer">
+              <StatusText status={statuses.movement} />
+              <div className="step-buttons">
+                {step > 1 && <button className="btn btn-dim" type="button" onClick={() => { status('movement', ''); setStep(step - 1); }}>Atrás</button>}
+                {step < 3
+                  ? <button className="btn btn-green btn-block" type="button" disabled={!selectedPerson} onClick={() => goToStep(step + 1)}>Continuar</button>
+                  : <button className="btn btn-green btn-block" type="button" disabled={busy === 'movement' || !selectedPerson} onClick={() => void submitMovement()}>{busy === 'movement' ? 'Guardando...' : 'Guardar movimiento'}</button>}
+              </div>
+            </div>
+          </motion.section>
+        ) : (
+          <motion.section key="fund" className="card admin-card-primary" aria-labelledby="fund-title" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(0)}>
+            <h2 className="section-title" id="fund-title">Actualizar valor del fondo</h2>
+            <div className="form-group"><label className="form-label" htmlFor="f-valor">Valor total del portafolio (USD)</label><MoneyInput id="f-valor" value={fundValue} onChange={setFundValue} /><div className="form-hint">{fundHint || (latest() ? `Último valor: ${fmt(latest()!.valor_total)}` : '')}</div></div>
             <DateTimeField mode={fundDateMode} setMode={setFundDateMode} date={fundDate} setDate={setFundDate} time={fundTime} setTime={setFundTime} />
-            <div className="form-footer primary-form-footer"><StatusText status={statuses.fund} /><button className="btn btn-green" disabled={busy === 'fund'} onClick={() => void submitFund()}>{busy === 'fund' ? 'Guardando...' : 'Guardar valuación'}</button></div>
-          </div>
-        </motion.div>
-
-        <motion.section className="card admin-secondary" aria-label="Otras tareas" variants={surfaceMotion} initial="hidden" animate="visible" transition={{ ...springTransition, delay: 0.08 }}>
-          <details className="admin-section">
-            <summary><span>Participantes</span><small>Agregar, ocultar o quitar</small></summary>
-            <div className="admin-section-body">
-              <div className="participants-manage-list">
-                {activeParticipants.length ? activeParticipants.map(name => {
-                  const hidden = participanteOculto(name);
-                  return (
-                    <motion.div className="participant-row" key={name} layout variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
-                      <span>{name}</span>
-                      <span className="participant-actions">
-                        <button type="button" className="btn-toggle-participant" disabled={busy === 'participants'} title={`${hidden ? 'Mostrar' : 'Ocultar'} en resumen y movimientos`} aria-label={`${hidden ? 'Mostrar' : 'Ocultar'} a ${name} en resumen y movimientos`} onClick={() => void toggleVisibility(name)}><EyeIcon hidden={hidden} /></button>
-                        <button type="button" className="btn-remove-participant" disabled={busy === 'participants'} title="Quitar" aria-label={`Quitar a ${name}`} onClick={() => setRemoveName(name)}><CloseIcon /></button>
-                      </span>
-                    </motion.div>
-                  );
-                }) : <div className="form-hint">Sin participantes — agrega el primero abajo.</div>}
+            <div className="step-footer">
+              <StatusText status={statuses.fund} />
+              <div className="step-buttons">
+                <button className="btn btn-green btn-block" type="button" disabled={busy === 'fund'} onClick={() => void submitFund()}>{busy === 'fund' ? 'Guardando...' : 'Guardar valuación'}</button>
               </div>
-              <div className="form-group"><label className="form-label" htmlFor="f-nuevo-participante">Nuevo participante</label><div className="input-row"><input className="input-base input-flex" id="f-nuevo-participante" placeholder="Nombre" value={newParticipant} onChange={event => setNewParticipant(event.target.value)} onKeyDown={event => pressEnter(event, () => void addParticipant())} /><button className="btn btn-green" disabled={busy === 'participants'} onClick={() => void addParticipant()}>Agregar</button></div></div>
-              <div className="form-footer"><StatusText status={statuses.participants} /></div>
             </div>
-          </details>
+          </motion.section>
+        )}
 
-          <details className="admin-section">
-            <summary><span>Respaldo y restauración</span><small>Exportar o reemplazar datos</small></summary>
-            <div className="admin-section-body">
-              <a className="btn btn-dim btn-link" href={exportUrl()}>Descargar respaldo</a>
-              <p className="form-hint download-note">Safari puede pedir permiso la primera vez.</p>
-              <input ref={importInputRef} key={importFile?.name || 'empty'} hidden type="file" accept=".xlsx" onChange={event => { const file = event.target.files?.[0] || null; setImportFile(file); if (file) setConfirmImport(true); }} />
-              <div className="form-footer restore-action"><button className="btn btn-danger" disabled={busy === 'import'} onClick={requestImport}>{busy === 'import' ? 'Restaurando...' : 'Elegir archivo y restaurar'}</button><StatusText status={statuses.import} /></div>
-              <p className="form-hint import-warning">Reemplaza todos los datos actuales; el backend crea un backup antes.</p>
-            </div>
-          </details>
+        <motion.section className="card admin-settings" aria-label="Otras tareas" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(1)}>
+          <button type="button" className="settings-row" aria-expanded={panel === 'participants'} aria-controls="settings-participants" onClick={() => setPanel(panel === 'participants' ? '' : 'participants')}>
+            <Icon name="users" />
+            <span className="settings-text"><b>Participantes</b><small>{activeParticipants.length} activos{hiddenCount ? ` · ${hiddenCount} ocultos` : ''}</small></span>
+            <span className={`settings-chevron${panel === 'participants' ? ' open' : ''}`}><Icon name="chevron" /></span>
+          </button>
+          <AnimatePresence initial={false}>
+            {panel === 'participants' && (
+              <motion.div key="participants" id="settings-participants" className="settings-panel" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={quickTransition}>
+                {activeParticipants.length ? (
+                  <table className="admin-table">
+                    <thead><tr><th>Nombre</th><th>Estado</th><th>Visible</th><th><span className="sr-only">Quitar</span></th></tr></thead>
+                    <tbody>
+                      {activeParticipants.map(name => {
+                        const hidden = participanteOculto(name);
+                        return (
+                          <tr key={name}>
+                            <td><span className="name-cell"><span className="chip-dot" style={{ background: participanteColor(name) }} />{name}</span></td>
+                            <td><span className={`status-pill${hidden ? '' : ' on'}`}>{hidden ? 'Oculto' : 'Activo'}</span></td>
+                            <td><button type="button" role="switch" className="switch" aria-checked={!hidden} disabled={busy === 'participants'} aria-label={`Mostrar a ${name} en resumen y movimientos`} onClick={() => void toggleVisibility(name)}><span /></button></td>
+                            <td className="cell-end"><button type="button" className="btn-remove-participant" disabled={busy === 'participants'} title="Quitar" aria-label={`Quitar a ${name}`} onClick={() => setRemoveName(name)}><CloseIcon /></button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : <div className="form-hint">Sin participantes — agrega el primero abajo.</div>}
+                <div className="form-group add-participant"><label className="form-label" htmlFor="f-nuevo-participante">Nuevo participante</label><div className="input-row"><input className="input-base input-flex" id="f-nuevo-participante" placeholder="Nombre" value={newParticipant} onChange={event => setNewParticipant(event.target.value)} onKeyDown={event => pressEnter(event, () => void addParticipant())} /><button className="btn btn-green" disabled={busy === 'participants'} onClick={() => void addParticipant()}>Agregar</button></div></div>
+                <StatusText status={statuses.participants} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <a className="settings-row" href={exportUrl()}>
+            <Icon name="download" />
+            <span className="settings-text"><b>Exportar respaldo</b><small>.xlsx con las 3 tablas · Safari puede pedir permiso</small></span>
+            <span className="settings-chevron"><Icon name="chevron" /></span>
+          </a>
+          <button type="button" className="settings-row danger" disabled={busy === 'import'} onClick={requestImport}>
+            <Icon name="upload" />
+            <span className="settings-text"><b>{busy === 'import' ? 'Restaurando...' : 'Restaurar desde archivo'}</b><small>Reemplaza todos los datos; el backend crea un backup antes</small></span>
+            <span className="settings-chevron"><Icon name="chevron" /></span>
+          </button>
+          <input ref={importInputRef} key={importFile?.name || 'empty'} hidden type="file" accept=".xlsx" onChange={event => { const file = event.target.files?.[0] || null; setImportFile(file); if (file) setConfirmImport(true); }} />
+          <StatusText status={statuses.import} />
         </motion.section>
       </div>
 
@@ -464,6 +549,21 @@ export function Admin({ onRefresh, onToast }: Props) {
       <ConfirmDialog open={confirmImport} onOpenChange={setConfirmImport} title="Reemplazar todos los datos" description="La importación reemplaza las tres tablas completas por el contenido del archivo. El backend creará un backup antes de continuar." action="Importar archivo" onConfirm={() => void importData()} />
     </>
   );
+}
+
+const ICON_PATHS: Record<string, React.ReactNode> = {
+  lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  trend: <path d="M3 17l6-6 4 4 8-8M15 7h6v6" />,
+  users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6" /></>,
+  download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
+  upload: <path d="M12 20V9M7 14l5-5 5 5M5 4h14" />,
+  chevron: <path d="m9 6 6 6-6 6" />,
+  check: <path d="m5 12 4.5 4.5L19 7" />,
+};
+
+function Icon({ name }: { name: string }) {
+  return <svg className="ic" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICON_PATHS[name]}</svg>;
 }
 
 function StatusText({ status }: { status?: Status }) {
@@ -495,12 +595,6 @@ function DateTimeField({ mode, setMode, date, setDate, time, setTime }: {
       </div>
     </details>
   );
-}
-
-function EyeIcon({ hidden }: { hidden: boolean }) {
-  return hidden
-    ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m3 3 18 18" /><path d="M10.6 6.2A9.8 9.8 0 0 1 12 6c6.5 0 10 6 10 6a18.1 18.1 0 0 1-3 3.7M6.2 6.2C3.5 8.1 2 12 2 12s3.5 6 10 6c1.4 0 2.6-.3 3.7-.8" /><circle cx="12" cy="12" r="2.5" /></svg>
-    : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="2.5" /></svg>;
 }
 
 function CloseIcon() {

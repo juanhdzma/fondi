@@ -26,3 +26,12 @@ const TOLERANCIA_CUOTAS = 1e-6;
 export function excedeSaldo({ cuotas, cuotasDisponibles }) {
   return -cuotas > cuotasDisponibles + TOLERANCIA_CUOTAS;
 }
+
+// Participación de una persona antes y después de un movimiento, en % del fondo.
+export function participacion({ cuotasPersona, cuotasTotal, cuotasMovimiento }) {
+  const pct = (parte, total) => total > 0 ? Math.max(0, parte) / total * 100 : 0;
+  return {
+    antes: pct(cuotasPersona, cuotasTotal),
+    despues: pct(cuotasPersona + cuotasMovimiento, cuotasTotal + cuotasMovimiento),
+  };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularCuotas, excedeSaldo } from './cuotas.js';
+import { calcularCuotas, excedeSaldo, participacion } from './cuotas.js';
 
 describe('calcularCuotas', () => {
   it('primer aporte: cuota inicial de $1', () => {
@@ -78,5 +78,21 @@ describe('excedeSaldo', () => {
   it('retiro total pasa aunque el redondeo deje un residuo mínimo', () => {
     const r = calcularCuotas({ tipo: 'retiro', monto: 1200, valorFondo: 0, cuotasActuales: 1000 });
     expect(excedeSaldo({ cuotas: r.cuotas, cuotasDisponibles: 1000 })).toBe(false);
+  });
+});
+
+describe('participacion', () => {
+  it('recalcula el % con las cuotas nuevas en ambos lados', () => {
+    const { antes, despues } = participacion({ cuotasPersona: 300, cuotasTotal: 1000, cuotasMovimiento: 500 });
+    expect(antes).toBeCloseTo(30, 10);
+    expect(despues).toBeCloseTo(800 / 1500 * 100, 10);
+  });
+
+  it('un retiro total deja a la persona en 0%', () => {
+    expect(participacion({ cuotasPersona: 200, cuotasTotal: 1000, cuotasMovimiento: -200 }).despues).toBe(0);
+  });
+
+  it('sin cuotas en circulación no divide por cero', () => {
+    expect(participacion({ cuotasPersona: 0, cuotasTotal: 0, cuotasMovimiento: 0 })).toEqual({ antes: 0, despues: 0 });
   });
 });
