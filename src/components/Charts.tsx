@@ -240,45 +240,84 @@ function standardOptions(ticks: number[]) {
 
 export type HeroPoint = { ts: number; fecha: string; valor: number; aportado: number; ganancia: number; precio_cuota: number; trm: number };
 
+export type Grain = 'day' | 'week' | 'month';
+
+export function grainFor(spanDays: number): Grain {
+  return spanDays > 150 ? 'month' : spanDays > 45 ? 'week' : 'day';
+}
+
+export function bucketStart(ts: number, grain: Grain) {
+  const date = new Date(ts);
+  if (grain === 'month') return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+  const back = grain === 'week' ? (date.getDay() + 6) % 7 : 0;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() - back).getTime();
+}
+
+// Resume la serie a un punto por semana o mes quedándose con el último snapshot real de cada
+// período (no un promedio): se pierde detalle, pero cada punto seleccionable dice lo que el
+// fondo valía ese día.
+export function downsample<T extends { ts: number }>(points: T[], grain: Grain) {
+  if (grain === 'day' || points.length < 3) return points;
+  const kept = [points[0]];
+  for (let index = 1; index < points.length; index++) {
+    const next = points[index + 1];
+    if (!next || bucketStart(next.ts, grain) !== bucketStart(points[index].ts, grain)) kept.push(points[index]);
+  }
+  return kept;
+}
+
+const spanGrain = (points: Array<{ ts: number }>) => grainFor(points.length ? (points.at(-1)!.ts - points[0].ts) / 86400000 : 0);
+
 export function heroSeries(range: string): HeroPoint[] {
   const rows = filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[]);
   const cutoff = rangeCutoff(range)?.getTime();
-  return rows.map((row, index) => {
+  const points = rows.map((row, index) => {
     const value = toTimestamp(row.fecha);
     return { ...(row as any), ts: index === 0 && cutoff && value < cutoff ? cutoff : value };
   });
+  return downsample(points, spanGrain(points));
 }
 
 // La línea de aportado usa todas las valuaciones, incluida la del día de un retiro que
 // historialParaGrafica() omite de la línea de valor: sin ella el escalón bajaba una semana tarde.
-function contributedSeries(range: string) {
+function contributedSeries(range: string, grain: Grain) {
   const rows = filteredWithFill(range, historialGananciaFondo() as any) as Row[];
   const cutoff = rangeCutoff(range)?.getTime();
-  return rows.map((row, index) => {
+  return downsample(rows.map((row, index) => {
     const value = toTimestamp(row.fecha);
     return { ts: index === 0 && cutoff && value < cutoff ? cutoff : value, aportado: Number(row.aportado) };
-  });
+  }), grain);
 }
 
-type Marker = { x: number; y: number; amount: number; count: number; ts: number };
+const monthYearFormatter = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
+
+function periodLabel(ts: number, grain: Grain) {
+  if (grain === 'month') return monthYearFormatter.format(new Date(ts));
+  if (grain === 'week') return `semana del ${formatTimestamp(ts)}`;
+  return formatTimestamp(ts);
+}
+
+type Marker = { x: number; y: number; amount: number; count: number; ts: number; label: string };
 type Overlay = { width: number; left: number; right: number; bottom: number; markers: Marker[]; ends: Array<{ y: number; kind: string }> };
 
 const END_LABELS_MIN_WIDTH = 560;
 
-function eventsIn(points: HeroPoint[]) {
+function eventsIn(points: HeroPoint[], grain: Grain) {
   if (points.length < 2) return [];
   const [from, to] = [points[0].ts, points.at(-1)!.ts];
-  const byDay = new Map<string, { ts: number; amount: number; count: number }>();
+  const byBucket = new Map<number, { ts: number; amount: number; count: number; label: string }>();
   for (const movement of S.movimientos) {
     const ts = toTimestamp(movement.fecha);
     if (ts < from || ts > to) continue;
-    const key = movement.fecha.slice(0, 10);
-    const entry = byDay.get(key) ?? { ts, amount: 0, count: 0 };
+    const bucket = bucketStart(ts, grain);
+    const entry = byBucket.get(bucket) ?? { ts, amount: 0, count: 0, label: '' };
+    entry.ts = Math.max(entry.ts, ts);
     entry.amount += movement.tipo === 'retiro' ? -movement.monto : movement.monto;
     entry.count += 1;
-    byDay.set(key, entry);
+    entry.label = entry.count > 1 ? periodLabel(bucket, grain) : formatTimestamp(ts);
+    byBucket.set(bucket, entry);
   }
-  return [...byDay.values()];
+  return [...byBucket.values()];
 }
 
 // Separa etiquetas verticales que quedarían encimadas: las ordena y empuja hacia abajo la
@@ -319,7 +358,12 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
     const ticks = computeCalendarTicks(points.map(point => point.ts));
     const accent = cssVar('--accent');
     const muted = cssVar('--muted');
-    const events = eventsIn(points);
+    const grain = spanGrain(points);
+    const events = eventsIn(points, grain);
+    const contributed = contributedSeries(range, grain);
+    const values = [...points.map(point => point.valor), ...contributed.map(point => point.aportado)];
+    const [low, high] = [Math.min(...values), Math.max(...values)];
+    const pad = (high - low) * 0.08;
     const wide = () => (canvas.current?.parentElement?.clientWidth ?? 0) >= END_LABELS_MIN_WIDTH;
 
     const overlayPlugin = {
@@ -333,6 +377,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
           amount: event.amount,
           count: event.count,
           ts: event.ts,
+          label: event.label,
         }));
         const last = points.at(-1)!;
         const next: Overlay = {
@@ -389,7 +434,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
             tension: 0,
           },
           {
-            data: contributedSeries(range).map(point => ({ x: point.ts, y: point.aportado })),
+            data: contributed.map(point => ({ x: point.ts, y: point.aportado })),
             borderColor: muted,
             borderDash: [5, 5],
             borderWidth: 1.5,
@@ -427,7 +472,8 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
           },
           y: {
             position: 'left',
-            grace: '8%',
+            suggestedMin: low >= 0 ? Math.max(0, low - pad) : low - pad,
+            suggestedMax: high + pad,
             ticks: { color: muted, font: { size: 11 }, maxTicksLimit: 5, callback: (value: any) => compact(value) },
             grid: { color: cssVar('--line') },
             border: { display: false },
@@ -476,7 +522,9 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
             ))}
             {tipMarker && (
               <span className="event-tip" style={{ left: tipMarker.x, top: tipMarker.y }}>
-                {`${tipMarker.count > 1 ? `${tipMarker.count} movimientos · neto` : tipMarker.amount >= 0 ? 'Aporte' : 'Retiro'} ${tipMarker.amount >= 0 ? '+' : '−'}${fmt0(Math.abs(tipMarker.amount))} · ${formatTimestamp(tipMarker.ts)}`}
+                <small className={tipMarker.amount >= 0 ? 'pos' : 'neg'}>{tipMarker.count > 1 ? `${tipMarker.count} movimientos · neto` : tipMarker.amount >= 0 ? 'Aporte' : 'Retiro'}</small>
+                <b>{tipMarker.amount >= 0 ? '+' : '−'}{fmt0(Math.abs(tipMarker.amount))}</b>
+                <span>{tipMarker.label}</span>
               </span>
             )}
           </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeCalendarTicks, nextTooltipTap, spreadLabels, valueAt } from './Charts';
+import { bucketStart, computeCalendarTicks, downsample, grainFor, nextTooltipTap, spreadLabels, valueAt } from './Charts';
 
 describe('chart data helpers', () => {
   it('interpolates the line value between points and clamps at the ends', () => {
@@ -29,5 +29,26 @@ describe('chart data helpers', () => {
     expect(nextTooltipTap('', point)).toBe('1:4');
     expect(nextTooltipTap('1:4', point)).toBe('');
     expect(nextTooltipTap('1:4')).toBe('');
+  });
+});
+
+describe('downsample', () => {
+  const day = (date: string) => new Date(`${date}T12:00:00`).getTime();
+
+  it('picks the grain from the visible span', () => {
+    expect(grainFor(30)).toBe('day');
+    expect(grainFor(100)).toBe('week');
+    expect(grainFor(200)).toBe('month');
+  });
+
+  it('starts weeks on Monday and months on the 1st', () => {
+    expect(new Date(bucketStart(day('2026-09-26'), 'week')).getDate()).toBe(21);
+    expect(new Date(bucketStart(day('2026-09-26'), 'month')).getDate()).toBe(1);
+  });
+
+  it('keeps the first point and the last real snapshot of each week', () => {
+    const points = ['2026-09-01', '2026-09-02', '2026-09-04', '2026-09-08', '2026-09-10'].map((date, index) => ({ ts: day(date), valor: index }));
+    expect(downsample(points, 'week').map(point => point.valor)).toEqual([0, 2, 4]);
+    expect(downsample(points, 'day')).toBe(points);
   });
 });
