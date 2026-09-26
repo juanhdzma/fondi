@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 import { historialGananciaFondo, historialParaGrafica, historialParticipante, participanteColor } from '../computed.js';
 import { S } from '../state.js';
-import { laneLayout } from '../utils/lanes.js';
 import { compact, fmt, fmt0 } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
 import { useReducedMotion } from 'motion/react';
@@ -261,23 +260,21 @@ function contributedSeries(range: string) {
   });
 }
 
-type LaneChip = { x: number; lane: number; amount: number; people: string[]; count: number; ts: number };
-type Overlay = { width: number; left: number; right: number; bottom: number; chips: LaneChip[]; ends: Array<{ y: number; kind: string }> };
+type Marker = { x: number; y: number; amount: number; count: number; ts: number };
+type Overlay = { width: number; left: number; right: number; bottom: number; markers: Marker[]; ends: Array<{ y: number; kind: string }> };
 
-const LANE_GAP = 62;
 const END_LABELS_MIN_WIDTH = 560;
 
 function eventsIn(points: HeroPoint[]) {
   if (points.length < 2) return [];
   const [from, to] = [points[0].ts, points.at(-1)!.ts];
-  const byDay = new Map<string, { ts: number; amount: number; people: string[]; count: number }>();
+  const byDay = new Map<string, { ts: number; amount: number; count: number }>();
   for (const movement of S.movimientos) {
     const ts = toTimestamp(movement.fecha);
     if (ts < from || ts > to) continue;
     const key = movement.fecha.slice(0, 10);
-    const entry = byDay.get(key) ?? { ts, amount: 0, people: [], count: 0 };
+    const entry = byDay.get(key) ?? { ts, amount: 0, count: 0 };
     entry.amount += movement.tipo === 'retiro' ? -movement.monto : movement.monto;
-    if (!entry.people.includes(movement.persona)) entry.people.push(movement.persona);
     entry.count += 1;
     byDay.set(key, entry);
   }
@@ -292,6 +289,17 @@ export function spreadLabels<T extends { y: number }>(labels: T[], gap: number) 
     if (sorted[index].y - sorted[index - 1].y < gap) sorted[index] = { ...sorted[index], y: sorted[index - 1].y + gap };
   }
   return sorted;
+}
+
+// Valor de la línea en un instante dado, interpolando entre los dos puntos que lo rodean: el
+// snapshot del día de un retiro se omite del gráfico, así que su marcador cae entre puntos.
+export function valueAt(points: Array<{ ts: number; valor: number }>, ts: number) {
+  if (!points.length) return 0;
+  const after = points.findIndex(point => point.ts >= ts);
+  if (after === -1) return points[points.length - 1].valor;
+  if (after === 0) return points[0].valor;
+  const [left, right] = [points[after - 1], points[after]];
+  return left.valor + (right.valor - left.valor) * (ts - left.ts) / (right.ts - left.ts);
 }
 
 const sameOverlay = (a: Overlay | null, b: Overlay) => JSON.stringify(a) === JSON.stringify(b);
@@ -318,15 +326,20 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
       afterUpdate(chart: Chart) {
         const { chartArea, scales } = chart;
         if (!chartArea) return;
-        const edge = LANE_GAP / 2 + 4;
-        const chips = laneLayout(events.map(event => ({ ...event, x: Math.min(Math.max(scales.x.getPixelForValue(event.ts), edge), chart.width - edge) })), LANE_GAP) as LaneChip[];
+        const markers = events.map(event => ({
+          x: scales.x.getPixelForValue(event.ts),
+          y: scales.y.getPixelForValue(valueAt(points, event.ts)),
+          amount: event.amount,
+          count: event.count,
+          ts: event.ts,
+        }));
         const last = points.at(-1)!;
         const next: Overlay = {
           width: chart.width,
           left: chartArea.left,
           right: chartArea.right,
           bottom: chartArea.bottom,
-          chips,
+          markers,
           ends: spreadLabels([
             { y: scales.y.getPixelForValue(last.valor), kind: 'valor' },
             { y: scales.y.getPixelForValue((last.valor + last.aportado) / 2), kind: 'ganancia' },
@@ -392,7 +405,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
         events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { left: 2, right: wide() ? 116 : 4, top: 8, bottom: events.length ? 64 : 4 } },
+        layout: { padding: { left: 2, right: wide() ? 116 : 4, top: 8, bottom: 4 } },
         interaction: { mode: 'index', intersect: false },
         onHover: (_event: any, elements: Array<{ index: number }>) => {
           hoverRef.current(elements.length ? points[elements[0].index] : null);
@@ -449,17 +462,13 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
             {showEnds && overlay.ends.map(end => (
               <span key={end.kind} className={`end-label ${endText[end.kind][1]}`} style={{ left: overlay.right + 10, top: end.y }}>{endText[end.kind][0]}</span>
             ))}
-            {overlay.chips.map(chip => (
+            {overlay.markers.map(marker => (
               <span
-                key={chip.ts}
-                className={`lane-chip ${chip.amount >= 0 ? 'pos' : 'neg'}`}
-                style={{ left: chip.x, top: overlay.bottom + 26 + chip.lane * 26 }}
-                title={`${chip.people.join(', ')} · ${chip.amount >= 0 ? '+' : '−'}${fmt0(Math.abs(chip.amount))} · ${formatTimestamp(chip.ts)}`}
-              >
-                <span className="lane-avatars">{chip.people.slice(0, 3).map(name => <span key={name} style={{ background: participanteColor(name) }}>{name.charAt(0).toUpperCase()}</span>)}</span>
-                {chip.amount >= 0 ? '+' : '−'}{compact(Math.abs(chip.amount))}
-                {chip.count > 1 && <small>×{chip.count}</small>}
-              </span>
+                key={marker.ts}
+                className={`event-mark ${marker.amount >= 0 ? 'pos' : 'neg'}`}
+                style={{ left: marker.x, top: marker.y }}
+                title={`${marker.count > 1 ? `${marker.count} movimientos · neto` : marker.amount >= 0 ? 'Aporte' : 'Retiro'} ${marker.amount >= 0 ? '+' : '−'}${fmt0(Math.abs(marker.amount))} · ${formatTimestamp(marker.ts)}`}
+              />
             ))}
           </div>
         )}

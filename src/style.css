@@ -262,13 +262,8 @@ button { color: inherit; }
 .end-pos { color: var(--pos); }
 .end-neg { color: var(--neg); }
 .end-muted { color: var(--muted); }
-.lane-chip { position: absolute; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: auto; }
-.lane-chip.pos { color: var(--pos); }
-.lane-chip.neg { color: var(--neg); }
-.lane-chip small { color: var(--muted); font-size: 10px; }
-.lane-avatars { display: inline-flex; }
-.lane-avatars span { width: 18px; height: 18px; margin-right: -5px; display: grid; place-items: center; border: 2px solid var(--surface-2); border-radius: 50%; color: var(--on-pastel); font-size: 9px; font-weight: 800; }
-.lane-avatars span:last-child { margin-right: 0; }
+.event-mark { position: absolute; width: 11px; height: 11px; border: 2.5px solid var(--pos); border-radius: 50%; background: var(--surface); transform: translate(-50%, -50%); pointer-events: auto; cursor: help; }
+.event-mark.neg { border-color: var(--neg); }
 .hero-legend { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 12px; font-weight: 650; }
 .hero-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .hero-legend i { width: 12px; height: 3px; border-radius: 2px; }

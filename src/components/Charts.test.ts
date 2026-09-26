@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { computeCalendarTicks, nextTooltipTap, spreadLabels } from './Charts';
+import { computeCalendarTicks, nextTooltipTap, spreadLabels, valueAt } from './Charts';
 
 describe('chart data helpers', () => {
+  it('interpolates the line value between points and clamps at the ends', () => {
+    const points = [{ ts: 0, valor: 100 }, { ts: 10, valor: 200 }];
+    expect(valueAt(points, 5)).toBe(150);
+    expect(valueAt(points, 10)).toBe(200);
+    expect(valueAt(points, -3)).toBe(100);
+    expect(valueAt(points, 50)).toBe(200);
+    expect(valueAt([], 5)).toBe(0);
+  });
+
   it('pushes overlapping end labels apart without reordering', () => {
     const spread = spreadLabels([{ y: 100, kind: 'a' }, { y: 105, kind: 'b' }, { y: 200, kind: 'c' }], 17);
     expect(spread.map(label => label.y)).toEqual([100, 117, 200]);
