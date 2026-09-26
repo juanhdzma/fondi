@@ -182,12 +182,12 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
             <div className="hero-line">
               <span className="hero-label">Valor del fondo</span>
               <span className="hero-figure">
-                <b className="hero-value">{current ? hover ? fmt0(shownUsd) : <CountUp value={shownUsd} format={fmt0} /> : '—'}</b>
+                <b className="hero-value">{current ? <CountUp value={shownUsd} format={fmt0} /> : '—'}</b>
                 <Delta value={usdChange} lead />
               </span>
               <span className="hero-sep" aria-hidden="true" />
               <span className="hero-figure">
-                <b className="hero-value">{current ? hover ? COP(Math.round(shownUsd * shownTrm)) : <CountUp value={shownUsd * shownTrm} format={value => COP(Math.round(value))} /> : '—'}</b>
+                <b className="hero-value">{current ? <CountUp value={shownUsd * shownTrm} format={value => COP(Math.round(value))} /> : '—'}</b>
                 <Delta value={copChange} lead />
                 <TrmChip cached={trmCached} />
               </span>
@@ -224,7 +224,6 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
         <motion.section className="participants-card" aria-labelledby="participants-title" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(2)}>
           <div className="section-head">
             <h2 id="participants-title">Participantes</h2>
-            <span className="section-count">{`${participants.length} activos`}</span>
           </div>
           {!participants.length ? (
             <div className="empty"><div className="empty-title">Sin participantes visibles</div><div className="empty-text">Puedes volver a mostrarlos desde el panel Admin.</div></div>

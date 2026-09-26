@@ -5,9 +5,10 @@ export function CountUp({ value, format }: { value: number; format: (value: numb
   const reduced = useReducedMotion();
   const [shown, setShown] = useState(reduced ? value : 0);
   const from = useRef(reduced ? value : 0);
+  const animated = useRef(false);
 
   useEffect(() => {
-    if (reduced) {
+    if (reduced || animated.current) {
       setShown(value);
       from.current = value;
       return;
@@ -16,10 +17,11 @@ export function CountUp({ value, format }: { value: number; format: (value: numb
       duration: 0.9,
       ease: [0.16, 1, 0.3, 1],
       onUpdate: latest => setShown(latest),
+      onComplete: () => { animated.current = true; },
     });
     from.current = value;
     return () => controls.stop();
   }, [value, reduced]);
 
-  return <>{format(shown)}</>;
+  return <>{format(animated.current ? value : shown)}</>;
 }
