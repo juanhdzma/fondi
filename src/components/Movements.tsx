@@ -18,7 +18,7 @@ function month(date: string) {
 
 function ParticipantSummary({ name }: { name: string }) {
   const participant = calcParticipante(name);
-  const tone = participant.ganancia_pct > 0 ? 'pos' : participant.ganancia_pct < 0 ? 'neg' : 'zero';
+  const gainTone = (value: number) => value > 0 ? 'pos' : value < 0 ? 'neg' : 'zero';
   return (
     <div className="participant-summary">
       <div className="p-summary-grid">
@@ -29,9 +29,8 @@ function ParticipantSummary({ name }: { name: string }) {
         </div>
         <div>
           <div className="summary-label">Ganancia</div>
-          <div className="summary-value">{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))}<span className="summary-unit">USD</span></div>
-          <div className="summary-sub">{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} COP</div>
-          <div style={{ marginTop: 6 }}><span className={`gain-badge ${tone}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</span></div>
+          <div className={`summary-value ${gainTone(participant.ganancia_monto)}`}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))}<span className="summary-unit">USD</span><span className={`gain-badge ${gainTone(participant.ganancia_pct) || 'zero'}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</span></div>
+          <div className={`summary-sub ${gainTone(participant.ganancia_cop)}`}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} COP<span className={`gain-badge ${gainTone(participant.ganancia_cop_pct) || 'zero'}`}>{signStr(participant.ganancia_cop_pct)}{fmtPct(Math.abs(participant.ganancia_cop_pct))}%</span></div>
         </div>
         <div>
           <div className="summary-label">Total aportado</div>

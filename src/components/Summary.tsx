@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
 import { PARTICIPANT_COLORS } from '../config.js';
-import { calcParticipante, cuotasCirc, gananciaCop, latest, participantesTodos, participantesVisiblesActivos } from '../computed.js';
+import { calcParticipante, cuotasCirc, gananciaCop, latest, participantesTodos, participantesVisiblesActivos, rendimientoPct } from '../computed.js';
 import { quickTransition, springTransition, surfaceMotion } from '../motion';
 import { COP, fmt0, fmtPct, signStr } from '../utils/format.js';
 import { HeroChart, periodPct, RANGE_LABELS, RANGES, rangeHistory } from './Charts';
@@ -20,6 +20,16 @@ function Change({ value, range }: { value: number | null; range: string }) {
       {signStr(value)}{fmtPct(Math.abs(value))}%
       <span className="stat-chg-period"> · cambio en {RANGE_LABELS[range]}</span>
     </div>
+  );
+}
+
+function Delta({ value, lead = false }: { value: number; lead?: boolean }) {
+  const tone = value > 0 ? 'pos' : value < 0 ? 'neg' : 'zero';
+  return (
+    <span className={`p-delta ${tone}${lead ? ' lead' : ''}`}>
+      {value !== 0 && <svg viewBox="0 0 8 8" aria-hidden="true"><path d={value > 0 ? 'M4 1 7.5 7h-7z' : 'M4 7 .5 1h7z'} /></svg>}
+      {fmtPct(Math.abs(value))}%
+    </span>
   );
 }
 
@@ -41,6 +51,7 @@ export function Summary({ loading }: { loading: boolean }) {
 
   const history = rangeHistory(range);
   const fundChange = periodPct(history, 'valor_total');
+  const fundCopChange = periodPct(history.map(row => ({ ...row, valor_cop: row.valor_total * (row.trm || S.trm || 1) })), 'valor_cop');
   const totalShares = cuotasCirc();
   const participants = participantesTodos()
     .map(name => calcParticipante(name))
@@ -55,7 +66,7 @@ export function Summary({ loading }: { loading: boolean }) {
   const highlighted = participants.find(participant => participant.nombre === highlightedParticipant);
   const contributed = S.movimientos.reduce((total, movement) => total + (movement.tipo === 'retiro' ? -movement.monto : movement.monto), 0);
   const gain = current ? current.valor_total - contributed : 0;
-  const gainPercentage = contributed > 0 ? gain / contributed * 100 : 0;
+  const { ganancia_pct: gainPercentage, ganancia_cop_pct: gainCopPercentage } = rendimientoPct(S.movimientos);
   const gainCop = current ? gananciaCop(S.movimientos, current.valor_total) : 0;
   const signedCop = (value: number) => `${signStr(value)}${COP(Math.round(Math.abs(value)))} COP`;
   const gainTone = (value: number) => value > 0 ? 'pos' : value < 0 ? 'neg' : '';
@@ -105,6 +116,11 @@ export function Summary({ loading }: { loading: boolean }) {
               <div className="stat-value">{current ? `${fmt0(current.valor_total)} USD` : '—'}</div>
               <Change value={fundChange} range={range} />
             </div>
+            <div className="period-metric">
+              <div className="stat-label">Valor en COP</div>
+              <div className="stat-value">{current ? `${COP(Math.round(current.valor_total * (S.trm || 1)))} COP` : '—'}</div>
+              <Change value={fundCopChange} range={range} />
+            </div>
           </div>
           <div className="hero-toggle" role="group" aria-label="Métrica del gráfico">
             {metrics.map(([value, label]) => (
@@ -134,9 +150,8 @@ export function Summary({ loading }: { loading: boolean }) {
         <h2>Totales actuales</h2>
         <div className="current-totals-grid">
           <div><span>Aportado</span><b>{current ? `${fmt0(contributed)} USD` : '—'}</b></div>
-          <div><span>Valor en COP</span><b>{current ? `${COP(Math.round(current.valor_total * (S.trm || 1)))} COP` : '—'}</b></div>
           <div><span>Ganancia USD</span><b className={gainTone(gain)}>{current ? `${signStr(gain)}${fmt0(Math.abs(gain))} USD (${signStr(gainPercentage)}${fmtPct(Math.abs(gainPercentage))}%)` : '—'}</b></div>
-          <div><span>Ganancia COP</span><b className={gainTone(gainCop)}>{current ? signedCop(gainCop) : '—'}</b></div>
+          <div><span>Ganancia COP</span><b className={gainTone(gainCop)}>{current ? `${signedCop(gainCop)} (${signStr(gainCopPercentage)}${fmtPct(Math.abs(gainCopPercentage))}%)` : '—'}</b></div>
         </div>
       </section>
 
@@ -186,22 +201,25 @@ export function Summary({ loading }: { loading: boolean }) {
               animate="visible"
               transition={{ ...springTransition, delay: Math.min(index, 5) * 0.04 }}
               layout
-              aria-label={`Resaltar a ${participant.nombre}, ${percentage.toFixed(0)}% del fondo`}
+              aria-label={`Resaltar a ${participant.nombre}, ${percentage.toFixed(0)}% del fondo, ${fmt0(participant.valor_actual)} USD, rendimiento ${signStr(participant.ganancia_pct)}${fmtPct(Math.abs(participant.ganancia_pct))}% en USD y ${signStr(participant.ganancia_cop_pct)}${fmtPct(Math.abs(participant.ganancia_cop_pct))}% en COP`}
               aria-pressed={highlightedParticipant === participant.nombre}
               {...participantInteraction(participant.nombre)}
             >
               <div className="p-avatar" style={{ background: tone }}>{participant.nombre.charAt(0).toUpperCase()}</div>
               <div className="p-main">
                 <div className="p-name">{participant.nombre}</div>
-                <div className="p-pct">{percentage.toFixed(0)}% del fondo · <span className={`p-chg ${gainTone(participant.ganancia_pct) || 'zero'}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</span>{!activeNames.has(participant.nombre) ? ' · histórico' : ''}</div>
+                <div className="p-share">
+                  <span className="p-meter" aria-hidden="true">
+                    <motion.span style={{ background: tone, originX: 0 }} initial={{ scaleX: 0 }} animate={{ scaleX: percentage / 100 }} transition={{ ...springTransition, delay: 0.1 + Math.min(index, 5) * 0.05 }} />
+                  </span>
+                  <span className="p-pct">{percentage.toFixed(0)}% del fondo{!activeNames.has(participant.nombre) ? ' · histórico' : ''}</span>
+                </div>
               </div>
               <div className="p-figures">
-                <div className="p-monto">{fmt0(participant.valor_actual)} USD</div>
-                <div className="p-cop">{COP(Math.round(participant.valor_cop))} COP</div>
-              </div>
-              <div className="p-figures">
-                <div className={`p-monto p-chg ${gainTone(participant.ganancia_monto) || 'zero'}`}>{signStr(participant.ganancia_monto)}{fmt0(Math.abs(participant.ganancia_monto))} USD</div>
-                <div className={`p-cop p-chg ${gainTone(participant.ganancia_cop) || 'zero'}`}>{signedCop(participant.ganancia_cop)}</div>
+                <div className="p-monto">{fmt0(participant.valor_actual)}<span className="p-unit">USD</span></div>
+                <Delta value={participant.ganancia_pct} lead />
+                <div className="p-cop">{COP(Math.round(participant.valor_cop))}<span className="p-unit">COP</span></div>
+                <Delta value={participant.ganancia_cop_pct} />
               </div>
             </motion.button>
           );
