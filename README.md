@@ -31,19 +31,19 @@ Modeled like a real mutual fund: every contribution/withdrawal buys "shares" at 
 
 ### Resumen
 
-Fund value and share price at a glance, each with its own % change over a range you pick (1 week to all-time) — plus a "Ganancia acumulada" view that plots the fund's accumulated gain over time as a single line, green while it's ahead of what's been contributed and red while behind, switching color exactly where it crosses zero. Below that, every participant's current value and % gain in one row each.
+Fund value in USD and COP on one line, over a chart of the fund's value against what's been contributed, labeled at the end of each line, with every contribution and withdrawal shown as a chip under its date. Hovering the chart updates the figures above it; each period button shows that period's return by share price. Next to it: totals with sparklines, a treemap of who owns what (value and return in USD and COP) and a card per participant with their own sparkline. Dark by default, with a light theme toggle.
 
 ![Resumen](docs/screenshots/desktop-resumen.png)
 
 ### Movimientos
 
-The full history of contributions and withdrawals, filterable by participant. Pick someone from the dropdown for their personal breakdown — current value, gain in USD and COP, total contributed — plus a chart of their investment's value against what they've put in, with its own independent date range.
+The full history of contributions and withdrawals as a timeline grouped by month, filterable by participant (chips), text search (name or amount), type and period. Pick someone for their personal breakdown — current value, gain in USD and COP, total contributed — next to a chart of their investment's value against what they've put in, with its own independent date range.
 
 ![Movimientos](docs/screenshots/desktop-movimientos.png)
 
 ### Admin
 
-Register a contribution/withdrawal or a plain valuation, with live hints as you type — the resulting COP/USD rate, the new share price — so you can sanity-check a number before saving. Also where you add/remove participants and export/import the whole dataset as `.xlsx`. Gated behind a password checked server-side.
+Register a contribution/withdrawal in three steps (who, amounts, confirm) ending in a receipt with the share math — price, shares, ownership before and after — or a plain valuation. Also where you add, hide or remove participants and export/import the whole dataset as `.xlsx`. Gated behind a password checked server-side.
 
 ![Admin](docs/screenshots/desktop-admin.png)
 
@@ -51,7 +51,7 @@ Screenshots above use placeholder data for illustration, not a real fund's figur
 
 ### Mobile
 
-Below 720px the top nav becomes a bottom tab bar. Inputs are sized to avoid iOS's zoom-on-focus.
+Below 820px the icon rail becomes a top bar with the sections as icons. Inputs are sized to avoid iOS's zoom-on-focus.
 
 <table>
 <tr>
@@ -97,7 +97,7 @@ The frontend talks to `http://localhost:8000` in dev (see `API_BASE_URL` in `src
   index.html          Vite entry shell
 src/
   main.tsx             React entry point and reduced-motion provider
-  App.tsx              Data refresh, navigation, error and toast state
+  App.tsx              Data refresh, navigation, theme toggle and load errors
   components/          Summary, Movements, Admin and Chart.js React components
   config.js            API_BASE_URL, MOCK_MODE and mock fixtures
   state.ts             Typed in-memory API snapshot

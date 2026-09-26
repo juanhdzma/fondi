@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { S } from '../state.js';
-import { calcParticipante, cuotasCirc, gananciaCop, historialGananciaFondo, historialParticipante, latest, participanteColor, participantesTodos, participantesVisiblesActivos, rendimientoPct } from '../computed.js';
+import { calcParticipante, cuotasCirc, gananciaCop, historialGananciaFondo, historialParticipante, latest, participanteColor, participantesActivos, participantesTodos, participantesVisiblesActivos, rendimientoPct } from '../computed.js';
 import { springTransition, staggered, surfaceMotion } from '../motion';
 import { COP, fmt0, fmtN, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort } from '../utils/dates.js';
@@ -12,6 +12,7 @@ import { CountUp } from './CountUp';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
 import { Sparkline } from './Sparkline';
+import { SetupSteps } from './States';
 
 type Participant = ReturnType<typeof calcParticipante>;
 
@@ -25,29 +26,48 @@ function TrmChip({ cached }: { cached: boolean }) {
 }
 
 function useElementSize<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
+  const [node, setNode] = useState<T | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return;
+    if (!node) return;
     const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height }));
-    observer.observe(element);
+    observer.observe(node);
     return () => observer.disconnect();
-  }, []);
-  return [ref, size] as const;
+  }, [node]);
+  return [setNode, size] as const;
 }
 
-function LoadingParticipants() {
-  return <>{Array.from({ length: 4 }, (_, index) => (
-    <div className="p-card" key={index}>
-      <span className="skeleton" style={{ width: 36, height: 36, borderRadius: 18, flexShrink: 0 }} />
-      <span className="skeleton" style={{ width: 90, height: 13 }} />
-      <span className="skeleton" style={{ width: 70, height: 18, marginLeft: 'auto' }} />
+function SummarySkeleton() {
+  const bar = (width: string | number, height: number, style = {}) => <span className="skeleton" style={{ width, height, ...style }} />;
+  return (
+    <div className="resumen-grid" aria-busy="true" aria-label="Cargando resumen">
+      <div className="resumen-main">
+        <section className="chart-card summary-hero skeleton-card">
+          {bar('55%', 30)}
+          {bar('30%', 12, { marginTop: 10 })}
+          {bar('100%', 300, { marginTop: 18, borderRadius: 12 })}
+          {bar('100%', 44, { marginTop: 12, borderRadius: 12 })}
+        </section>
+        <div className="totals-tiles">
+          {[0, 1, 2].map(index => <div className="total-tile skeleton-card" key={index}>{bar('50%', 11)}{bar('70%', 18, { marginTop: 6 })}{bar('100%', 30, { marginTop: 8 })}</div>)}
+        </div>
+      </div>
+      <section className="participants-card skeleton-card">
+        {bar('40%', 16)}
+        {bar('100%', 220, { marginTop: 14, borderRadius: 12 })}
+        {[0, 1, 2].map(index => (
+          <div className="skeleton-row" key={index}>
+            {bar(36, 36, { borderRadius: 18, flexShrink: 0 })}
+            <span style={{ flex: 1, display: 'grid', gap: 6 }}>{bar('45%', 12)}{bar('30%', 10)}</span>
+            {bar(80, 16)}
+          </div>
+        ))}
+      </section>
     </div>
-  ))}</>;
+  );
 }
 
-export function Summary({ loading, trmCached }: { loading: boolean; trmCached: boolean }) {
+export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; trmCached: boolean; onGoAdmin: () => void }) {
   const theme = useTheme();
   const [range, setRange] = useState('3M');
   const [hover, setHover] = useState<HeroPoint | null>(null);
@@ -131,6 +151,24 @@ export function Summary({ loading, trmCached }: { loading: boolean; trmCached: b
     { label: 'Ganancia COP', value: current ? `${signStr(gainCop)}${COP(Math.round(Math.abs(gainCop)))}` : '—', tone: tone(gainCop), pct: gainCopPercentage, series: history.map(row => row.ganancia_cop), color: gainCop >= 0 ? colors.pos : colors.neg },
   ];
 
+  if (loading) return <><PageHeading title="Resumen" /><SummarySkeleton /></>;
+
+  if (!current) {
+    return (
+      <>
+        <PageHeading title="Resumen" />
+        <SetupSteps
+          steps={[
+            { label: 'Agregar participantes', done: participantesActivos().length > 0 },
+            { label: 'Registrar los primeros aportes', done: S.movimientos.length > 0 },
+            { label: 'Registrar el valor del fondo', done: false },
+          ]}
+          onAction={onGoAdmin}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeading title="Resumen" />
@@ -183,11 +221,9 @@ export function Summary({ loading, trmCached }: { loading: boolean; trmCached: b
         <motion.section className="participants-card" aria-labelledby="participants-title" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(2)}>
           <div className="section-head">
             <h2 id="participants-title">Participantes</h2>
-            <span className="section-count">{loading ? '—' : `${activeNames.size} activos${historicalCount ? ` · ${historicalCount} históricos` : ''}`}</span>
+            <span className="section-count">{`${activeNames.size} activos${historicalCount ? ` · ${historicalCount} históricos` : ''}`}</span>
           </div>
-          {loading ? <div className="p-cards"><LoadingParticipants /></div> : !current ? (
-            <div className="empty"><div className="empty-title">Fondo vacío</div><div className="empty-text">El admin puede registrar aportes y el primer valor del fondo en el panel Admin.</div></div>
-          ) : !participants.length ? (
+          {!participants.length ? (
             <div className="empty"><div className="empty-title">Sin participantes visibles</div><div className="empty-text">Puedes volver a mostrarlos desde el panel Admin.</div></div>
           ) : (
             <>

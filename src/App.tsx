@@ -4,6 +4,8 @@ import { fetchAll } from './api/backend.js';
 import { Admin } from './components/Admin';
 import { Movements } from './components/Movements';
 import { Summary } from './components/Summary';
+import { LoadError } from './components/States';
+import { S } from './state.js';
 import { quickTransition, springTransition, surfaceMotion } from './motion';
 import { nextTabIndex } from './utils/tabs';
 import { applyTheme, currentTheme, type Theme } from './theme';
@@ -34,7 +36,6 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [trmCached, setTrmCached] = useState(false);
-  const [toast, setToast] = useState('');
   const [theme, setTheme] = useState<Theme>(currentTheme);
 
   const refresh = useCallback(async () => {
@@ -49,11 +50,14 @@ export function App() {
     void refresh();
   }, [refresh]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(''), 2200);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  const retry = () => {
+    setLoading(true);
+    void refresh();
+  };
+
+  const loadError = error && !loading && (
+    <LoadError message={error} hasData={S.historial.length > 0} onRetry={retry} />
+  );
 
   const chooseTheme = (next: Theme) => {
     applyTheme(next);
@@ -112,35 +116,18 @@ export function App() {
 
       <main className="main">
         <motion.section id="tab-resumen" className={`tab-content${tab === 'resumen' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-resumen" hidden={tab !== 'resumen'} variants={surfaceMotion} initial="hidden" animate={tab === 'resumen' ? 'visible' : 'hidden'} transition={quickTransition}>
-          <AnimatePresence initial={false}>
-            {error && <motion.div key="load-error" className="error-banner" role="alert" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>Error cargando datos: {error}</motion.div>}
-          </AnimatePresence>
-          <Summary loading={loading} trmCached={trmCached} />
+          {loadError}
+          {!(error && !S.historial.length) && <Summary loading={loading} trmCached={trmCached} onGoAdmin={() => setTab('admin')} />}
         </motion.section>
         <motion.section id="tab-movimientos" className={`tab-content${tab === 'movimientos' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-movimientos" hidden={tab !== 'movimientos'} variants={surfaceMotion} initial="hidden" animate={tab === 'movimientos' ? 'visible' : 'hidden'} transition={quickTransition}>
-          <Movements loading={loading} />
+          {loadError}
+          {!(error && !S.historial.length) && <Movements loading={loading} />}
         </motion.section>
         <motion.section id="tab-admin" className={`tab-content${tab === 'admin' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-admin" hidden={tab !== 'admin'} variants={surfaceMotion} initial="hidden" animate={tab === 'admin' ? 'visible' : 'hidden'} transition={quickTransition}>
           <Admin onRefresh={refresh} />
         </motion.section>
       </main>
 
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            key="toast"
-            className="toast"
-            role="status"
-            aria-live="polite"
-            initial={{ opacity: 0, filter: 'blur(4px)', transform: 'translateX(-50%) translateY(100%) scale(0.96)' }}
-            animate={{ opacity: 1, filter: 'blur(0px)', transform: 'translateX(-50%) translateY(0) scale(1)' }}
-            exit={{ opacity: 0, filter: 'blur(4px)', transform: 'translateX(-50%) translateY(100%) scale(0.96)' }}
-            transition={quickTransition}
-          >
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }

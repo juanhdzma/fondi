@@ -130,7 +130,9 @@ export function Movements({ loading }: { loading: boolean }) {
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.section key={`${selectedName}-${type}-${period}-${loading ? 'loading' : 'ready'}`} className="card mov-timeline" aria-label="Movimientos" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-          {loading ? <div className="empty">Cargando...</div> : !movements.length ? (
+          {loading ? (
+            <div aria-busy="true" aria-label="Cargando movimientos">{[0, 1, 2, 3].map(index => <div className="skeleton-row" key={index}><span className="skeleton" style={{ width: 48, height: 32 }} /><span style={{ flex: 1, display: 'grid', gap: 6 }}><span className="skeleton" style={{ width: '35%', height: 12 }} /><span className="skeleton" style={{ width: '25%', height: 10 }} /></span><span className="skeleton" style={{ width: 90, height: 16 }} /></div>)}</div>
+          ) : !movements.length ? (
             <div className="empty"><div className="empty-title">Sin movimientos</div><p className="empty-text">{filtered ? 'Ningún movimiento coincide con los filtros.' : 'Los aportes y retiros aparecerán aquí.'}</p></div>
           ) : (groupByMonth(movements) as Array<{ key: string; items: Movement[] }>).map((group, groupIndex) => {
             const [month, year] = monthParts(group.key);

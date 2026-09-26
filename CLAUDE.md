@@ -34,15 +34,16 @@ To test changes without hitting the real backend, set `MOCK_MODE = true` in `src
 ## `src/` structure
 
 ```
-main.tsx          React entry point + Motion reduced-motion policy
-App.tsx           Fetch lifecycle, navigation, error banner and toast state
-components/       Summary.tsx, Movements.tsx, Admin.tsx, Charts.tsx
-config.js         Deployment constants: API_BASE_URL, MOCK_MODE/MOCK_*
+main.tsx          React entry point + Motion reduced-motion policy + Geist font import
+App.tsx           Fetch lifecycle, icon rail navigation, theme toggle, load-error state
+theme.ts          Dark/light theme (applyTheme, useTheme), cssVar() and withAlpha() for Chart.js colors
+components/       Summary.tsx, Movements.tsx, Admin.tsx, Charts.tsx + PageHeading, States, Delta, Sparkline, CountUp, ParticipantPicker
+config.js         Deployment constants: API_BASE_URL, PARTICIPANT_COLORS (pastel), MOCK_MODE/MOCK_*
 state.ts          Typed in-memory API snapshot plus the two chart range selections
 computed.js       latest(), precioCuota(), cuotasCirc(), calcParticipante(), participantesActivos(), participantesTodos(), historialParticipante(), historialGananciaFondo()
 api/backend.js    fetchAll/postMovimiento/postFondo/postParticipante/exportUrl/postImportXlsx/fetchTRM — all I/O against the FastAPI backend
-domain/cuotas.js  calcularCuotas() + excedeSaldo() — pure share math
-utils/            dates.js (incl. todayLocal()), format.js and money-input.js
+domain/cuotas.js  calcularCuotas() + excedeSaldo() + participacion() — pure share math
+utils/            dates.js (todayLocal(), greeting(), freshness()), format.js, money-input.js, movements.js (filterMovements/groupByMonth), treemap.js, lanes.js
 ```
 
 `state.ts` (`S`) is the API snapshot in memory — if the browser hasn't completed a recent `fetchAll()`, everything derived from `computed.js` is stale. React owns only UI state such as forms, tabs and selected chart ranges.
@@ -125,8 +126,11 @@ The valuation submit path in `src/components/Admin.tsx` is different: it records
 - **Calendar-aligned ticks**: `computeCalendarTicks()` decides the granularity based on the visible span (month if >150 days, week if >20, every 4 days if >8, otherwise every day) and returns exact timestamps (start of month/week), not data indices — they're injected by overwriting the ticks array via `afterBuildTicks`, regardless of whether real data exists exactly there.
 - **Chart.js gotcha**: the `linear` axis defaults to `bounds: 'ticks'`, which expands `min`/`max` to its own auto-generated "round" ticks — `afterBuildTicks` overwrites them but doesn't fix that already-inflated `min`, leaving a phantom gap before the first real point. That's why `xAxis()` sets explicit `min`/`max` to the first/last real timestamp (plus `bounds: 'data'` as reinforcement). If that explicit `min`/`max` is removed, the gap comes back.
 - **Backward-fill point clamp**: `filteredHistorialWithFill()` may prepend the last valuation *before* the selected range (so the line doesn't start at zero); its real date can be much earlier than the visible range, so in `renderCharts()` its `x` is clamped to the range edge (not its real date) — otherwise most of the chart width would be wasted on a flat segment outside the range.
-- **Straight lines, no curves**: `tension: 0` in `makeDataset()` — with tension>0 and proportional spacing (very uneven gaps between points), Chart.js's bezier smoothing produced visible distortions near the edges. Point radius (`pointRadiusFor()`) decreases with point count so they don't pile up over long ranges.
-- **"Ganancia acumulada" line color needs a zero-crossing split, not just per-segment sign**: `makeGananciaDataset()` colors the line green above zero / red below via Chart.js's `segment.borderColor`, which colors a whole segment by one endpoint's sign — a segment that crosses zero (e.g. -$50 → +$30) would otherwise render as a single solid color even though half of it is on the wrong side of the line. `splitAtZero()` fixes this by inserting an interpolated point at exactly `y: 0` wherever consecutive points change sign, so no segment ever straddles zero. `gainSegmentColor()` then has to fall back to `p0`'s sign when `p1` is that interpolated zero point (its own sign is meaningless — "0 is not negative" would otherwise miscolor every ascending crossing green from the bottom up). Both halves (`splitAtZero` + the `p0` fallback) are required together; this exact combination was arrived at by fixing two related bugs in the same session — don't simplify one away without re-checking both crossing directions (descending AND ascending) against real data with a sign change.
+- **Straight lines, no curves**: `tension: 0` in the datasets — with tension>0 and proportional spacing (very uneven gaps between points), Chart.js's bezier smoothing produced visible distortions near the edges. Point radius (`pointRadiusFor()`) decreases with point count so they don't pile up over long ranges.
+- **The hero chart has no metric selector**: it always plots value (area) and net contributed (dashed, `stepped: 'after'`), with the gap between them read as gain. The old "Ganancia acumulada" line and its zero-crossing split (`splitAtZero`) were removed with the redesign.
+- **Hero overlay is HTML, positioned by a Chart.js plugin**: the `heroOverlay` plugin's `afterUpdate` reads `chartArea` and the scales and stores the pixel positions of the movement lane chips and the end labels ("Valor · ganancia · Aportado") in React state; the markup is regular JSX over the canvas. `setOverlay` compares with the previous value before updating — without that guard every `afterUpdate` would re-render and loop. Chips go through `laneLayout()` (`src/utils/lanes.js`) so close movements move to a second lane or merge, and are clamped to the chart edges *before* the lane pass so the clamp can't create overlaps. End labels go through `spreadLabels()` for the same reason, and below 560px of width they become a legend row under the chart.
+- **Hovering the hero chart drives the figures above it**: `onHover` sends the point to `Summary`, which swaps the USD/COP values and changes for that date. Because that re-renders `Summary` on every mouse move, `heroSeries(range)` is memoized on `S.historial`/`S.movimientos` — recomputing it inline would give `HeroChart` a new array each render and rebuild the chart on every hover.
+- **Period returns use the share price, not the fund value**: the range pills and the hero change call `periodPct(rows, 'precio_cuota')`. `valor_total` includes contributions, so over a year it showed things like +116% for a fund that actually earned ~2%.
 
 ### The persona chart's tooltip is custom HTML, not Chart.js's native one
 
@@ -136,12 +140,22 @@ The participant chart in `src/components/Charts.tsx` uses `tooltip: { enabled: f
 
 On iOS Safari, the Admin panel's native date/time inputs used to clear when their DOM containers were hidden or re-rendered. `src/components/Admin.tsx` now keeps every field as controlled React state, so a data refetch never trusts the DOM to retain values. Keep new Admin fields controlled for the same reason.
 
+The movement form is a three-step flow (Quién → Montos → Confirmar) over that same state: steps only change what is rendered, `amountsError()` validates before moving to the confirmation step and again on submit, and the save still sends movement + valuation in one request. Confirmations are inline next to the button (`StatusText`); there is no toast anymore.
+
+### Theme, fonts and colors
+
+- **Dark (Noche) is the default; light (Petróleo) is opt-in** via `data-theme="light"` on `<html>`, persisted in `localStorage` (`fondi-theme`). `public/theme.js` applies it before the first paint and is an external file on purpose: the CSP has `script-src 'self'`, which blocks an inline `<script>`.
+- **All colors are CSS tokens** (`--bg`, `--surface`, `--text`, `--muted`, `--accent`, `--pos`, `--neg`, …) defined for both themes at the top of `style.css`. Chart.js can't read CSS variables, so charts call `cssVar()` when they're created and include `useTheme()` in their effect deps to rebuild on a theme change; canvas gradients go through `withAlpha()` because `color-mix()` isn't reliable in canvas across browsers.
+- **Geist is self-hosted** through `@fontsource-variable/geist`, bundled by Vite into same-origin `.woff2` files. Google Fonts would be blocked by the CSP (`default-src 'self'`), and so would a font inlined as `data:` — keep the files above Vite's inline limit.
+- **Participant colors are pastels**, so any text on them uses `--on-pastel` (dark), never white.
+- **Money format is `US$ 12.450` / `$ 48.230.000`** (`fmt0`/`fmt`/`COP` in `format.js`). Callers must not append " USD"/" COP"; TRM and other plain numbers use `fmtN`/`fmtN0`, not `fmt`.
+
 ### Other quirks
 
 - **Every write in the Admin panel is guarded against a double click** — `Admin.tsx` holds one `busy` operation and disables the relevant controls until the request finishes. The log is append-only, so a duplicated row can't be deleted from the app; on import it's worse, since a second run would back up the already replaced DB and push a good snapshot out of the 5-backup rotation.
 - **`precioCuota()` (`src/computed.js`) only falls back to `1` when there's no history at all.** With a valuation saved it returns its price as-is, even if that's `0` — the old `|| 1` invented a dollar of value per share for a fund worth nothing (reachable via import, not through the UI).
 - **`fmtMoneyInput()` (`src/utils/money-input.js`) restores the caret by counting real characters** (digits and the decimal comma), not by index: thousand separators appear and disappear as you type and shift every index after them. It used to force the caret to the end on every keystroke, which made it impossible to fix a digit in the middle of an amount. Deleting a thousand separator itself is still a no-op (the formatter puts it right back) — that one needs to know the input was a deletion, which `input` alone doesn't tell us.
-- **Zero emojis in the UI**: not in toasts, status messages, banners, or decorative icons. Explicit request — the CSS color/class (`.ok`/`.err`) already communicates the state.
+- **Zero emojis in the UI**: not in status messages, banners, or decorative icons. Explicit request — the CSS color/class (`.ok`/`.err`) already communicates the state.
 - **Admin panel auth is real, server-side**: the unlock flow in `Admin.tsx` POSTs the typed key to `/api/auth/verify`; the backend compares it against `ADMIN_PASSWORD` with `secrets.compare_digest` (`backend/app/main.py`). The key is never embedded in the frontend bundle — every write request resends it via `X-Admin-Key` and the backend re-validates it independently (there's no session/token, each request is checked on its own).
 - **TRM (exchange rate)** is fetched live from Superfinanciera via `datos.gov.co` (`fetchTRM()`, `src/api/backend.js`), with a fallback to 4000 if the fetch fails. It runs with `AbortSignal.timeout(4000)` and **in parallel with `/api/all`, not before it** — it used to be awaited first, so a slow day at that third party left the whole dashboard on skeletons waiting for a value that has a fallback anyway. `renderAll()` still waits for both so COP figures don't render twice.
 - **Money formatting goes through `src/utils/format.js`, which instantiates its `Intl.NumberFormat`s once at module level.** Several of these run inside Chart.js tick/tooltip callbacks — those fire per tick per render, and building a formatter in there was allocating one per call. Don't write `new Intl.NumberFormat(...)` in a render path; add a helper there instead.
@@ -152,4 +166,5 @@ On iOS Safari, the Admin panel's native date/time inputs used to clear when thei
 - **Never build a date with `toISOString()`** — use `todayLocal()` (`src/utils/dates.js`). `toISOString()` returns the date in **UTC**: in Colombia (GMT-5) everything after 19:00 local is already the next day. `Admin.tsx` and `Charts.tsx` both go through `todayLocal()` now.
 - **Participant names are rendered as JSX text**, so React escapes them. Do not reintroduce `dangerouslySetInnerHTML` for names or backend error messages.
 - **The Admin panel warns when the two share-count sources disagree**: `Admin.tsx` compares `cuotasCirc()` against `historial_fondo.cuotas_circ` from the latest valuation. They only drift via an import whose `historial` is complete but whose `movimientos` aren't; the warning stays hidden while the difference is ≤ 0.01.
-- **Two independent range selectors keep separate React state**: Summary owns the hero range and Movements owns the participant range. They share `.range-btn` styling but no event delegation.
+- **Two independent range selectors keep separate React state**: Summary owns the hero range (`.range-pill`) and Movements owns the participant range (`.range-btn`).
+- **Load errors**: with no data loaded, `LoadError` (`src/components/States.tsx`) replaces Resumen and Movimientos with a retry card; if a refresh fails after data was already loaded, it shows a small note above the stale data instead. An empty fund shows `SetupSteps` instead of an empty dashboard.

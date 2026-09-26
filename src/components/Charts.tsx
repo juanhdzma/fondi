@@ -273,6 +273,16 @@ function eventsIn(points: HeroPoint[]) {
   return [...byDay.values()];
 }
 
+// Separa etiquetas verticales que quedarían encimadas: las ordena y empuja hacia abajo la
+// que esté a menos de `gap` px de la anterior.
+export function spreadLabels<T extends { y: number }>(labels: T[], gap: number) {
+  const sorted = [...labels].sort((a, b) => a.y - b.y);
+  for (let index = 1; index < sorted.length; index++) {
+    if (sorted[index].y - sorted[index - 1].y < gap) sorted[index] = { ...sorted[index], y: sorted[index - 1].y + gap };
+  }
+  return sorted;
+}
+
 const sameOverlay = (a: Overlay | null, b: Overlay) => JSON.stringify(a) === JSON.stringify(b);
 
 export function HeroChart({ range, onHover }: { range: string; onHover: (point: HeroPoint | null) => void }) {
@@ -297,7 +307,8 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
       afterUpdate(chart: Chart) {
         const { chartArea, scales } = chart;
         if (!chartArea) return;
-        const chips = laneLayout(events.map(event => ({ ...event, x: scales.x.getPixelForValue(event.ts) })), LANE_GAP) as LaneChip[];
+        const edge = LANE_GAP / 2 + 4;
+        const chips = laneLayout(events.map(event => ({ ...event, x: Math.min(Math.max(scales.x.getPixelForValue(event.ts), edge), chart.width - edge) })), LANE_GAP) as LaneChip[];
         const last = points.at(-1)!;
         const next: Overlay = {
           width: chart.width,
@@ -305,11 +316,11 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
           right: chartArea.right,
           bottom: chartArea.bottom,
           chips,
-          ends: [
+          ends: spreadLabels([
             { y: scales.y.getPixelForValue(last.valor), kind: 'valor' },
             { y: scales.y.getPixelForValue((last.valor + last.aportado) / 2), kind: 'ganancia' },
             { y: scales.y.getPixelForValue(last.aportado), kind: 'aportado' },
-          ],
+          ], 17),
         };
         setOverlay(current => sameOverlay(current, next) ? current : next);
       },
