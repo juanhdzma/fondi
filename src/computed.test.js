@@ -177,6 +177,21 @@ describe('calcParticipante', () => {
     expect(p.valor_cop).toBeCloseTo(6000000, 6);
     expect(p.trm_avg_entrada).toBeCloseTo(4000, 10);
   });
+
+  it('ganancia en COP: valor a TRM actual + retiros a TRM de su día − aportes en COP', () => {
+    S.trm = 5000;
+    S.historial = [
+      { fecha: '2026-01-01', valor_total: 1000, precio_cuota: 1, cuotas_circ: 1000, trm: 4000 },
+      { fecha: '2026-02-01', valor_total: 900, precio_cuota: 1.2, cuotas_circ: 750, trm: 4500 },
+    ];
+    S.movimientos = [
+      mov('Ana', 'aporte', 1000, 1000, '2026-01-01', { monto_cop: 4000000, trm_dia: 4000 }),
+      mov('Ana', 'retiro', 300, -250, '2026-02-01'),
+    ];
+
+    const p = calcParticipante('Ana');
+    expect(p.ganancia_cop).toBeCloseTo(900 * 5000 + 300 * 4500 - 4000000, 6);
+  });
 });
 
 describe('porcentajeRetiro', () => {

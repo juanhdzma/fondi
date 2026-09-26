@@ -277,6 +277,10 @@ button { color: inherit; }
 .p-figures { flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; }
 .p-monto { font-size: 15px; font-weight: 700; }
 .p-chg { margin-top: 3px; font-size: 12px; font-weight: 680; }
+.p-cop { margin-top: 3px; color: var(--text-secondary); font-size: 11px; }
+.p-figures + .p-figures { margin-left: 18px; }
+.p-pct .p-chg { font-size: inherit; }
+.p-monto.p-chg { margin-top: 0; font-size: 15px; font-weight: 700; }
 .p-chg.pos { color: var(--green); }
 .p-chg.neg { color: var(--red); }
 .p-chg.zero { color: var(--text-secondary); }

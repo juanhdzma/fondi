@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Chart } from 'chart.js/auto';
-import { S } from '../state.js';
 import { historialGananciaFondo, historialParaGrafica, historialParticipante, participanteColor } from '../computed.js';
-import { fmt, fmtPct } from '../utils/format.js';
+import { fmt } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
 
 export const RANGES = [
@@ -274,36 +273,6 @@ function standardOptions(ticks: number[]) {
   };
 }
 
-function quotaOptions(ticks: number[]) {
-  return {
-    ...standardOptions(ticks),
-    plugins: {
-      legend: {
-        display: true,
-        position: 'bottom' as const,
-        labels: { color: '#6E6F76', font: { size: 14 }, padding: 14, usePointStyle: true },
-      },
-      tooltip: {
-        ...tooltip,
-        callbacks: {
-          title: () => '',
-          label: (context: any) => ` ${context.parsed.y >= 0 ? '+' : ''}${fmtPct(context.parsed.y)}% ${context.datasetIndex === 0 ? 'USD' : 'COP'}`,
-          footer: (items: any[]) => items.length ? formatTimestamp(items[0].parsed.x) : '',
-        },
-      },
-    },
-    scales: {
-      x: xAxis(ticks),
-      y: {
-        position: 'right' as const,
-        ticks: { color: '#6E6F76', font: { size: 13 }, callback: (value: any) => `${Number(value) >= 0 ? '+' : ''}${fmtPct(Number(value))}%` },
-        grid: { color: '#E7E7EA' },
-        border: { display: false },
-      },
-    },
-  };
-}
-
 export function HeroChart({ range, metric }: { range: string; metric: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const data = rangeHistory(range);
@@ -319,16 +288,10 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
     const totalPoints = data.map((row, index) => ({ x: timestamps[index], y: row.valor_total }));
     const gainRows = filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[]);
     const gainPoints = gainRows.map((row, index) => ({ x: timestamps[index], y: row.ganancia }));
-    const baseUsd = data[0]?.precio_cuota || 1;
-    const baseCop = data[0] ? data[0].precio_cuota * (data[0].trm || S.trm || 1) : 1;
-    const usdPoints = data.map((row, index) => ({ x: timestamps[index], y: (row.precio_cuota / baseUsd - 1) * 100 }));
-    const copPoints = data.map((row, index) => ({ x: timestamps[index], y: (row.precio_cuota * (row.trm || S.trm || 1) / baseCop - 1) * 100 }));
 
-    const config = metric === 'cuota'
-      ? { datasets: [{ ...dataset(usdPoints, '#0C243B'), label: 'USD', fill: false }, { ...dataset(copPoints, '#4A6E93'), label: 'COP', fill: false }], options: quotaOptions(ticks) }
-      : metric === 'ganancia'
-        ? { datasets: [gainDataset(gainPoints)], options: standardOptions(ticks) }
-        : { datasets: [dataset(totalPoints, '#0C243B')], options: standardOptions(ticks) };
+    const config = metric === 'ganancia'
+      ? { datasets: [gainDataset(gainPoints)], options: standardOptions(ticks) }
+      : { datasets: [dataset(totalPoints, '#0C243B')], options: standardOptions(ticks) };
 
     const chart = new Chart(canvas.current, { type: 'line', data: { datasets: config.datasets as any }, options: config.options as any });
     const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
@@ -343,7 +306,6 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
   const labels: Record<string, [string, string, (row: Row) => number]> = {
     ganancia: ['Ganancia acumulada', 'USD', row => row.ganancia],
     total: ['Valor total', 'USD', row => row.valor_total],
-    cuota: ['Precio de cuota', 'USD por cuota', row => row.precio_cuota],
   };
   const [label, unit] = labels[metric];
   const summaryRows = metric === 'ganancia'

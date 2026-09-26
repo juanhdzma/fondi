@@ -25,11 +25,12 @@ function ParticipantSummary({ name }: { name: string }) {
         <div>
           <div className="summary-label">Valor actual</div>
           <div className="summary-value">{fmt(participant.valor_actual)}<span className="summary-unit">USD</span></div>
-          {participant.has_cop && <div className="summary-sub">{COP(Math.round(participant.valor_cop))} COP</div>}
+          <div className="summary-sub">{COP(Math.round(participant.valor_cop))} COP</div>
         </div>
         <div>
           <div className="summary-label">Ganancia</div>
           <div className="summary-value">{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))}<span className="summary-unit">USD</span></div>
+          <div className="summary-sub">{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} COP</div>
           <div style={{ marginTop: 6 }}><span className={`gain-badge ${tone}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</span></div>
         </div>
         <div>

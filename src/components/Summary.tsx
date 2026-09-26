@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
 import { PARTICIPANT_COLORS } from '../config.js';
-import { calcParticipante, cuotasCirc, latest, participantesTodos, participantesVisiblesActivos } from '../computed.js';
+import { calcParticipante, cuotasCirc, gananciaCop, latest, participantesTodos, participantesVisiblesActivos } from '../computed.js';
 import { quickTransition, springTransition, surfaceMotion } from '../motion';
-import { COP, fmt, fmt0, fmtN, fmtPct, signStr } from '../utils/format.js';
+import { COP, fmt0, fmtPct, signStr } from '../utils/format.js';
 import { HeroChart, periodPct, RANGE_LABELS, RANGES, rangeHistory } from './Charts';
 
 const metrics = [
   ['ganancia', 'Ganancia'],
   ['total', 'Valor total'],
-  ['cuota', 'Precio cuota'],
 ];
 
 function Change({ value, range }: { value: number | null; range: string }) {
@@ -42,7 +41,6 @@ export function Summary({ loading }: { loading: boolean }) {
 
   const history = rangeHistory(range);
   const fundChange = periodPct(history, 'valor_total');
-  const quotaChange = periodPct(history, 'precio_cuota');
   const totalShares = cuotasCirc();
   const participants = participantesTodos()
     .map(name => calcParticipante(name))
@@ -58,6 +56,9 @@ export function Summary({ loading }: { loading: boolean }) {
   const contributed = S.movimientos.reduce((total, movement) => total + (movement.tipo === 'retiro' ? -movement.monto : movement.monto), 0);
   const gain = current ? current.valor_total - contributed : 0;
   const gainPercentage = contributed > 0 ? gain / contributed * 100 : 0;
+  const gainCop = current ? gananciaCop(S.movimientos, current.valor_total) : 0;
+  const signedCop = (value: number) => `${signStr(value)}${COP(Math.round(Math.abs(value)))} COP`;
+  const gainTone = (value: number) => value > 0 ? 'pos' : value < 0 ? 'neg' : '';
 
   useEffect(() => {
     const clearHighlight = (event: PointerEvent) => {
@@ -104,11 +105,6 @@ export function Summary({ loading }: { loading: boolean }) {
               <div className="stat-value">{current ? `${fmt0(current.valor_total)} USD` : '—'}</div>
               <Change value={fundChange} range={range} />
             </div>
-            <div className="period-metric">
-              <div className="stat-label">Precio de cuota</div>
-              <div className="stat-value">{current ? `${fmt(current.precio_cuota)} USD` : '—'}</div>
-              <Change value={quotaChange} range={range} />
-            </div>
           </div>
           <div className="hero-toggle" role="group" aria-label="Métrica del gráfico">
             {metrics.map(([value, label]) => (
@@ -138,9 +134,9 @@ export function Summary({ loading }: { loading: boolean }) {
         <h2>Totales actuales</h2>
         <div className="current-totals-grid">
           <div><span>Aportado</span><b>{current ? `${fmt0(contributed)} USD` : '—'}</b></div>
-          <div><span>Ganancia</span><b className={gain > 0 ? 'pos' : gain < 0 ? 'neg' : ''}>{current ? `${signStr(gain)}${fmt0(Math.abs(gain))} USD (${signStr(gainPercentage)}${fmtPct(Math.abs(gainPercentage))}%)` : '—'}</b></div>
-          <div><span>Cuotas totales</span><b>{current ? fmtN(totalShares) : '—'}</b></div>
-          <div><span>Cuota en COP</span><b>{current ? `${COP(Math.round(current.precio_cuota * (S.trm || 1)))} COP` : '—'}</b></div>
+          <div><span>Valor en COP</span><b>{current ? `${COP(Math.round(current.valor_total * (S.trm || 1)))} COP` : '—'}</b></div>
+          <div><span>Ganancia USD</span><b className={gainTone(gain)}>{current ? `${signStr(gain)}${fmt0(Math.abs(gain))} USD (${signStr(gainPercentage)}${fmtPct(Math.abs(gainPercentage))}%)` : '—'}</b></div>
+          <div><span>Ganancia COP</span><b className={gainTone(gainCop)}>{current ? signedCop(gainCop) : '—'}</b></div>
         </div>
       </section>
 
@@ -180,7 +176,6 @@ export function Summary({ loading }: { loading: boolean }) {
             {participants.map((participant, index) => {
           const tone = PARTICIPANT_COLORS[index % PARTICIPANT_COLORS.length];
           const percentage = totalShares > 0 ? Math.max(0, participant.cuotas) / totalShares * 100 : 0;
-          const gainTone = participant.ganancia_pct > 0 ? 'pos' : participant.ganancia_pct < 0 ? 'neg' : 'zero';
           return (
             <motion.button
               type="button"
@@ -198,11 +193,15 @@ export function Summary({ loading }: { loading: boolean }) {
               <div className="p-avatar" style={{ background: tone }}>{participant.nombre.charAt(0).toUpperCase()}</div>
               <div className="p-main">
                 <div className="p-name">{participant.nombre}</div>
-                <div className="p-pct">{percentage.toFixed(0)}% del fondo{!activeNames.has(participant.nombre) ? ' · histórico' : ''}</div>
+                <div className="p-pct">{percentage.toFixed(0)}% del fondo · <span className={`p-chg ${gainTone(participant.ganancia_pct) || 'zero'}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</span>{!activeNames.has(participant.nombre) ? ' · histórico' : ''}</div>
               </div>
               <div className="p-figures">
-                <div className="p-monto">{fmt0(participant.valor_actual)}</div>
-                <div className={`p-chg ${gainTone}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</div>
+                <div className="p-monto">{fmt0(participant.valor_actual)} USD</div>
+                <div className="p-cop">{COP(Math.round(participant.valor_cop))} COP</div>
+              </div>
+              <div className="p-figures">
+                <div className={`p-monto p-chg ${gainTone(participant.ganancia_monto) || 'zero'}`}>{signStr(participant.ganancia_monto)}{fmt0(Math.abs(participant.ganancia_monto))} USD</div>
+                <div className={`p-cop p-chg ${gainTone(participant.ganancia_cop) || 'zero'}`}>{signedCop(participant.ganancia_cop)}</div>
               </div>
             </motion.button>
           );

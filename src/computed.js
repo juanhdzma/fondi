@@ -70,6 +70,7 @@ export function calcParticipante(nombre) {
   const precio_prom   = aportes_cuotas > 0 ? aportes_monto / aportes_cuotas : 0;
   const ganancia_pct  = precio_prom > 0 ? (pc - precio_prom) / precio_prom * 100 : 0;
   const ganancia_monto= valor_actual + retiros_monto - aportes_monto;
+  const ganancia_cop  = gananciaCop(movs, valor_actual);
 
   // ── COP ──────────────────────────────────────────────────────────────────
   const cop_invertido  = aportes.reduce((s, m) => s + (m.monto_cop || 0), 0);
@@ -82,8 +83,21 @@ export function calcParticipante(nombre) {
   return {
     nombre, cuotas, valor_actual, aportes_monto, retiros_monto,
     precio_prom, ganancia_pct, ganancia_monto,
-    cop_invertido, has_cop, valor_cop, trm_avg_entrada,
+    cop_invertido, has_cop, valor_cop, trm_avg_entrada, ganancia_cop,
   };
+}
+
+// Los retiros no guardan monto_cop: se convierten con la TRM de la valuación de ese día,
+// que se escribe en la misma transacción que el movimiento.
+function montoCop(m) {
+  if (m.tipo === 'aporte') return m.monto_cop || 0;
+  const dia = String(m.fecha).slice(0, 10);
+  const h = S.historial.find(r => String(r.fecha).slice(0, 10) === dia);
+  return m.monto * (h?.trm || S.trm || 1);
+}
+
+export function gananciaCop(movs, valorUsd) {
+  return movs.reduce((s, m) => s + (m.tipo === 'retiro' ? montoCop(m) : -montoCop(m)), valorUsd * (S.trm || 1));
 }
 
 export function porcentajeRetiro(movimiento) {
