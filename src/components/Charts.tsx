@@ -1,8 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 import { historialGananciaFondo, historialParaGrafica, historialParticipante, participanteColor } from '../computed.js';
-import { compact, fmt } from '../utils/format.js';
+import { S } from '../state.js';
+import { laneLayout } from '../utils/lanes.js';
+import { compact, fmt, fmt0 } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
+import { useReducedMotion } from 'motion/react';
 import { cssVar, useTheme, withAlpha } from '../theme';
 
 export const RANGES = [
@@ -200,44 +203,6 @@ function dataset(points: Point[], color: string) {
   };
 }
 
-export function splitAtZero(points: Point[]) {
-  const result: Point[] = [];
-  for (let index = 0; index < points.length; index += 1) {
-    result.push(points[index]);
-    const current = points[index];
-    const next = points[index + 1];
-    if (next && (current.y < 0) !== (next.y < 0)) {
-      const ratio = current.y / (current.y - next.y);
-      result.push({ x: current.x + (next.x - current.x) * ratio, y: 0, interpolated: true });
-    }
-  }
-  return result;
-}
-
-const gainColor = (context: any) => {
-  const end = context.p1.parsed.y;
-  const value = end !== 0 ? end : context.p0.parsed.y;
-  return cssVar(value >= 0 ? '--pos' : '--neg');
-};
-
-function gainDataset(rawPoints: Point[]) {
-  const radius = pointRadius(rawPoints.length);
-  return {
-    data: splitAtZero(rawPoints),
-    borderWidth: 3,
-    fill: true,
-    segment: {
-      borderColor: gainColor,
-      backgroundColor: (context: any) => withAlpha(gainColor(context), 0.14),
-    },
-    pointRadius: (context: any) => context.raw?.interpolated ? 0 : radius,
-    pointHoverRadius: (context: any) => context.raw?.interpolated ? 0 : radius + 2,
-    pointBackgroundColor: (context: any) => cssVar((context.raw?.y ?? 0) >= 0 ? '--pos' : '--neg'),
-    pointHoverBackgroundColor: (context: any) => cssVar((context.raw?.y ?? 0) >= 0 ? '--pos' : '--neg'),
-    tension: 0,
-  };
-}
-
 function standardOptions(ticks: number[]) {
   return {
     animation: false as const,
@@ -274,54 +239,218 @@ function standardOptions(ticks: number[]) {
   };
 }
 
-export function HeroChart({ range, metric }: { range: string; metric: string }) {
+export type HeroPoint = { ts: number; fecha: string; valor: number; aportado: number; ganancia: number; precio_cuota: number; trm: number };
+
+export function heroSeries(range: string): HeroPoint[] {
+  const rows = filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[]);
+  const cutoff = rangeCutoff(range)?.getTime();
+  return rows.map((row, index) => {
+    const value = toTimestamp(row.fecha);
+    return { ...(row as any), ts: index === 0 && cutoff && value < cutoff ? cutoff : value };
+  });
+}
+
+type LaneChip = { x: number; lane: number; amount: number; people: string[]; count: number; ts: number };
+type Overlay = { width: number; left: number; right: number; bottom: number; chips: LaneChip[]; ends: Array<{ y: number; kind: string }> };
+
+const LANE_GAP = 62;
+const END_LABELS_MIN_WIDTH = 560;
+
+function eventsIn(points: HeroPoint[]) {
+  if (points.length < 2) return [];
+  const [from, to] = [points[0].ts, points.at(-1)!.ts];
+  const byDay = new Map<string, { ts: number; amount: number; people: string[]; count: number }>();
+  for (const movement of S.movimientos) {
+    const ts = toTimestamp(movement.fecha);
+    if (ts < from || ts > to) continue;
+    const key = movement.fecha.slice(0, 10);
+    const entry = byDay.get(key) ?? { ts, amount: 0, people: [], count: 0 };
+    entry.amount += movement.tipo === 'retiro' ? -movement.monto : movement.monto;
+    if (!entry.people.includes(movement.persona)) entry.people.push(movement.persona);
+    entry.count += 1;
+    byDay.set(key, entry);
+  }
+  return [...byDay.values()];
+}
+
+const sameOverlay = (a: Overlay | null, b: Overlay) => JSON.stringify(a) === JSON.stringify(b);
+
+export function HeroChart({ range, onHover }: { range: string; onHover: (point: HeroPoint | null) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const theme = useTheme();
-  const data = rangeHistory(range);
+  const reduced = useReducedMotion();
+  const [overlay, setOverlay] = useState<Overlay | null>(null);
+  const points = useMemo(() => heroSeries(range), [range, S.historial, S.movimientos]);
+  const hoverRef = useRef(onHover);
+  hoverRef.current = onHover;
 
   useEffect(() => {
-    if (!canvas.current || !data.length) return;
-    const cutoff = rangeCutoff(range)?.getTime();
-    const timestamps = data.map((row, index) => {
-      const value = toTimestamp(row.fecha);
-      return index === 0 && cutoff && value < cutoff ? cutoff : value;
+    if (!canvas.current || !points.length) return;
+    const ticks = computeCalendarTicks(points.map(point => point.ts));
+    const accent = cssVar('--accent');
+    const muted = cssVar('--muted');
+    const events = eventsIn(points);
+    const wide = () => (canvas.current?.parentElement?.clientWidth ?? 0) >= END_LABELS_MIN_WIDTH;
+
+    const overlayPlugin = {
+      id: 'heroOverlay',
+      afterUpdate(chart: Chart) {
+        const { chartArea, scales } = chart;
+        if (!chartArea) return;
+        const chips = laneLayout(events.map(event => ({ ...event, x: scales.x.getPixelForValue(event.ts) })), LANE_GAP) as LaneChip[];
+        const last = points.at(-1)!;
+        const next: Overlay = {
+          width: chart.width,
+          left: chartArea.left,
+          right: chartArea.right,
+          bottom: chartArea.bottom,
+          chips,
+          ends: [
+            { y: scales.y.getPixelForValue(last.valor), kind: 'valor' },
+            { y: scales.y.getPixelForValue((last.valor + last.aportado) / 2), kind: 'ganancia' },
+            { y: scales.y.getPixelForValue(last.aportado), kind: 'aportado' },
+          ],
+        };
+        setOverlay(current => sameOverlay(current, next) ? current : next);
+      },
+      afterDatasetsDraw(chart: Chart) {
+        const active = chart.getActiveElements()[0];
+        if (!active) return;
+        const { ctx, chartArea } = chart;
+        const x = active.element.x;
+        ctx.save();
+        ctx.strokeStyle = muted;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.stroke();
+        ctx.restore();
+      },
+      afterEvent(chart: Chart, args: any) {
+        if (args.event.type === 'mouseout') {
+          chart.setActiveElements([]);
+          hoverRef.current(null);
+        }
+      },
+    };
+
+    const chart = new Chart(canvas.current, {
+      type: 'line',
+      data: {
+        datasets: [
+          {
+            data: points.map(point => ({ x: point.ts, y: point.valor })),
+            borderColor: accent,
+            backgroundColor: (context: any) => gradient(context.chart, accent),
+            fill: true,
+            borderWidth: 2.5,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointHoverBackgroundColor: accent,
+            pointHoverBorderColor: cssVar('--surface'),
+            pointHoverBorderWidth: 3,
+            tension: 0,
+          },
+          {
+            data: points.map(point => ({ x: point.ts, y: point.aportado })),
+            borderColor: muted,
+            borderDash: [5, 5],
+            borderWidth: 1.5,
+            stepped: 'after',
+            fill: false,
+            pointRadius: 0,
+            pointHoverRadius: 0,
+          },
+        ] as any,
+      },
+      plugins: [overlayPlugin],
+      options: {
+        animation: reduced ? false : { duration: 900, easing: 'easeOutQuart' },
+        events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { left: 2, right: wide() ? 116 : 4, top: 8, bottom: events.length ? 64 : 4 } },
+        interaction: { mode: 'index', intersect: false },
+        onHover: (_event: any, elements: Array<{ index: number }>) => {
+          hoverRef.current(elements.length ? points[elements[0].index] : null);
+        },
+        onResize: (chart: Chart, size: { width: number }) => {
+          const right = size.width >= END_LABELS_MIN_WIDTH ? 116 : 4;
+          const padding = (chart.options.layout as any).padding;
+          if (padding.right !== right) {
+            padding.right = right;
+            chart.update('none');
+          }
+        },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: {
+          x: {
+            ...xAxis(ticks),
+            ticks: { display: true, color: muted, font: { size: 11 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 18, callback: (value: any) => formatTimestamp(Number(value)) },
+          },
+          y: {
+            position: 'left',
+            grace: '8%',
+            ticks: { color: muted, font: { size: 11 }, maxTicksLimit: 5, callback: (value: any) => compact(value) },
+            grid: { color: cssVar('--line') },
+            border: { display: false },
+          },
+        },
+      } as any,
     });
-    const ticks = computeCalendarTicks(timestamps);
-    const totalPoints = data.map((row, index) => ({ x: timestamps[index], y: row.valor_total }));
-    const gainRows = filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[]);
-    const gainPoints = gainRows.map((row, index) => ({ x: timestamps[index], y: row.ganancia }));
-
-    const config = metric === 'ganancia'
-      ? { datasets: [gainDataset(gainPoints)], options: standardOptions(ticks) }
-      : { datasets: [dataset(totalPoints, cssVar('--accent'))], options: standardOptions(ticks) };
-
-    const chart = new Chart(canvas.current, { type: 'line', data: { datasets: config.datasets as any }, options: config.options as any });
     const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
     return () => {
       stopOutsideDismiss();
       chart.destroy();
     };
-  }, [data, metric, range, theme]);
+  }, [points, range, theme, reduced]);
 
-  if (!data.length) return <div className="empty"><div className="empty-title">Sin historial</div><p className="empty-text">El gráfico aparecerá después de la primera valuación.</p></div>;
+  if (!points.length) return <div className="empty"><div className="empty-title">Sin historial</div><p className="empty-text">El gráfico aparecerá después de la primera valuación.</p></div>;
 
-  const labels: Record<string, [string, string, (row: Row) => number]> = {
-    ganancia: ['Ganancia acumulada', 'USD', row => row.ganancia],
-    total: ['Valor total', 'USD', row => row.valor_total],
+  const first = points[0];
+  const last = points.at(-1)!;
+  const trend = last.valor > first.valor ? 'subió' : last.valor < first.valor ? 'bajó' : 'se mantuvo';
+  const showEnds = overlay && overlay.width >= END_LABELS_MIN_WIDTH;
+  const endText: Record<string, [string, string]> = {
+    valor: [`Valor ${compact(last.valor)}`, 'end-valor'],
+    ganancia: [`${last.ganancia >= 0 ? '+' : '−'}${compact(Math.abs(last.ganancia))} ganancia`, last.ganancia >= 0 ? 'end-pos' : 'end-neg'],
+    aportado: [`Aportado ${compact(last.aportado)}`, 'end-muted'],
   };
-  const [label] = labels[metric];
-  const summaryRows = metric === 'ganancia'
-    ? filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[])
-    : data;
-  const start = labels[metric][2](summaryRows[0]);
-  const end = labels[metric][2](summaryRows.at(-1)!);
-  const trend = end > start ? 'subió' : end < start ? 'bajó' : 'se mantuvo';
 
   return (
     <>
-      <canvas ref={canvas} role="img" aria-label={`Gráfico de ${label}`} aria-describedby="chart-hero-summary" />
+      <div className="hero-canvas">
+        <canvas ref={canvas} role="img" aria-label="Valor del fondo y total aportado" aria-describedby="chart-hero-summary" />
+        {overlay && (
+          <div className="hero-overlay" aria-hidden="true">
+            {showEnds && overlay.ends.map(end => (
+              <span key={end.kind} className={`end-label ${endText[end.kind][1]}`} style={{ left: overlay.right + 10, top: end.y }}>{endText[end.kind][0]}</span>
+            ))}
+            {overlay.chips.map(chip => (
+              <span
+                key={chip.ts}
+                className={`lane-chip ${chip.amount >= 0 ? 'pos' : 'neg'}`}
+                style={{ left: chip.x, top: overlay.bottom + 26 + chip.lane * 26 }}
+                title={`${chip.people.join(', ')} · ${chip.amount >= 0 ? '+' : '−'}${fmt0(Math.abs(chip.amount))} · ${formatTimestamp(chip.ts)}`}
+              >
+                <span className="lane-avatars">{chip.people.slice(0, 3).map(name => <span key={name} style={{ background: participanteColor(name) }}>{name.charAt(0).toUpperCase()}</span>)}</span>
+                {chip.amount >= 0 ? '+' : '−'}{compact(Math.abs(chip.amount))}
+                {chip.count > 1 && <small>×{chip.count}</small>}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      {!showEnds && (
+        <div className="hero-legend">
+          <span><i className="dot-valor" />{endText.valor[0]}</span>
+          <span className={endText.ganancia[1]}><i className="dot-ganancia" />{endText.ganancia[0]}</span>
+          <span><i className="dash" />{endText.aportado[0]}</span>
+        </div>
+      )}
       <p className="sr-only" id="chart-hero-summary" aria-live="polite">
-        {label} en {RANGE_LABELS[range]}. {trend} de {fmt(start)} a {fmt(end)}.
+        Valor del fondo en {RANGE_LABELS[range]}: {trend} de {fmt(first.valor)} a {fmt(last.valor)}. Aportado neto: {fmt(last.aportado)}.
       </p>
     </>
   );

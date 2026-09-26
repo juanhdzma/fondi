@@ -276,6 +276,19 @@ describe('historialGananciaFondo', () => {
 
     expect(historialGananciaFondo()[1].ganancia).toBeCloseTo(0, 10);
   });
+
+  it('expone lo aportado y la ganancia en COP de cada fecha', () => {
+    S.historial = [
+      { fecha: '2026-01-01', valor_total: 1000, precio_cuota: 1, cuotas_circ: 1000, trm: 4000 },
+      { fecha: '2026-02-01', valor_total: 1100, precio_cuota: 1.1, cuotas_circ: 1000, trm: 3800 },
+    ];
+    S.movimientos = [mov('Ana', 'aporte', 1000, 1000, '2026-01-01', { monto_cop: 4_000_000 })];
+
+    const [first, second] = historialGananciaFondo();
+    expect(first.aportado).toBe(1000);
+    expect(second.valor).toBe(1100);
+    expect(second.ganancia_cop).toBeCloseTo(1100 * 3800 - 4_000_000, 6);
+  });
 });
 
 describe('historialParaGrafica', () => {
