@@ -2,8 +2,8 @@ import type { Transition, Variants } from 'motion/react';
 
 export const springTransition: Transition = {
   type: 'spring',
-  stiffness: 150,
-  damping: 25,
+  stiffness: 170,
+  damping: 19,
 };
 
 export const quickTransition: Transition = {
@@ -11,11 +11,13 @@ export const quickTransition: Transition = {
   ease: [0.23, 1, 0.32, 1],
 };
 
+export const staggered = (index: number): Transition => ({ ...springTransition, delay: Math.min(index, 8) * 0.07 });
+
 export const surfaceMotion: Variants = {
   hidden: {
     opacity: 0,
     filter: 'blur(4px)',
-    transform: 'translateY(8px) scale(0.97)',
+    transform: 'translateY(18px) scale(0.98)',
   },
   visible: {
     opacity: 1,

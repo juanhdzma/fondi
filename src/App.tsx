@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { fetchAll } from './api/backend.js';
-import { S } from './state.js';
 import { Admin } from './components/Admin';
 import { Movements } from './components/Movements';
 import { Summary } from './components/Summary';
 import { quickTransition, springTransition, surfaceMotion } from './motion';
 import { nextTabIndex } from './utils/tabs';
+import { applyTheme, currentTheme, type Theme } from './theme';
 
 type Tab = 'resumen' | 'movimientos' | 'admin';
 
@@ -35,6 +35,7 @@ export function App() {
   const [error, setError] = useState('');
   const [trmCached, setTrmCached] = useState(false);
   const [toast, setToast] = useState('');
+  const [theme, setTheme] = useState<Theme>(currentTheme);
 
   const refresh = useCallback(async () => {
     const result = await fetchAll();
@@ -54,10 +55,10 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const trm = Number(S.trm || 0).toLocaleString('es-CO', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const chooseTheme = (next: Theme) => {
+    applyTheme(next);
+    setTheme(next);
+  };
 
   return (
     <>
@@ -89,7 +90,7 @@ export function App() {
                 }}
               >
                 {active && <motion.span className="nav-active" layoutId="active-navigation" transition={springTransition} />}
-                <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <svg className="nav-icon" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                   {item.icon}
                 </svg>
                 <span className="nav-label">{item.label}</span>
@@ -98,15 +99,13 @@ export function App() {
           })}
         </nav>
         <div className="header-right">
-          <div className="trm-status">
-            <div className="trm-badge">TRM {trmCached ? '~' : ''}${trm || '—'}</div>
-            <AnimatePresence initial={false}>
-              {trmCached && (
-                <motion.span key="trm-cache" className="trm-cache-warning" role="status" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-                  TRM cacheada
-                </motion.span>
-              )}
-            </AnimatePresence>
+          <div className="theme-toggle" role="group" aria-label="Tema">
+            <button type="button" aria-pressed={theme === 'light'} aria-label="Tema claro" onClick={() => chooseTheme('light')}>
+              <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+            </button>
+            <button type="button" aria-pressed={theme === 'dark'} aria-label="Tema oscuro" onClick={() => chooseTheme('dark')}>
+              <svg viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" /></svg>
+            </button>
           </div>
         </div>
       </header>
@@ -116,7 +115,7 @@ export function App() {
           <AnimatePresence initial={false}>
             {error && <motion.div key="load-error" className="error-banner" role="alert" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>Error cargando datos: {error}</motion.div>}
           </AnimatePresence>
-          <Summary loading={loading} />
+          <Summary loading={loading} trmCached={trmCached} />
         </motion.section>
         <motion.section id="tab-movimientos" className={`tab-content${tab === 'movimientos' ? ' active' : ''}`} role="tabpanel" aria-labelledby="nav-movimientos" hidden={tab !== 'movimientos'} variants={surfaceMotion} initial="hidden" animate={tab === 'movimientos' ? 'visible' : 'hidden'} transition={quickTransition}>
           <Movements loading={loading} />

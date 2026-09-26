@@ -3,10 +3,11 @@ import { AnimatePresence, motion } from 'motion/react';
 import { S } from '../state.js';
 import { calcParticipante, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
 import { quickTransition, springTransition, surfaceMotion } from '../motion';
-import { COP, fmt, fmtPct, signStr } from '../utils/format.js';
+import { COP, fmt, fmtN0, fmtPct, signStr } from '../utils/format.js';
 import { fmtDate, normDate } from '../utils/dates.js';
 import { ParticipantChart, RANGES } from './Charts';
 import { ParticipantPicker } from './ParticipantPicker';
+import { PageHeading } from './PageHeading';
 
 const monthFormatter = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
 
@@ -24,19 +25,19 @@ function ParticipantSummary({ name }: { name: string }) {
       <div className="p-summary-grid">
         <div>
           <div className="summary-label">Valor actual</div>
-          <div className="summary-value">{fmt(participant.valor_actual)}<span className="summary-unit">USD</span></div>
-          <div className="summary-sub">{COP(Math.round(participant.valor_cop))} COP</div>
+          <div className="summary-value">{fmt(participant.valor_actual)}</div>
+          <div className="summary-sub">{COP(Math.round(participant.valor_cop))}</div>
         </div>
         <div>
           <div className="summary-label">Ganancia</div>
-          <div className={`summary-value ${gainTone(participant.ganancia_monto)}`}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))}<span className="summary-unit">USD</span><span className={`gain-badge ${gainTone(participant.ganancia_pct) || 'zero'}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</span></div>
-          <div className={`summary-sub ${gainTone(participant.ganancia_cop)}`}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} COP<span className={`gain-badge ${gainTone(participant.ganancia_cop_pct) || 'zero'}`}>{signStr(participant.ganancia_cop_pct)}{fmtPct(Math.abs(participant.ganancia_cop_pct))}%</span></div>
+          <div className={`summary-value ${gainTone(participant.ganancia_monto)}`}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))}<span className={`gain-badge ${gainTone(participant.ganancia_pct) || 'zero'}`}>{signStr(participant.ganancia_pct)}{fmtPct(Math.abs(participant.ganancia_pct))}%</span></div>
+          <div className={`summary-sub ${gainTone(participant.ganancia_cop)}`}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))}<span className={`gain-badge ${gainTone(participant.ganancia_cop_pct) || 'zero'}`}>{signStr(participant.ganancia_cop_pct)}{fmtPct(Math.abs(participant.ganancia_cop_pct))}%</span></div>
         </div>
         <div>
           <div className="summary-label">Total aportado</div>
-          <div className="summary-value">{fmt(participant.aportes_monto)}<span className="summary-unit">USD</span></div>
-          {participant.has_cop && <div className="summary-sub">{COP(participant.cop_invertido)} COP · TRM prom {COP(participant.trm_avg_entrada)}</div>}
-          {participant.retiros_monto > 0 && <div className="summary-sub">{fmt(participant.retiros_monto)} USD retirados</div>}
+          <div className="summary-value">{fmt(participant.aportes_monto)}</div>
+          {participant.has_cop && <div className="summary-sub">{COP(participant.cop_invertido)} · TRM prom {fmtN0(participant.trm_avg_entrada)}</div>}
+          {participant.retiros_monto > 0 && <div className="summary-sub">{fmt(participant.retiros_monto)} retirados</div>}
         </div>
       </div>
     </div>
@@ -58,12 +59,11 @@ export function Movements({ loading }: { loading: boolean }) {
 
   return (
     <>
-      <div className="page-heading page-heading-actions">
-        <div><h1>Movimientos</h1><p>Aportes y retiros del fondo.</p></div>
+      <PageHeading title="Movimientos">
         <div className="table-filters">
           <ParticipantPicker names={names} value={selectedName} onChange={setSelected} inactiveNames={inactiveNames} ariaLabel="Filtrar por participante" />
         </div>
-      </div>
+      </PageHeading>
 
       <AnimatePresence initial={false}>
         {selectedName && (
@@ -103,11 +103,11 @@ export function Movements({ loading }: { loading: boolean }) {
               <li className="mov-card">
                 <div className="mov-who"><div className="mov-persona">{movement.persona}</div><div className="mov-fecha">{fmtDate(movement.fecha)}</div></div>
                 <div className="mov-figures">
-                  <div className="mov-monto"><span className={`badge badge-${movement.tipo}`}>{movement.tipo}</span>{fmt(movement.monto)} USD</div>
+                  <div className="mov-monto"><span className={`badge badge-${movement.tipo}`}>{movement.tipo}</span>{fmt(movement.monto)}</div>
                   <div className="mov-meta">
                     {movement.tipo === 'retiro'
                       ? `Retiró ${fmtPct(porcentajeRetiro(movement))}% de su saldo`
-                      : `${movement.monto_cop ? COP(movement.monto_cop) : '—'} COP · TRM ${movement.trm_dia ? COP(movement.trm_dia) : '—'}`}
+                      : `${movement.monto_cop ? COP(movement.monto_cop) : '—'} · TRM ${movement.trm_dia ? fmtN0(movement.trm_dia) : '—'}`}
                   </div>
                 </div>
               </li>

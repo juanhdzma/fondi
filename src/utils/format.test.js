@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { fmt0 } from './format.js';
+import { COP, compact, fmt, fmt0 } from './format.js';
 
-describe('fmt0', () => {
-  it('rounds USD values for compact display', () => {
-    expect(fmt0(22484.52)).toBe('$22.485');
+describe('money formatting', () => {
+  it('prefixes USD amounts with US$', () => {
+    expect(fmt0(22484.52)).toBe('US$ 22.485');
+    expect(fmt(1234.5)).toBe('US$ 1.234,50');
+  });
+
+  it('prefixes COP amounts with $', () => {
+    expect(COP(48230000)).toBe('$ 48.230.000');
+  });
+
+  it('abbreviates large axis values', () => {
+    expect(compact(12450)).toBe('12,5k');
+    expect(compact(950)).toBe('950');
   });
 });

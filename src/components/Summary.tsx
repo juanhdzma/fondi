@@ -6,6 +6,9 @@ import { calcParticipante, cuotasCirc, gananciaCop, latest, participantesTodos, 
 import { quickTransition, springTransition, surfaceMotion } from '../motion';
 import { COP, fmt0, fmtPct, signStr } from '../utils/format.js';
 import { HeroChart, periodPct, RANGE_LABELS, RANGES, rangeHistory } from './Charts';
+import { CountUp } from './CountUp';
+import { PageHeading } from './PageHeading';
+import { fmtN } from '../utils/format.js';
 
 const metrics = [
   ['ganancia', 'Ganancia'],
@@ -43,7 +46,7 @@ function LoadingParticipants() {
   ))}</>;
 }
 
-export function Summary({ loading }: { loading: boolean }) {
+export function Summary({ loading, trmCached }: { loading: boolean; trmCached: boolean }) {
   const [range, setRange] = useState('1M');
   const [metric, setMetric] = useState('ganancia');
   const [highlightedParticipant, setHighlightedParticipant] = useState('');
@@ -68,7 +71,7 @@ export function Summary({ loading }: { loading: boolean }) {
   const gain = current ? current.valor_total - contributed : 0;
   const { ganancia_pct: gainPercentage, ganancia_cop_pct: gainCopPercentage } = rendimientoPct(S.movimientos);
   const gainCop = current ? gananciaCop(S.movimientos, current.valor_total) : 0;
-  const signedCop = (value: number) => `${signStr(value)}${COP(Math.round(Math.abs(value)))} COP`;
+  const signedCop = (value: number) => `${signStr(value)}${COP(Math.round(Math.abs(value)))}`;
   const gainTone = (value: number) => value > 0 ? 'pos' : value < 0 ? 'neg' : '';
 
   useEffect(() => {
@@ -101,24 +104,19 @@ export function Summary({ loading }: { loading: boolean }) {
 
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <h1>Resumen</h1>
-          <p>Rendimiento y participación del fondo.</p>
-        </div>
-      </div>
+      <PageHeading title="Resumen" />
 
       <section className="chart-card summary-hero">
         <div className="summary-hero-toolbar">
           <div className="summary-period-metrics">
             <div className="period-metric">
               <div className="stat-label">Valor del fondo</div>
-              <div className="stat-value">{current ? `${fmt0(current.valor_total)} USD` : '—'}</div>
+              <div className="stat-value">{current ? <CountUp value={current.valor_total} format={fmt0} /> : '—'}</div>
               <Change value={fundChange} range={range} />
             </div>
             <div className="period-metric">
-              <div className="stat-label">Valor en COP</div>
-              <div className="stat-value">{current ? `${COP(Math.round(current.valor_total * (S.trm || 1)))} COP` : '—'}</div>
+              <div className="stat-label">Valor en COP {S.trm ? <span className={`trm-chip${trmCached ? ' cached' : ''}`} title={trmCached ? 'TRM cacheada: no se pudo consultar la de hoy' : 'TRM de hoy, Superfinanciera'}>TRM {trmCached ? '~' : ''}${fmtN(S.trm)}</span> : null}</div>
+              <div className="stat-value">{current ? <CountUp value={current.valor_total * (S.trm || 1)} format={value => COP(Math.round(value))} /> : '—'}</div>
               <Change value={fundCopChange} range={range} />
             </div>
           </div>
@@ -149,8 +147,8 @@ export function Summary({ loading }: { loading: boolean }) {
       <section className="current-totals" aria-label="Totales actuales">
         <h2>Totales actuales</h2>
         <div className="current-totals-grid">
-          <div><span>Aportado</span><b>{current ? `${fmt0(contributed)} USD` : '—'}</b></div>
-          <div><span>Ganancia USD</span><b className={gainTone(gain)}>{current ? `${signStr(gain)}${fmt0(Math.abs(gain))} USD (${signStr(gainPercentage)}${fmtPct(Math.abs(gainPercentage))}%)` : '—'}</b></div>
+          <div><span>Aportado</span><b>{current ? fmt0(contributed) : '—'}</b></div>
+          <div><span>Ganancia USD</span><b className={gainTone(gain)}>{current ? `${signStr(gain)}${fmt0(Math.abs(gain))} (${signStr(gainPercentage)}${fmtPct(Math.abs(gainPercentage))}%)` : '—'}</b></div>
           <div><span>Ganancia COP</span><b className={gainTone(gainCop)}>{current ? `${signedCop(gainCop)} (${signStr(gainCopPercentage)}${fmtPct(Math.abs(gainCopPercentage))}%)` : '—'}</b></div>
         </div>
       </section>
@@ -166,7 +164,7 @@ export function Summary({ loading }: { loading: boolean }) {
             <div className="ownership-summary">
               <div>
                 <strong>{highlighted ? highlighted.nombre : 'Participación del fondo'}</strong>
-                <span>{highlighted ? `${fmt0(highlighted.valor_actual)} USD · ${(Math.max(0, highlighted.cuotas) / totalShares * 100).toFixed(0)}%` : `${participants.length} visibles · ${visiblePercentage.toFixed(0)}% representado`}</span>
+                <span>{highlighted ? `${fmt0(highlighted.valor_actual)} · ${(Math.max(0, highlighted.cuotas) / totalShares * 100).toFixed(0)}%` : `${participants.length} visibles · ${visiblePercentage.toFixed(0)}% representado`}</span>
               </div>
               {hiddenPercentage > 0.5 && <b>{hiddenPercentage.toFixed(0)}% oculto</b>}
             </div>
@@ -201,7 +199,7 @@ export function Summary({ loading }: { loading: boolean }) {
               animate="visible"
               transition={{ ...springTransition, delay: Math.min(index, 5) * 0.04 }}
               layout
-              aria-label={`Resaltar a ${participant.nombre}, ${percentage.toFixed(0)}% del fondo, ${fmt0(participant.valor_actual)} USD, rendimiento ${signStr(participant.ganancia_pct)}${fmtPct(Math.abs(participant.ganancia_pct))}% en USD y ${signStr(participant.ganancia_cop_pct)}${fmtPct(Math.abs(participant.ganancia_cop_pct))}% en COP`}
+              aria-label={`Resaltar a ${participant.nombre}, ${percentage.toFixed(0)}% del fondo, ${fmt0(participant.valor_actual)}, rendimiento ${signStr(participant.ganancia_pct)}${fmtPct(Math.abs(participant.ganancia_pct))}% en USD y ${signStr(participant.ganancia_cop_pct)}${fmtPct(Math.abs(participant.ganancia_cop_pct))}% en COP`}
               aria-pressed={highlightedParticipant === participant.nombre}
               {...participantInteraction(participant.nombre)}
             >
@@ -216,9 +214,9 @@ export function Summary({ loading }: { loading: boolean }) {
                 </div>
               </div>
               <div className="p-figures">
-                <div className="p-monto">{fmt0(participant.valor_actual)}<span className="p-unit">USD</span></div>
+                <div className="p-monto">{fmt0(participant.valor_actual)}</div>
                 <Delta value={participant.ganancia_pct} lead />
-                <div className="p-cop">{COP(Math.round(participant.valor_cop))}<span className="p-unit">COP</span></div>
+                <div className="p-cop">{COP(Math.round(participant.valor_cop))}</div>
                 <Delta value={participant.ganancia_cop_pct} />
               </div>
             </motion.button>

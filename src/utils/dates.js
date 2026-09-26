@@ -41,3 +41,28 @@ export function fmtDateShort(s) {
   if (isNaN(d)) return '—';
   return `${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`;
 }
+
+const LONG_DATE = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+
+export function greeting(now = new Date()) {
+  const hour = now.getHours();
+  const hello = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
+  return `${hello} · ${LONG_DATE.format(now)}`;
+}
+
+export function daysSince(fecha, now = new Date()) {
+  const iso = normDate(fecha);
+  const then = new Date(iso.includes('T') ? iso : `${iso}T12:00`);
+  if (isNaN(then)) return null;
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  return Math.round((start - day) / 86400000);
+}
+
+export function freshness(fecha, now = new Date()) {
+  const days = daysSince(fecha, now);
+  if (days === null) return '';
+  const ago = days <= 0 ? 'hoy' : days === 1 ? 'ayer' : `hace ${days} días`;
+  const time = normDate(fecha).split('T')[1];
+  return `Actualizado ${ago} · última valuación ${fmtDateShort(fecha)}${time ? `, ${time.slice(0, 5)}` : ''}`;
+}

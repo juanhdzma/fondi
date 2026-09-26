@@ -2,7 +2,7 @@
 // ambos quedan en el mismo container/origen, así que las requests van relativas.
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
-export const PARTICIPANT_COLORS = ['#12324A', '#1F6572', '#8A611C', '#684D78', '#914B42', '#3E5F8A', '#5F6F3A'];
+export const PARTICIPANT_COLORS = ['#7FA7D6', '#8FCAA6', '#EAB676', '#C79BD0', '#EC8F86', '#A9BB7B', '#9ECFD4'];
 
 // ── Mock data — cambiar a false cuando el backend esté listo ─
 export const MOCK_MODE = false;

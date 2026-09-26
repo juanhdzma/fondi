@@ -185,7 +185,7 @@ export function Admin({ onRefresh, onToast }: Props) {
     const shares = calcularCuotas({ tipo: type, monto: amountUsd, valorFondo: totalAfter, cuotasActuales: cuotasCirc() });
     const available = selectedPerson ? calcParticipante(selectedPerson).cuotas : 0;
     if (excedeSaldo({ cuotas: shares.cuotas, cuotasDisponibles: available })) {
-      return status('movement', `${selectedPerson} solo tiene ${fmt(available * shares.precioAntes)} USD disponibles`, 'err');
+      return status('movement', `${selectedPerson} solo tiene ${fmt(available * shares.precioAntes)} disponibles`, 'err');
     }
 
     await run('movement', async () => {
@@ -327,7 +327,7 @@ export function Admin({ onRefresh, onToast }: Props) {
     ? conversionMode === 'trm' ? 'Ingresá la tasa real de esta compra; puede diferir de la TRM de hoy.' : 'Ingresá lo pagado en COP y calculamos la TRM aplicada.'
     : !exchange.exchangeRate
       ? conversionMode === 'trm' ? 'Ingresá la TRM aplicada al aporte.' : 'Ingresá el monto pagado en COP.'
-      : `${conversionMode === 'trm' ? `Equivale a ${COP(exchange.amountCOP)} COP` : `TRM aplicada: ${fmt(exchange.exchangeRate)}`}${S.trm ? ` · Hoy: ${fmt(S.trm)}` : ''}${deviation > 0.15 ? ` · Confirmá: ${Math.round(deviation * 100)}% ${exchange.exchangeRate > (S.trm || 0) ? 'por encima' : 'por debajo'}; se guardará esta tasa.` : ''}`;
+      : `${conversionMode === 'trm' ? `Equivale a ${COP(exchange.amountCOP)}` : `TRM aplicada: ${fmtN(exchange.exchangeRate)}`}${S.trm ? ` · Hoy: ${fmtN(S.trm)}` : ''}${deviation > 0.15 ? ` · Confirmá: ${Math.round(deviation * 100)}% ${exchange.exchangeRate > (S.trm || 0) ? 'por encima' : 'por debajo'}; se guardará esta tasa.` : ''}`;
   const movementHint = sharePreview
     ? `Nueva cuota → $${sharePreview.precioDespues.toFixed(2)} (${sharePreview.precioDespues >= currentQuota ? '+' : ''}${((sharePreview.precioDespues - currentQuota) / currentQuota * 100).toFixed(2)}%)`
     : '';
@@ -360,7 +360,7 @@ export function Admin({ onRefresh, onToast }: Props) {
             <div className="form-group">
               <div className="form-label" id="lbl-persona">Participante</div>
               <ParticipantPicker names={operationParticipants} value={selectedPerson} onChange={setPerson} includeAll={false} labelledBy="lbl-persona" />
-              <div className="form-hint">{selectedPerson ? `Saldo actual: ${fmt(participantBalance)} USD` : 'No hay participantes visibles activos.'}</div>
+              <div className="form-hint">{selectedPerson ? `Saldo actual: ${fmt(participantBalance)}` : 'No hay participantes visibles activos.'}</div>
             </div>
             <div className="form-group">
               <div className="form-label" id="lbl-tipo">Tipo</div>

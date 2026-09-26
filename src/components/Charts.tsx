@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Chart } from 'chart.js/auto';
 import { historialGananciaFondo, historialParaGrafica, historialParticipante, participanteColor } from '../computed.js';
-import { fmt } from '../utils/format.js';
+import { compact, fmt } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
+import { cssVar, useTheme, withAlpha } from '../theme';
 
 export const RANGES = [
   ['1W', '1 semana', '1S'],
@@ -134,24 +135,24 @@ function xAxis(ticks: number[]) {
 
 function gradient(chart: any, color: string) {
   const { ctx, chartArea } = chart;
-  if (!chartArea) return `${color}22`;
+  if (!chartArea) return 'transparent';
   const fill = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-  fill.addColorStop(0, `${color}44`);
-  fill.addColorStop(1, `${color}00`);
+  fill.addColorStop(0, withAlpha(color, 0.3));
+  fill.addColorStop(1, withAlpha(color, 0));
   return fill;
 }
 
-const tooltip = {
-  backgroundColor: '#FFFFFF',
-  borderColor: '#E7E7EA',
+const tooltip = () => ({
+  backgroundColor: cssVar('--menu'),
+  borderColor: cssVar('--line'),
   borderWidth: 1,
-  bodyColor: '#0C0D0F',
-  footerColor: '#9AA0A6',
+  bodyColor: cssVar('--text'),
+  footerColor: cssVar('--muted'),
   padding: 12,
   bodyFont: { size: 15, weight: '700' as const },
   footerFont: { size: 11, weight: '600' as const },
   footerMarginTop: 4,
-};
+});
 
 const tappedTooltips = new WeakMap<Chart, string>();
 
@@ -216,7 +217,7 @@ export function splitAtZero(points: Point[]) {
 const gainColor = (context: any) => {
   const end = context.p1.parsed.y;
   const value = end !== 0 ? end : context.p0.parsed.y;
-  return value >= 0 ? '#17803D' : '#B4231F';
+  return cssVar(value >= 0 ? '--pos' : '--neg');
 };
 
 function gainDataset(rawPoints: Point[]) {
@@ -227,12 +228,12 @@ function gainDataset(rawPoints: Point[]) {
     fill: true,
     segment: {
       borderColor: gainColor,
-      backgroundColor: (context: any) => `${gainColor(context)}22`,
+      backgroundColor: (context: any) => withAlpha(gainColor(context), 0.14),
     },
     pointRadius: (context: any) => context.raw?.interpolated ? 0 : radius,
     pointHoverRadius: (context: any) => context.raw?.interpolated ? 0 : radius + 2,
-    pointBackgroundColor: (context: any) => (context.raw?.y ?? 0) >= 0 ? '#17803D' : '#B4231F',
-    pointHoverBackgroundColor: (context: any) => (context.raw?.y ?? 0) >= 0 ? '#17803D' : '#B4231F',
+    pointBackgroundColor: (context: any) => cssVar((context.raw?.y ?? 0) >= 0 ? '--pos' : '--neg'),
+    pointHoverBackgroundColor: (context: any) => cssVar((context.raw?.y ?? 0) >= 0 ? '--pos' : '--neg'),
     tension: 0,
   };
 }
@@ -253,10 +254,10 @@ function standardOptions(ticks: number[]) {
     plugins: {
       legend: { display: false },
       tooltip: {
-        ...tooltip,
+        ...tooltip(),
         callbacks: {
           title: () => '',
-          label: (context: any) => ` ${fmt(context.parsed.y)} USD`,
+          label: (context: any) => ` ${fmt(context.parsed.y)}`,
           footer: (items: any[]) => items.length ? formatTimestamp(items[0].parsed.x) : '',
         },
       },
@@ -265,8 +266,8 @@ function standardOptions(ticks: number[]) {
       x: xAxis(ticks),
       y: {
         position: 'right' as const,
-        ticks: { color: '#6E6F76', font: { size: 13 }, callback: (value: any) => fmt(value) },
-        grid: { color: '#E7E7EA' },
+        ticks: { color: cssVar('--muted'), font: { size: 12 }, callback: (value: any) => compact(value) },
+        grid: { color: cssVar('--line') },
         border: { display: false },
       },
     },
@@ -275,6 +276,7 @@ function standardOptions(ticks: number[]) {
 
 export function HeroChart({ range, metric }: { range: string; metric: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const theme = useTheme();
   const data = rangeHistory(range);
 
   useEffect(() => {
@@ -291,7 +293,7 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
 
     const config = metric === 'ganancia'
       ? { datasets: [gainDataset(gainPoints)], options: standardOptions(ticks) }
-      : { datasets: [dataset(totalPoints, '#0C243B')], options: standardOptions(ticks) };
+      : { datasets: [dataset(totalPoints, cssVar('--accent'))], options: standardOptions(ticks) };
 
     const chart = new Chart(canvas.current, { type: 'line', data: { datasets: config.datasets as any }, options: config.options as any });
     const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
@@ -299,7 +301,7 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
       stopOutsideDismiss();
       chart.destroy();
     };
-  }, [data, metric, range]);
+  }, [data, metric, range, theme]);
 
   if (!data.length) return <div className="empty"><div className="empty-title">Sin historial</div><p className="empty-text">El gráfico aparecerá después de la primera valuación.</p></div>;
 
@@ -307,7 +309,7 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
     ganancia: ['Ganancia acumulada', 'USD', row => row.ganancia],
     total: ['Valor total', 'USD', row => row.valor_total],
   };
-  const [label, unit] = labels[metric];
+  const [label] = labels[metric];
   const summaryRows = metric === 'ganancia'
     ? filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[])
     : data;
@@ -319,7 +321,7 @@ export function HeroChart({ range, metric }: { range: string; metric: string }) 
     <>
       <canvas ref={canvas} role="img" aria-label={`Gráfico de ${label}`} aria-describedby="chart-hero-summary" />
       <p className="sr-only" id="chart-hero-summary" aria-live="polite">
-        {label} en {RANGE_LABELS[range]}. {trend} de {fmt(start)} {unit} a {fmt(end)} {unit}.
+        {label} en {RANGE_LABELS[range]}. {trend} de {fmt(start)} a {fmt(end)}.
       </p>
     </>
   );
@@ -341,7 +343,7 @@ function personaTooltip({ chart, tooltip: model }: any) {
     const line = document.createElement('div');
     const label = document.createElement('b');
     label.textContent = point.dataset.label;
-    line.append(label, `: ${fmt(point.parsed.y)} USD`);
+    line.append(label, `: ${fmt(point.parsed.y)}`);
     element.appendChild(line);
   }
   const date = document.createElement('div');
@@ -356,6 +358,7 @@ function personaTooltip({ chart, tooltip: model }: any) {
 
 export function ParticipantChart({ name, range }: { name: string; range: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const theme = useTheme();
   const rows = filteredWithFill(range, historialParticipante(name) as Row[]);
 
   useEffect(() => {
@@ -372,7 +375,7 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
     options.plugins.legend = {
       display: true,
       position: 'bottom',
-      labels: { color: '#6E6F76', font: { size: 14 }, padding: 14, usePointStyle: true },
+      labels: { color: cssVar('--muted'), font: { size: 13 }, padding: 14, usePointStyle: true },
     };
     options.plugins.tooltip = { enabled: false, external: personaTooltip };
     const chart = new Chart(canvas.current, {
@@ -380,7 +383,7 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
       data: {
         datasets: [
           { ...dataset(current, participanteColor(name)), label: 'Valor actual', fill: false },
-          { ...dataset(invested, '#8A8F98'), label: 'Invertido', fill: false, borderDash: [5, 5] },
+          { ...dataset(invested, cssVar('--muted')), label: 'Invertido', fill: false, borderDash: [5, 5] },
         ] as any,
       },
       options,
@@ -391,7 +394,7 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
       chart.destroy();
       document.getElementById('persona-tooltip')?.remove();
     };
-  }, [name, range, rows]);
+  }, [name, range, rows, theme]);
 
   if (!rows.length) return <div className="empty"><div className="empty-title">Sin historial</div></div>;
   const first = rows[0];
@@ -402,7 +405,7 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
     <>
       <canvas ref={canvas} role="img" aria-label={`Evolución de ${name}`} aria-describedby="chart-persona-summary" />
       <p className="sr-only" id="chart-persona-summary" aria-live="polite">
-        La inversión de {name} en {RANGE_LABELS[range]} {trend} de {fmt(first.valor)} USD a {fmt(last.valor)} USD.
+        La inversión de {name} en {RANGE_LABELS[range]} {trend} de {fmt(first.valor)} a {fmt(last.valor)}.
       </p>
     </>
   );
