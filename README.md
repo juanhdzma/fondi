@@ -31,7 +31,7 @@ Modeled like a real mutual fund: every contribution/withdrawal buys "shares" at 
 
 ### Resumen
 
-Fund value in USD and COP on one line, over a chart of the fund's value against what's been contributed, labeled at the end of each line, with every contribution and withdrawal marked on the line. Hovering the chart updates the figures above it; each period button shows that period's return by share price. Next to it: totals with sparklines, a treemap of who owns what and a card per participant with their value, return in USD and COP and their own sparkline. Dark by default, with a light theme toggle.
+Fund value in USD and COP on one line, over a chart of the fund's value against what's been contributed, labeled at the end of each line, with every contribution and withdrawal marked on the line. Hovering the chart updates the figures above it; each period button shows that period's return by share price. Next to it: totals with sparklines, a donut of who owns what and a card per participant with their value, return in USD and COP and their own sparkline. Dark by default, with a light theme toggle.
 
 ![Resumen](docs/screenshots/desktop-resumen.png)
 

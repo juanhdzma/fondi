@@ -104,7 +104,7 @@ export function Movements({ loading }: { loading: boolean }) {
       </div>
 
       <AnimatePresence initial={false}>
-        {selectedName && <PersonPanel key={selectedName} name={selectedName} range={range} setRange={setRange} />}
+        {selectedName && <PersonPanel key="person-panel" name={selectedName} range={range} setRange={setRange} />}
       </AnimatePresence>
 
       <div className="mov-filters">

@@ -309,6 +309,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
   const theme = useTheme();
   const reduced = useReducedMotion();
   const [overlay, setOverlay] = useState<Overlay | null>(null);
+  const [activeMarker, setActiveMarker] = useState<number | null>(null);
   const points = useMemo(() => heroSeries(range), [range, S.historial, S.movimientos]);
   const hoverRef = useRef(onHover);
   hoverRef.current = onHover;
@@ -447,6 +448,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
   const last = points.at(-1)!;
   const trend = last.valor > first.valor ? 'subió' : last.valor < first.valor ? 'bajó' : 'se mantuvo';
   const showEnds = overlay && overlay.width >= END_LABELS_MIN_WIDTH;
+  const tipMarker = overlay?.markers.find(marker => marker.ts === activeMarker);
   const endText: Record<string, [string, string]> = {
     valor: [`Valor ${compact(last.valor)}`, 'end-valor'],
     ganancia: [`${last.ganancia >= 0 ? '+' : '−'}${compact(Math.abs(last.ganancia))} ganancia`, last.ganancia >= 0 ? 'end-pos' : 'end-neg'],
@@ -467,9 +469,16 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
                 key={marker.ts}
                 className={`event-mark ${marker.amount >= 0 ? 'pos' : 'neg'}`}
                 style={{ left: marker.x, top: marker.y }}
-                title={`${marker.count > 1 ? `${marker.count} movimientos · neto` : marker.amount >= 0 ? 'Aporte' : 'Retiro'} ${marker.amount >= 0 ? '+' : '−'}${fmt0(Math.abs(marker.amount))} · ${formatTimestamp(marker.ts)}`}
+                onPointerEnter={() => setActiveMarker(marker.ts)}
+                onPointerLeave={() => setActiveMarker(null)}
+                onClick={() => setActiveMarker(current => current === marker.ts ? null : marker.ts)}
               />
             ))}
+            {tipMarker && (
+              <span className="event-tip" style={{ left: tipMarker.x, top: tipMarker.y }}>
+                {`${tipMarker.count > 1 ? `${tipMarker.count} movimientos · neto` : tipMarker.amount >= 0 ? 'Aporte' : 'Retiro'} ${tipMarker.amount >= 0 ? '+' : '−'}${fmt0(Math.abs(tipMarker.amount))} · ${formatTimestamp(tipMarker.ts)}`}
+              </span>
+            )}
           </div>
         )}
       </div>

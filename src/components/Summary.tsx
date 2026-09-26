@@ -1,11 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { S } from '../state.js';
 import { calcParticipante, cuotasCirc, gananciaCop, historialGananciaFondo, historialParticipante, latest, participanteColor, participantesActivos, participantesTodos, participantesVisiblesActivos, rendimientoPct } from '../computed.js';
 import { springTransition, staggered, surfaceMotion } from '../motion';
 import { COP, fmt0, fmtN, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort } from '../utils/dates.js';
-import { treemapLayout } from '../utils/treemap.js';
 import { cssVar, useTheme } from '../theme';
 import { HeroChart, heroSeries, periodPct, RANGE_LABELS, RANGES, type HeroPoint } from './Charts';
 import { CountUp } from './CountUp';
@@ -16,6 +15,24 @@ import { SetupSteps } from './States';
 
 type Participant = ReturnType<typeof calcParticipante>;
 
+const DONUT_RADIUS = 15.915;
+const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
+const DONUT_GAP = 0.8;
+const DONUT_MIN_ARC = 0.6;
+
+export function donutArcs<T extends { weight: number }>(slices: T[]) {
+  const total = slices.reduce((sum, slice) => sum + slice.weight, 0);
+  if (!total) return [];
+  const gap = slices.length > 1 ? DONUT_GAP : 0;
+  let offset = 0;
+  return slices.map(slice => {
+    const span = slice.weight / total * DONUT_CIRCUMFERENCE;
+    const arc = { ...slice, offset: offset + gap / 2, length: Math.max(DONUT_MIN_ARC, span - gap) };
+    offset += span;
+    return arc;
+  });
+}
+
 const SHARE_TOLERANCE = 1e-6;
 
 function TrmChip({ cached }: { cached: boolean }) {
@@ -25,18 +42,6 @@ function TrmChip({ cached }: { cached: boolean }) {
       TRM {cached ? '~' : ''}${fmtN(S.trm)}
     </span>
   );
-}
-
-function useElementSize<T extends HTMLElement>() {
-  const [node, setNode] = useState<T | null>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  useLayoutEffect(() => {
-    if (!node) return;
-    const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height }));
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [node]);
-  return [setNode, size] as const;
 }
 
 function SummarySkeleton() {
@@ -71,10 +76,9 @@ function SummarySkeleton() {
 
 export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; trmCached: boolean; onGoAdmin: () => void }) {
   const theme = useTheme();
-  const [range, setRange] = useState('3M');
+  const [range, setRange] = useState('1M');
   const [hover, setHover] = useState<HeroPoint | null>(null);
   const [highlightedParticipant, setHighlightedParticipant] = useState('');
-  const [treemapRef, treemapSize] = useElementSize<HTMLDivElement>();
   const current = latest();
 
   const points = useMemo(() => heroSeries(range), [range, S.historial, S.movimientos]);
@@ -98,7 +102,6 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
     .filter(participant => participant.cuotas > SHARE_TOLERANCE)
     .sort((a, b) => b.cuotas - a.cuotas);
   const activeNames = new Set(participantesVisiblesActivos());
-  const historicalCount = participants.filter(participant => !activeNames.has(participant.nombre)).length;
   const share = (participant: Participant) => totalShares > 0 ? Math.max(0, participant.cuotas) / totalShares * 100 : 0;
   const visiblePercentage = participants.reduce((total, participant) => total + share(participant), 0);
   const hiddenPercentage = Math.max(0, 100 - visiblePercentage);
@@ -110,14 +113,11 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
 
   const colors = useMemo(() => ({ pos: cssVar('--pos'), neg: cssVar('--neg'), muted: cssVar('--muted') }), [theme]);
 
-  type Cell = { item: { weight: number; participant: Participant | null }; x: number; y: number; w: number; h: number };
-  const cells: Cell[] = treemapLayout(
-    [
-      ...participants.filter(participant => share(participant) > 0).map(participant => ({ weight: share(participant), participant })),
-      ...(hiddenPercentage > 0.5 ? [{ weight: hiddenPercentage, participant: null }] : []),
-    ],
-    treemapSize.height ? treemapSize.width / treemapSize.height : 2,
-  );
+  const slices = [
+    ...participants.map(participant => ({ key: participant.nombre, weight: share(participant), color: participanteColor(participant.nombre) })),
+    ...(hiddenPercentage > 0.5 ? [{ key: '', weight: hiddenPercentage, color: 'var(--surface-2)' }] : []),
+  ];
+  const highlighted = participants.find(participant => participant.nombre === highlightedParticipant);
 
   useEffect(() => {
     const clearHighlight = (event: PointerEvent) => {
@@ -224,31 +224,33 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
         <motion.section className="participants-card" aria-labelledby="participants-title" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(2)}>
           <div className="section-head">
             <h2 id="participants-title">Participantes</h2>
-            <span className="section-count">{`${activeNames.size} activos${historicalCount ? ` · ${historicalCount} históricos` : ''}`}</span>
+            <span className="section-count">{`${participants.length} activos`}</span>
           </div>
           {!participants.length ? (
             <div className="empty"><div className="empty-title">Sin participantes visibles</div><div className="empty-text">Puedes volver a mostrarlos desde el panel Admin.</div></div>
           ) : (
             <>
-              <div className="treemap" ref={treemapRef} role="group" aria-label="Distribución de la participación">
-                {cells.map(({ item, x, y, w, h }) => {
-                  const style = { left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` };
-                  if (!item.participant) return <span key="hidden" className="treemap-cell treemap-hidden" style={style}><b>Oculto</b></span>;
-                  const participant = item.participant;
-                  return (
-                    <button
-                      key={participant.nombre}
-                      type="button"
-                      className={`treemap-cell${dim(participant.nombre)}`}
-                      style={{ ...style, background: participanteColor(participant.nombre) }}
-                      aria-label={`${participant.nombre}, ${share(participant).toFixed(0)}% del fondo, ${fmt0(participant.valor_actual)}`}
-                      aria-pressed={highlightedParticipant === participant.nombre}
-                      {...participantInteraction(participant.nombre)}
-                    >
-                      <b>{participant.nombre}</b>
-                    </button>
-                  );
-                })}
+              <div className="donut" role="img" aria-label={`Distribución de la participación: ${participants.map(participant => `${participant.nombre} ${share(participant).toFixed(0)}%`).join(', ')}`}>
+                <svg viewBox="0 0 42 42" aria-hidden="true">
+                  {donutArcs(slices).map(arc => (
+                    <circle
+                      key={arc.key || 'hidden'}
+                      className={`donut-arc${arc.key ? dim(arc.key) : ''}`}
+                      cx="21" cy="21" r={DONUT_RADIUS}
+                      stroke={arc.color}
+                      strokeDasharray={`${arc.length} ${DONUT_CIRCUMFERENCE - arc.length}`}
+                      strokeDashoffset={DONUT_CIRCUMFERENCE / 4 - arc.offset}
+                      data-participant-highlight={arc.key ? true : undefined}
+                      onPointerEnter={event => { if (arc.key && event.pointerType === 'mouse') setHighlightedParticipant(arc.key); }}
+                      onPointerLeave={event => { if (event.pointerType === 'mouse') setHighlightedParticipant(''); }}
+                      onPointerUp={event => { if (arc.key && event.pointerType !== 'mouse') setHighlightedParticipant(currentName => currentName === arc.key ? '' : arc.key); }}
+                    />
+                  ))}
+                </svg>
+                <span className="donut-center">
+                  <b>{highlighted ? `${share(highlighted).toFixed(0)}%` : participants.length}</b>
+                  <small>{highlighted ? highlighted.nombre : participants.length === 1 ? 'participante' : 'participantes'}</small>
+                </span>
               </div>
               <div className="p-cards">
                 {participants.map((participant, index) => (

@@ -43,7 +43,7 @@ state.ts          Typed in-memory API snapshot plus the two chart range selectio
 computed.js       latest(), precioCuota(), cuotasCirc(), calcParticipante(), participantesActivos(), participantesTodos(), historialParticipante(), historialGananciaFondo()
 api/backend.js    fetchAll/postMovimiento/postFondo/postParticipante/exportUrl/postImportXlsx/fetchTRM — all I/O against the FastAPI backend
 domain/cuotas.js  calcularCuotas() + excedeSaldo() + participacion() — pure share math
-utils/            dates.js (todayLocal(), greeting(), freshness()), format.js, money-input.js, movements.js (filterMovements/groupByMonth), treemap.js
+utils/            dates.js (todayLocal(), greeting(), freshness()), format.js, money-input.js, movements.js (filterMovements/groupByMonth)
 ```
 
 `state.ts` (`S`) is the API snapshot in memory — if the browser hasn't completed a recent `fetchAll()`, everything derived from `computed.js` is stale. React owns only UI state such as forms, tabs and selected chart ranges.
@@ -168,6 +168,6 @@ The movement form is a three-step flow (Quién → Montos → Confirmar) over th
 - **Participant names are rendered as JSX text**, so React escapes them. Do not reintroduce `dangerouslySetInnerHTML` for names or backend error messages.
 - **The Admin panel warns when the two share-count sources disagree**: `Admin.tsx` compares `cuotasCirc()` against `historial_fondo.cuotas_circ` from the latest valuation. They only drift via an import whose `historial` is complete but whose `movimientos` aren't; the warning stays hidden while the difference is ≤ 0.01.
 - **Two independent range selectors keep separate React state**: Summary owns the hero range (`.range-pill`) and Movements owns the participant range (`.range-btn`).
-- **Resumen hides participants with zero shares** (treemap and cards): someone who withdrew everything keeps their history in Movimientos but no longer shows as a US$ 0 card. The treemap shows names only; figures live in the cards below it.
+- **Resumen hides participants with zero shares** (donut and cards): someone who withdrew everything keeps their history in Movimientos but no longer shows as a US$ 0 card. The "N activos" count is participants with shares, not the `participantes_config` log. The donut is an SVG built by `donutArcs()` (`Summary.tsx`), with a minimum arc so a small share stays visible; hovering a slice or card shows that person's % in the center.
 - **In Movimientos, the search/type/period filters sit below the participant panel**, so selecting someone shows their panel first. The period picker is `SelectMenu`, the same popover pattern as `ParticipantPicker`.
 - **Load errors**: with no data loaded, `LoadError` (`src/components/States.tsx`) replaces Resumen and Movimientos with a retry card; if a refresh fails after data was already loaded, it shows a small note above the stale data instead. An empty fund shows `SetupSteps` instead of an empty dashboard.
