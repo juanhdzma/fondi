@@ -16,6 +16,8 @@ import { SetupSteps } from './States';
 
 type Participant = ReturnType<typeof calcParticipante>;
 
+const SHARE_TOLERANCE = 1e-6;
+
 function TrmChip({ cached }: { cached: boolean }) {
   if (!S.trm) return null;
   return (
@@ -93,6 +95,7 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
   const totalShares = cuotasCirc();
   const participants = participantesTodos()
     .map(name => calcParticipante(name))
+    .filter(participant => participant.cuotas > SHARE_TOLERANCE)
     .sort((a, b) => b.cuotas - a.cuotas);
   const activeNames = new Set(participantesVisiblesActivos());
   const historicalCount = participants.filter(participant => !activeNames.has(participant.nombre)).length;
@@ -230,7 +233,7 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
               <div className="treemap" ref={treemapRef} role="group" aria-label="Distribución de la participación">
                 {cells.map(({ item, x, y, w, h }) => {
                   const style = { left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` };
-                  if (!item.participant) return <span key="hidden" className="treemap-cell treemap-hidden" style={style}><b>Oculto · {item.weight.toFixed(0)}%</b></span>;
+                  if (!item.participant) return <span key="hidden" className="treemap-cell treemap-hidden" style={style}><b>Oculto</b></span>;
                   const participant = item.participant;
                   return (
                     <button
@@ -242,11 +245,7 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
                       aria-pressed={highlightedParticipant === participant.nombre}
                       {...participantInteraction(participant.nombre)}
                     >
-                      <b>{participant.nombre} · {share(participant).toFixed(0)}%</b>
-                      <span className="treemap-figures">
-                        <span>{fmt0(participant.valor_actual)} <Delta value={participant.ganancia_pct} /></span>
-                        <span>{COP(Math.round(participant.valor_cop))} <Delta value={participant.ganancia_cop_pct} /></span>
-                      </span>
+                      <b>{participant.nombre}</b>
                     </button>
                   );
                 })}
