@@ -9,6 +9,7 @@ import { filterMovements, groupByMonth, PERIODS } from '../utils/movements.js';
 import { ParticipantChart, RANGES } from './Charts';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
+import { SelectMenu } from './SelectMenu';
 
 const monthFormatter = new Intl.DateTimeFormat('es-CO', { month: 'short' });
 
@@ -102,6 +103,10 @@ export function Movements({ loading }: { loading: boolean }) {
         ))}
       </div>
 
+      <AnimatePresence initial={false}>
+        {selectedName && <PersonPanel key={selectedName} name={selectedName} range={range} setRange={setRange} />}
+      </AnimatePresence>
+
       <div className="mov-filters">
         <label className="mov-search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
@@ -116,17 +121,8 @@ export function Movements({ loading }: { loading: boolean }) {
             </button>
           ))}
         </div>
-        <label className="mov-period">
-          <span className="sr-only">Período</span>
-          <select className="input-base" value={period} onChange={event => setPeriod(event.target.value)}>
-            {PERIODS.map(([value, label]) => <option key={String(value)} value={String(value)}>{label}</option>)}
-          </select>
-        </label>
+        <SelectMenu ariaLabel="Período" value={period} onChange={setPeriod} options={PERIODS.map(([value, label]) => ({ value: String(value), label: String(label) }))} />
       </div>
-
-      <AnimatePresence initial={false}>
-        {selectedName && <PersonPanel key={selectedName} name={selectedName} range={range} setRange={setRange} />}
-      </AnimatePresence>
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.section key={`${selectedName}-${type}-${period}-${loading ? 'loading' : 'ready'}`} className="card mov-timeline" aria-label="Movimientos" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>

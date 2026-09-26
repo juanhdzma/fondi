@@ -37,7 +37,7 @@ To test changes without hitting the real backend, set `MOCK_MODE = true` in `src
 main.tsx          React entry point + Motion reduced-motion policy + Geist font import
 App.tsx           Fetch lifecycle, icon rail navigation, theme toggle, load-error state
 theme.ts          Dark/light theme (applyTheme, useTheme), cssVar() and withAlpha() for Chart.js colors
-components/       Summary.tsx, Movements.tsx, Admin.tsx, Charts.tsx + PageHeading, States, Delta, Sparkline, CountUp, ParticipantPicker
+components/       Summary.tsx, Movements.tsx, Admin.tsx, Charts.tsx + PageHeading, States, Delta, Sparkline, CountUp, ParticipantPicker, SelectMenu
 config.js         Deployment constants: API_BASE_URL, PARTICIPANT_COLORS (pastel), MOCK_MODE/MOCK_*
 state.ts          Typed in-memory API snapshot plus the two chart range selections
 computed.js       latest(), precioCuota(), cuotasCirc(), calcParticipante(), participantesActivos(), participantesTodos(), historialParticipante(), historialGananciaFondo()
@@ -168,4 +168,6 @@ The movement form is a three-step flow (Quién → Montos → Confirmar) over th
 - **Participant names are rendered as JSX text**, so React escapes them. Do not reintroduce `dangerouslySetInnerHTML` for names or backend error messages.
 - **The Admin panel warns when the two share-count sources disagree**: `Admin.tsx` compares `cuotasCirc()` against `historial_fondo.cuotas_circ` from the latest valuation. They only drift via an import whose `historial` is complete but whose `movimientos` aren't; the warning stays hidden while the difference is ≤ 0.01.
 - **Two independent range selectors keep separate React state**: Summary owns the hero range (`.range-pill`) and Movements owns the participant range (`.range-btn`).
+- **Resumen hides participants with zero shares** (treemap and cards): someone who withdrew everything keeps their history in Movimientos but no longer shows as a US$ 0 card. The treemap shows names only; figures live in the cards below it.
+- **In Movimientos, the search/type/period filters sit below the participant panel**, so selecting someone shows their panel first. The period picker is `SelectMenu`, the same popover pattern as `ParticipantPicker`.
 - **Load errors**: with no data loaded, `LoadError` (`src/components/States.tsx`) replaces Resumen and Movimientos with a retry card; if a refresh fails after data was already loaded, it shows a small note above the stale data instead. An empty fund shows `SetupSteps` instead of an empty dashboard.
