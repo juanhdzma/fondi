@@ -6,10 +6,12 @@ import { quickTransition, springTransition, staggered, surfaceMotion } from '../
 import { COP, fmt, fmtN0, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, normDate } from '../utils/dates.js';
 import { filterMovements, groupByMonth, PERIODS } from '../utils/movements.js';
-import { ParticipantChart, RANGES } from './Charts';
+import { ParticipantChart, RANGES, type ParticipantPoint } from './Charts';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
 import { SelectMenu } from './SelectMenu';
+
+const SHARE_TOLERANCE = 1e-6;
 
 const monthFormatter = new Intl.DateTimeFormat('es-CO', { month: 'short' });
 
@@ -24,27 +26,44 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
   const total = cuotasCirc();
   const share = total > 0 ? Math.max(0, participant.cuotas) / total * 100 : 0;
   const first = S.movimientos.filter(movement => movement.persona === name).map(movement => movement.fecha).sort()[0];
+  const [hover, setHover] = useState<ParticipantPoint | null>(null);
+  const empty = participant.cuotas <= SHARE_TOLERANCE;
+  const hoverGain = hover ? hover.valor - hover.invertido : 0;
+  const hoverGainPct = hover && hover.invertido > 0 ? hoverGain / hover.invertido * 100 : 0;
   return (
     <motion.section id="mov-persona-panel" className="card person-panel" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
       <div className="person-head">
         <span className="p-avatar" style={{ background: participanteColor(name) }}>{name.charAt(0).toUpperCase()}</span>
         <div>
           <h2>{name}</h2>
-          <span>{share.toFixed(0)}% del fondo{first ? ` · participa desde ${fmtDateShort(first)} ${normDate(first).slice(0, 4)}` : ''}</span>
+          <span>{empty ? 'Sin saldo en el fondo' : `${share.toFixed(0)}% del fondo`}{first ? ` · ${empty ? 'participó' : 'participa'} desde ${fmtDateShort(first)} ${normDate(first).slice(0, 4)}` : ''}</span>
         </div>
       </div>
       <div className="person-grid">
         <dl className="person-kv">
           <div>
-            <dt>Valor actual</dt>
-            <dd><b>{fmt(participant.valor_actual)}</b><small>{COP(Math.round(participant.valor_cop))}</small></dd>
+            <dt>{hover ? `Valor al ${fmtDateShort(hover.fecha)}` : 'Valor actual'}</dt>
+            {hover ? (
+              <dd><b>{fmt(hover.valor)}</b><small>{COP(Math.round(hover.valor * hover.trm))}</small></dd>
+            ) : empty ? (
+              <dd><b>Sin saldo</b><small>Retiró todo su dinero del fondo</small></dd>
+            ) : (
+              <dd><b>{fmt(participant.valor_actual)}</b><small>{COP(Math.round(participant.valor_cop))}</small></dd>
+            )}
           </div>
           <div>
-            <dt>Ganancia</dt>
-            <dd>
-              <b className={tone(participant.ganancia_monto)}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))} <Delta value={participant.ganancia_pct} lead /></b>
-              <small className={tone(participant.ganancia_cop)}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} <Delta value={participant.ganancia_cop_pct} /></small>
-            </dd>
+            <dt>{hover ? `Ganancia al ${fmtDateShort(hover.fecha)}` : 'Ganancia'}</dt>
+            {hover ? (
+              <dd>
+                <b className={tone(hoverGain)}>{signStr(hoverGain)}{fmt(Math.abs(hoverGain))} <Delta value={hoverGainPct} lead /></b>
+                <small>Invertido {fmt(hover.invertido)}</small>
+              </dd>
+            ) : (
+              <dd>
+                <b className={tone(participant.ganancia_monto)}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))} <Delta value={participant.ganancia_pct} lead /></b>
+                <small className={tone(participant.ganancia_cop)}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} <Delta value={participant.ganancia_cop_pct} /></small>
+              </dd>
+            )}
           </div>
           <div>
             <dt>Total aportado</dt>
@@ -59,7 +78,7 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
           <div className="chart-title">Evolución de tu inversión</div>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={`${name}-${range}`} className="chart-wrap" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-              <ParticipantChart name={name} range={range} />
+              <ParticipantChart name={name} range={range} onHover={setHover} />
             </motion.div>
           </AnimatePresence>
           <div className="range-btns" role="group" aria-label="Período de evolución">

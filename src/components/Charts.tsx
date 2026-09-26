@@ -179,6 +179,31 @@ function dismissTooltipOutside(chart: Chart, canvas: HTMLCanvasElement) {
   return () => document.removeEventListener('pointerdown', dismiss);
 }
 
+function crosshairHooks(color: string, onLeave: () => void) {
+  return {
+    afterDatasetsDraw(chart: Chart) {
+      const active = chart.getActiveElements()[0];
+      if (!active) return;
+      const { ctx, chartArea } = chart;
+      const x = active.element.x;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
+      ctx.restore();
+    },
+    afterEvent(chart: Chart, args: any) {
+      if (args.event.type === 'mouseout') {
+        chart.setActiveElements([]);
+        onLeave();
+      }
+    },
+  };
+}
+
 function pointRadius(count: number) {
   if (count <= 10) return 2.2;
   if (count <= 25) return 1.5;
@@ -394,26 +419,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
         };
         setOverlay(current => sameOverlay(current, next) ? current : next);
       },
-      afterDatasetsDraw(chart: Chart) {
-        const active = chart.getActiveElements()[0];
-        if (!active) return;
-        const { ctx, chartArea } = chart;
-        const x = active.element.x;
-        ctx.save();
-        ctx.strokeStyle = muted;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.moveTo(x, chartArea.top);
-        ctx.lineTo(x, chartArea.bottom);
-        ctx.stroke();
-        ctx.restore();
-      },
-      afterEvent(chart: Chart, args: any) {
-        if (args.event.type === 'mouseout') {
-          chart.setActiveElements([]);
-          hoverRef.current(null);
-        }
-      },
+      ...crosshairHooks(muted, () => hoverRef.current(null)),
     };
 
     const chart = new Chart(canvas.current, {
@@ -544,37 +550,12 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
   );
 }
 
-function personaTooltip({ chart, tooltip: model }: any) {
-  let element = document.getElementById('persona-tooltip');
-  if (!element) {
-    element = document.createElement('div');
-    element.id = 'persona-tooltip';
-    document.body.appendChild(element);
-  }
-  if (model.opacity === 0) {
-    element.style.opacity = '0';
-    return;
-  }
-  element.replaceChildren();
-  for (const point of model.dataPoints) {
-    const line = document.createElement('div');
-    const label = document.createElement('b');
-    label.textContent = point.dataset.label;
-    line.append(label, `: ${fmt(point.parsed.y)}`);
-    element.appendChild(line);
-  }
-  const date = document.createElement('div');
-  date.className = 'persona-tooltip-date';
-  date.textContent = model.dataPoints.length ? formatTimestamp(model.dataPoints[0].parsed.x) : '';
-  element.appendChild(date);
-  const rect = chart.canvas.getBoundingClientRect();
-  element.style.opacity = '1';
-  element.style.left = `${rect.left + window.scrollX + model.caretX}px`;
-  element.style.top = `${rect.top + window.scrollY + model.caretY}px`;
-}
+export type ParticipantPoint = { fecha: string; valor: number; invertido: number; trm: number };
 
-export function ParticipantChart({ name, range }: { name: string; range: string }) {
+export function ParticipantChart({ name, range, onHover }: { name: string; range: string; onHover: (point: ParticipantPoint | null) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const hoverRef = useRef(onHover);
+  hoverRef.current = onHover;
   const theme = useTheme();
   const rows = filteredWithFill(range, historialParticipante(name) as Row[]);
 
@@ -594,7 +575,12 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
       position: 'bottom',
       labels: { color: cssVar('--muted'), font: { size: 12 }, padding: 14, usePointStyle: true, pointStyle: 'line' },
     };
-    options.plugins.tooltip = { enabled: false, external: personaTooltip };
+    options.plugins.tooltip = { enabled: false };
+    options.events = ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'];
+    options.onHover = (_event: any, elements: Array<{ index: number }>) => {
+      hoverRef.current(elements.length ? rows[elements[0].index] as ParticipantPoint : null);
+    };
+    const muted = cssVar('--muted');
     const chart = new Chart(canvas.current, {
       type: 'line',
       data: {
@@ -603,13 +589,14 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
           { ...dataset(invested, cssVar('--muted')), label: 'Invertido', fill: false, borderDash: [5, 5], borderWidth: 1.5, stepped: 'before', pointRadius: 0, pointHoverRadius: 0 },
         ] as any,
       },
+      plugins: [{ id: 'participantCrosshair', ...crosshairHooks(muted, () => hoverRef.current(null)) }],
       options,
     });
     const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
     return () => {
       stopOutsideDismiss();
       chart.destroy();
-      document.getElementById('persona-tooltip')?.remove();
+      hoverRef.current(null);
     };
   }, [name, range, rows, theme]);
 

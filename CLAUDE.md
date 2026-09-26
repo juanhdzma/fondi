@@ -136,9 +136,9 @@ The valuation submit path in `src/components/Admin.tsx` is different: it records
 - **Hovering the hero chart drives the figures above it**: `onHover` sends the point to `Summary`, which swaps the USD/COP values and changes for that date. Because that re-renders `Summary` on every mouse move, `heroSeries(range)` is memoized on `S.historial`/`S.movimientos` — recomputing it inline would give `HeroChart` a new array each render and rebuild the chart on every hover.
 - **Period returns use the share price, not the fund value**: the range pills and the hero change call `periodPct(rows, 'precio_cuota')`. `valor_total` includes contributions, so over a year it showed things like +116% for a fund that actually earned ~2%.
 
-### The persona chart's tooltip is custom HTML, not Chart.js's native one
+### The persona chart has no tooltip
 
-The participant chart in `src/components/Charts.tsx` uses `tooltip: { enabled: false, external: personaTooltip }` instead of the native callbacks used by the hero chart. Reason: the design calls for "Valor actual"/"Invertido" in bold but the dollar amount next to each in regular weight, on the same line — Chart.js's canvas tooltip applies one uniform font per body line. The React effect removes `#persona-tooltip` during cleanup; if you add another chart with this pattern, give it equivalent cleanup.
+Like the hero chart, the participant chart in `src/components/Charts.tsx` works as a slider: `tooltip: { enabled: false }`, a dashed crosshair (`crosshairHooks()`, shared with the hero) and `onHover` sends the row to `PersonPanel` (`Movements.tsx`), which swaps "Valor actual"/"Ganancia" for that date. `historialParticipante()` carries each snapshot's `trm` so the hovered COP value uses that day's rate.
 
 ### The Admin form is controlled by React state
 
