@@ -15,7 +15,8 @@ TEXT_COLUMNS = {"fecha", "persona", "tipo", "nombre", "accion"}
 # Columnas sin las cuales la fila no significa nada: si falta alguna, todas las filas de esa
 # hoja entrarían con "" o 0.0 y el import es destructivo — se aborta en vez de reemplazar la
 # DB por filas vacías. Las que no están acá (trm, monto_cop, precio_cuota_dia) sí pueden
-# faltar: se derivan o solo afectan la vista en COP.
+# faltar: se derivan o solo afectan la vista en COP. monto_cop igual se exige fila por fila
+# en los aportes (ver parse_workbook), porque la ganancia en COP se calcula con él.
 REQUIRED_COLUMNS = {
     "historial_fondo": ["fecha", "valor_total", "precio_cuota", "cuotas_circ"],
     "movimientos": ["fecha", "persona", "tipo", "monto", "cuotas"],
@@ -159,5 +160,7 @@ def parse_workbook(content: bytes):
                     item[col] = str(value).strip() if value is not None else ""
                 else:
                     item[col] = _to_float(value, col, sheet_name, n)
+            if item.get("tipo") == "aporte" and item["monto_cop"] <= 0:
+                raise InvalidWorkbook(f"{sheet_name} fila {n}: un aporte necesita 'monto_cop' mayor a 0")
             parsed[sheet_name].append(item)
     return parsed

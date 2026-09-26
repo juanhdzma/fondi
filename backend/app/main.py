@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .db import backup_db, get_conn, init_db, replace_all
 from .domain import calcular_movimiento
@@ -188,6 +188,12 @@ class Movimiento(BaseModel):
     monto_cop: float = Field(ge=0)
     trm_dia: float = Field(ge=0)
     fondo: FondoMovimiento
+
+    @model_validator(mode="after")
+    def aporte_con_cop(self):
+        if self.tipo == "aporte" and self.monto_cop <= 0:
+            raise ValueError("un aporte necesita monto_cop mayor a 0")
+        return self
 
 
 class Participante(BaseModel):

@@ -250,6 +250,7 @@ def test_movimiento_con_fondo_invalido_no_guarda_nada(client):
     ("monto_usd", 0),
     ("fecha", "10/01/2026"),
     ("persona", ""),
+    ("monto_cop", 0),
 ])
 def test_movimiento_rechaza_datos_invalidos(client, campo, valor):
     payload = {
@@ -322,6 +323,19 @@ def test_import_normaliza_tipo_y_rechaza_valores_desconocidos(client):
 
     # El import inválido no debe haber borrado lo que ya estaba.
     assert len(client.get("/api/all").json()["movimientos"]) == 1
+
+
+def test_import_rechaza_aporte_sin_monto_cop(client):
+    content = _xlsx_bytes({"movimientos": [
+        ["fecha", "persona", "tipo", "monto", "precio_cuota_dia", "cuotas", "monto_cop", "trm_dia"],
+        ["2026-01-10", "Patico", "aporte", 100, 1.0, 100, 330000, 3300],
+        ["2026-01-11", "Patico", "aporte", 50, 1.0, 50, None, None],
+    ]})
+    r = client.post("/api/import", headers={"X-Admin-Key": "s3cret"},
+                    files={"file": ("data.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 400
+    assert "fila 3" in r.json()["detail"]
+    assert "monto_cop" in r.json()["detail"]
 
 
 def test_retiro_mayor_al_saldo_se_rechaza(client):
