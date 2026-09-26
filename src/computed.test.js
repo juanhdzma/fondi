@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { S } from './state.js';
 import {
-  latest, precioCuota, cuotasCirc, calcParticipante,
+  latest, precioCuota, cuotasCirc, calcParticipante, aportadoNetoCop, rendimientoPct,
   participantesActivos, participantesTodos, participanteOculto, participantesVisiblesActivos,
   historialParticipante, historialGananciaFondo, historialParaGrafica, porcentajeRetiro,
 } from './computed.js';
@@ -176,6 +176,7 @@ describe('calcParticipante', () => {
     expect(p.has_cop).toBe(true);
     expect(p.valor_cop).toBeCloseTo(6000000, 6);
     expect(p.trm_avg_entrada).toBeCloseTo(4000, 10);
+    expect(p.ganancia_cop_pct).toBeCloseTo((1.2 * 5000 - 4000) / 4000 * 100, 10);
   });
 
   it('ganancia en COP: valor a TRM actual + retiros a TRM de su día − aportes en COP', () => {
@@ -191,6 +192,22 @@ describe('calcParticipante', () => {
 
     const p = calcParticipante('Ana');
     expect(p.ganancia_cop).toBeCloseTo(900 * 5000 + 300 * 4500 - 4000000, 6);
+    expect(aportadoNetoCop(S.movimientos)).toBeCloseTo(4000000 - 300 * 4500, 6);
+  });
+});
+
+describe('rendimientoPct', () => {
+  it('un retiro no infla el %: mide cuánto subió la cuota sobre el precio de compra', () => {
+    S.trm = 5000;
+    S.historial = [{ fecha: '2026-02-01', valor_total: 750, precio_cuota: 1.5, cuotas_circ: 500, trm: 5000 }];
+    S.movimientos = [
+      mov('Ana', 'aporte', 1000, 1000, '2026-01-01', { monto_cop: 4000000, trm_dia: 4000 }),
+      mov('Ana', 'retiro', 750, -500, '2026-02-01'),
+    ];
+
+    const r = rendimientoPct(S.movimientos);
+    expect(r.ganancia_pct).toBeCloseTo(50, 10);
+    expect(r.ganancia_cop_pct).toBeCloseTo((1.5 * 5000 - 4000) / 4000 * 100, 10);
   });
 });
 

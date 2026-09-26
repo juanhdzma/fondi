@@ -68,7 +68,7 @@ export function calcParticipante(nombre) {
   const pc            = precioCuota();
   const valor_actual  = cuotas * pc;
   const precio_prom   = aportes_cuotas > 0 ? aportes_monto / aportes_cuotas : 0;
-  const ganancia_pct  = precio_prom > 0 ? (pc - precio_prom) / precio_prom * 100 : 0;
+  const { ganancia_pct, ganancia_cop_pct } = rendimientoPct(movs);
   const ganancia_monto= valor_actual + retiros_monto - aportes_monto;
   const ganancia_cop  = gananciaCop(movs, valor_actual);
 
@@ -83,7 +83,22 @@ export function calcParticipante(nombre) {
   return {
     nombre, cuotas, valor_actual, aportes_monto, retiros_monto,
     precio_prom, ganancia_pct, ganancia_monto,
-    cop_invertido, has_cop, valor_cop, trm_avg_entrada, ganancia_cop,
+    cop_invertido, has_cop, valor_cop, trm_avg_entrada, ganancia_cop, ganancia_cop_pct,
+  };
+}
+
+// Rendimiento por precio de cuota: la cuota de hoy contra el precio promedio de compra.
+// No divide por aportes − retiros: ese denominador se achica con cada retiro e infla el %.
+export function rendimientoPct(movs) {
+  const aportes = movs.filter(m => m.tipo === 'aporte');
+  const cuotas  = aportes.reduce((s, m) => s + m.cuotas, 0);
+  if (cuotas <= 0) return { ganancia_pct: 0, ganancia_cop_pct: 0 };
+  const pc      = precioCuota();
+  const promUsd = aportes.reduce((s, m) => s + m.monto, 0) / cuotas;
+  const promCop = aportes.reduce((s, m) => s + (m.monto_cop || 0), 0) / cuotas;
+  return {
+    ganancia_pct:     promUsd > 0 ? (pc - promUsd) / promUsd * 100 : 0,
+    ganancia_cop_pct: promCop > 0 ? (pc * (S.trm || 1) - promCop) / promCop * 100 : 0,
   };
 }
 
@@ -96,8 +111,12 @@ function montoCop(m) {
   return m.monto * (h?.trm || S.trm || 1);
 }
 
+export function aportadoNetoCop(movs) {
+  return movs.reduce((s, m) => s + (m.tipo === 'retiro' ? -montoCop(m) : montoCop(m)), 0);
+}
+
 export function gananciaCop(movs, valorUsd) {
-  return movs.reduce((s, m) => s + (m.tipo === 'retiro' ? montoCop(m) : -montoCop(m)), valorUsd * (S.trm || 1));
+  return valorUsd * (S.trm || 1) - aportadoNetoCop(movs);
 }
 
 export function porcentajeRetiro(movimiento) {
