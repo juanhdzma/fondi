@@ -411,25 +411,18 @@ export function Admin({ onRefresh }: Props) {
             {step === 2 && (
               <>
                 <p className="step-context">{selectedPerson} · {type === 'aporte' ? 'Aporte' : 'Retiro'}</p>
-                <div className="movement-form-grid">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="f-monto">Monto (USD)</label>
-                    <MoneyInput
-                      id="f-monto"
-                      value={usd}
-                      onChange={setUsd}
-                      action={type === 'retiro' && participantBalance > 0 ? 'Retirar todo' : undefined}
-                      onAction={() => {
-                        setUsd(String(participantBalance).replace('.', ','));
-                        setFundAfter(String(Math.max(0, (latest()?.valor_total || 0) - participantBalance)).replace('.', ','));
-                      }}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="f-valor-mov">Valor del fondo después (USD) <span className="required">*</span></label>
-                    <MoneyInput id="f-valor-mov" value={fundAfter} onChange={setFundAfter} />
-                    <div className="form-hint">{movementHint || (latest() ? `Antes del movimiento: ${fmt(latest()!.valor_total)}` : '')}</div>
-                  </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="f-monto">Monto (USD)</label>
+                  <MoneyInput
+                    id="f-monto"
+                    value={usd}
+                    onChange={setUsd}
+                    action={type === 'retiro' && participantBalance > 0 ? 'Retirar todo' : undefined}
+                    onAction={() => {
+                      setUsd(String(participantBalance).replace('.', ','));
+                      setFundAfter(String(Math.max(0, (latest()?.valor_total || 0) - participantBalance)).replace('.', ','));
+                    }}
+                  />
                 </div>
                 {type === 'aporte' && (
                   <div className="form-group conversion-group">
@@ -451,6 +444,11 @@ export function Admin({ onRefresh }: Props) {
                     <div className={`form-hint${deviation > 0.15 ? ' notice' : ''}`} role="status" aria-live="polite">{trmHint}</div>
                   </div>
                 )}
+                <div className="form-group">
+                  <label className="form-label" htmlFor="f-valor-mov">Valor del fondo después (USD) <span className="required">*</span></label>
+                  <MoneyInput id="f-valor-mov" value={fundAfter} onChange={setFundAfter} />
+                  <div className="form-hint">{movementHint || (latest() ? `Antes del movimiento: ${fmt(latest()!.valor_total)}` : '')}</div>
+                </div>
               </>
             )}
 
@@ -535,6 +533,9 @@ export function Admin({ onRefresh }: Props) {
             <span className="settings-text"><b>Exportar respaldo</b><small>.xlsx con las 3 tablas · Safari puede pedir permiso</small></span>
             <span className="settings-chevron"><Icon name="chevron" /></span>
           </a>
+        </motion.section>
+
+        <motion.section className="card admin-settings" aria-label="Restaurar datos" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(2)}>
           <button type="button" className="settings-row danger" disabled={busy === 'import'} onClick={requestImport}>
             <Icon name="upload" />
             <span className="settings-text"><b>{busy === 'import' ? 'Restaurando...' : 'Restaurar desde archivo'}</b><small>Reemplaza todos los datos; el backend crea un backup antes</small></span>
