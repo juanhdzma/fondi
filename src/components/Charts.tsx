@@ -250,6 +250,17 @@ export function heroSeries(range: string): HeroPoint[] {
   });
 }
 
+// La línea de aportado usa todas las valuaciones, incluida la del día de un retiro que
+// historialParaGrafica() omite de la línea de valor: sin ella el escalón bajaba una semana tarde.
+function contributedSeries(range: string) {
+  const rows = filteredWithFill(range, historialGananciaFondo() as any) as Row[];
+  const cutoff = rangeCutoff(range)?.getTime();
+  return rows.map((row, index) => {
+    const value = toTimestamp(row.fecha);
+    return { ts: index === 0 && cutoff && value < cutoff ? cutoff : value, aportado: Number(row.aportado) };
+  });
+}
+
 type LaneChip = { x: number; lane: number; amount: number; people: string[]; count: number; ts: number };
 type Overlay = { width: number; left: number; right: number; bottom: number; chips: LaneChip[]; ends: Array<{ y: number; kind: string }> };
 
@@ -364,11 +375,11 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
             tension: 0,
           },
           {
-            data: points.map(point => ({ x: point.ts, y: point.aportado })),
+            data: contributedSeries(range).map(point => ({ x: point.ts, y: point.aportado })),
             borderColor: muted,
             borderDash: [5, 5],
             borderWidth: 1.5,
-            stepped: 'after',
+            stepped: 'before',
             fill: false,
             pointRadius: 0,
             pointHoverRadius: 0,
@@ -523,7 +534,7 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
       data: {
         datasets: [
           { ...dataset(current, participanteColor(name)), label: 'Valor actual', fill: false, borderWidth: 2.5, pointRadius: 0 },
-          { ...dataset(invested, cssVar('--muted')), label: 'Invertido', fill: false, borderDash: [5, 5], borderWidth: 1.5, stepped: 'after', pointRadius: 0, pointHoverRadius: 0 },
+          { ...dataset(invested, cssVar('--muted')), label: 'Invertido', fill: false, borderDash: [5, 5], borderWidth: 1.5, stepped: 'before', pointRadius: 0, pointHoverRadius: 0 },
         ] as any,
       },
       options,
