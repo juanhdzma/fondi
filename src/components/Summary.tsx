@@ -9,22 +9,11 @@ import { treemapLayout } from '../utils/treemap.js';
 import { cssVar, useTheme } from '../theme';
 import { HeroChart, heroSeries, periodPct, RANGE_LABELS, RANGES, type HeroPoint } from './Charts';
 import { CountUp } from './CountUp';
+import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
 import { Sparkline } from './Sparkline';
 
 type Participant = ReturnType<typeof calcParticipante>;
-
-const tone = (value: number) => value > 0 ? 'pos' : value < 0 ? 'neg' : 'zero';
-
-function Delta({ value, lead = false }: { value: number | null; lead?: boolean }) {
-  if (value === null || !Number.isFinite(value)) return null;
-  return (
-    <span className={`p-delta ${tone(value)}${lead ? ' lead' : ''}`}>
-      {value !== 0 && <svg viewBox="0 0 8 8" aria-hidden="true"><path d={value > 0 ? 'M4 1 7.5 7h-7z' : 'M4 7 .5 1h7z'} /></svg>}
-      {fmtPct(Math.abs(value))}%
-    </span>
-  );
-}
 
 function TrmChip({ cached }: { cached: boolean }) {
   if (!S.trm) return null;

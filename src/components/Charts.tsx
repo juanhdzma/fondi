@@ -504,15 +504,15 @@ export function ParticipantChart({ name, range }: { name: string; range: string 
     options.plugins.legend = {
       display: true,
       position: 'bottom',
-      labels: { color: cssVar('--muted'), font: { size: 13 }, padding: 14, usePointStyle: true },
+      labels: { color: cssVar('--muted'), font: { size: 12 }, padding: 14, usePointStyle: true, pointStyle: 'line' },
     };
     options.plugins.tooltip = { enabled: false, external: personaTooltip };
     const chart = new Chart(canvas.current, {
       type: 'line',
       data: {
         datasets: [
-          { ...dataset(current, participanteColor(name)), label: 'Valor actual', fill: false },
-          { ...dataset(invested, cssVar('--muted')), label: 'Invertido', fill: false, borderDash: [5, 5] },
+          { ...dataset(current, participanteColor(name)), label: 'Valor actual', fill: false, borderWidth: 2.5, pointRadius: 0 },
+          { ...dataset(invested, cssVar('--muted')), label: 'Invertido', fill: false, borderDash: [5, 5], borderWidth: 1.5, stepped: 'after', pointRadius: 0, pointHoverRadius: 0 },
         ] as any,
       },
       options,
