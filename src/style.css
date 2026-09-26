@@ -99,8 +99,8 @@ button { color: inherit; }
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 100;
-  width: 88px;
-  padding: max(18px, env(safe-area-inset-top)) 10px 18px;
+  width: 96px;
+  padding: max(18px, env(safe-area-inset-top)) 8px 18px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -118,8 +118,9 @@ button { color: inherit; }
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: 62px;
-  padding: 8px 4px;
+  width: 100%;
+  min-height: 64px;
+  padding: 9px 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -129,8 +130,10 @@ button { color: inherit; }
   border-radius: 14px;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 620;
+  font-size: 10.5px;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 160ms ease, background-color 160ms ease, transform 120ms var(--ease-out);
 }
@@ -151,7 +154,7 @@ button { color: inherit; }
 .trm-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: 11px; font-weight: 650; white-space: nowrap; vertical-align: middle; }
 .trm-chip.cached { color: var(--warn); }
 
-.main { min-height: 100vh; margin-left: 88px; padding: 40px clamp(24px, 4vw, 64px) 80px; }
+.main { min-height: 100vh; margin-left: 96px; padding: 40px clamp(24px, 4vw, 64px) 80px; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 #tab-resumen, #tab-movimientos { max-width: 1240px; margin: 0 auto; }
@@ -415,8 +418,9 @@ button { color: inherit; }
 .person-kv small { display: flex; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 12px; }
 .person-kv .pos { color: var(--pos); }
 .person-kv .neg { color: var(--neg); }
-.person-chart { min-width: 0; display: grid; align-content: start; gap: 8px; }
-.person-chart .chart-wrap { height: 300px; }
+.person-chart { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.person-chart .chart-wrap { flex: 1; height: auto; min-height: 300px; }
+.person-chart .range-btns { margin-top: 4px; }
 .mov-timeline { padding: 6px 22px; }
 .mov-month-group { padding: 14px 0; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 16px; border-bottom: 1px solid var(--line); }
 .mov-month-group:last-child { border-bottom: 0; }
