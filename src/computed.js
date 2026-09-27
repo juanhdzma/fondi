@@ -178,3 +178,14 @@ export function historialParticipante(nombre) {
     return { fecha: h.fecha, valor: cuotas * h.precio_cuota, invertido, trm: h.trm };
   });
 }
+
+// Estado del panel de un participante: 'nuevo' si nunca aportó, 'cerrado' si retiró todas sus
+// cuotas (con la fecha del último retiro para el aviso), 'activo' en otro caso.
+export function estadoParticipante(nombre, tolerancia = 1e-6) {
+  const movs = S.movimientos.filter(m => m.persona === nombre).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const aportes = movs.filter(m => m.tipo === 'aporte').length;
+  const cuotas = movs.reduce((s, m) => s + m.cuotas, 0);
+  const retiros = movs.filter(m => m.tipo === 'retiro');
+  const estado = !movs.length ? 'nuevo' : cuotas <= tolerancia ? 'cerrado' : 'activo';
+  return { estado, aportes, desde: movs[0]?.fecha ?? '', ultimoRetiro: retiros.at(-1)?.fecha ?? '' };
+}

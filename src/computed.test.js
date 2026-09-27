@@ -3,7 +3,7 @@ import { S } from './state.js';
 import {
   latest, precioCuota, cuotasCirc, calcParticipante, aportadoNetoCop, rendimientoPct,
   participantesActivos, participantesTodos, participanteOculto, participantesVisiblesActivos,
-  historialParticipante, historialGananciaFondo, historialParaGrafica, porcentajeRetiro,
+  historialParticipante, historialGananciaFondo, historialParaGrafica, porcentajeRetiro, estadoParticipante,
 } from './computed.js';
 
 const mov = (persona, tipo, monto, cuotas, fecha, extra = {}) =>
@@ -300,5 +300,21 @@ describe('historialParaGrafica', () => {
     S.movimientos = [mov('Ana', 'retiro', 600, -600, '2026-01-02T00:00')];
 
     expect(historialParaGrafica()).toEqual([S.historial[0]]);
+  });
+});
+
+describe('estadoParticipante', () => {
+  it('nuevo: sin movimientos', () => {
+    expect(estadoParticipante('Ana')).toEqual({ estado: 'nuevo', aportes: 0, desde: '', ultimoRetiro: '' });
+  });
+
+  it('activo: cuenta aportes y toma la primera fecha aunque lleguen desordenados', () => {
+    S.movimientos = [mov('Ana', 'aporte', 200, 200, '2026-03-01'), mov('Ana', 'aporte', 100, 100, '2026-01-01'), mov('Ana', 'retiro', 50, -50, '2026-04-01')];
+    expect(estadoParticipante('Ana')).toEqual({ estado: 'activo', aportes: 2, desde: '2026-01-01', ultimoRetiro: '2026-04-01' });
+  });
+
+  it('cerrado: retiró todas sus cuotas', () => {
+    S.movimientos = [mov('Ana', 'aporte', 100, 100, '2026-01-01'), mov('Ana', 'retiro', 110, -100, '2026-08-28')];
+    expect(estadoParticipante('Ana')).toMatchObject({ estado: 'cerrado', ultimoRetiro: '2026-08-28' });
   });
 });

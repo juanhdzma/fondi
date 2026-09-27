@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S, type Movement } from '../state.js';
-import { calcParticipante, cuotasCirc, participanteColor, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
+import { calcParticipante, cuotasCirc, estadoParticipante, participanteColor, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
 import { quickTransition, springTransition, staggered, surfaceMotion } from '../motion';
 import { COP, fmt, fmtN0, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, normDate } from '../utils/dates.js';
 import { filterMovements, groupByMonth, PERIODS } from '../utils/movements.js';
-import { ParticipantChart, RANGES, type ParticipantPoint } from './Charts';
+import { heroSeries, ParticipantChart, periodPct, RANGES, type ParticipantPoint } from './Charts';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
 import { SelectMenu } from './SelectMenu';
@@ -21,59 +21,86 @@ function monthParts(key: string) {
   return [month.charAt(0).toUpperCase() + month.slice(1), String(date.getFullYear())];
 }
 
+function ShareRing({ name, share }: { name: string; share: number }) {
+  const circumference = 2 * Math.PI * 25;
+  return (
+    <span className="person-ring">
+      <svg viewBox="0 0 56 56" aria-hidden="true">
+        <circle cx="28" cy="28" r="25" className="person-ring-track" />
+        {share > 0 && <circle cx="28" cy="28" r="25" stroke={participanteColor(name)} strokeDasharray={`${circumference * Math.min(share, 100) / 100} ${circumference}`} transform="rotate(-90 28 28)" />}
+      </svg>
+      <span className="p-avatar" style={{ background: participanteColor(name) }}>{name.charAt(0).toUpperCase()}</span>
+    </span>
+  );
+}
+
 function PersonPanel({ name, range, setRange }: { name: string; range: string; setRange: (range: string) => void }) {
   const participant = calcParticipante(name);
   const total = cuotasCirc();
   const share = total > 0 ? Math.max(0, participant.cuotas) / total * 100 : 0;
-  const first = S.movimientos.filter(movement => movement.persona === name).map(movement => movement.fecha).sort()[0];
+  const { estado, aportes, desde, ultimoRetiro } = estadoParticipante(name, SHARE_TOLERANCE);
   const [hover, setHover] = useState<ParticipantPoint | null>(null);
-  const empty = participant.cuotas <= SHARE_TOLERANCE;
+  const rangeReturns = useMemo(
+    () => Object.fromEntries(RANGES.map(([value]) => [value, periodPct(heroSeries(value), 'precio_cuota')])),
+    [S.historial, S.movimientos],
+  );
   const hoverGain = hover ? hover.valor - hover.invertido : 0;
   const hoverGainPct = hover && hover.invertido > 0 ? hoverGain / hover.invertido * 100 : 0;
+  const gain = hover ? hoverGain : participant.ganancia_monto;
+  const since = desde ? `desde ${fmtDateShort(desde)} ${normDate(desde).slice(0, 4)}` : '';
+
   return (
-    <motion.section id="mov-persona-panel" className="card person-panel" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
-      <div className="person-head">
-        <span className="p-avatar" style={{ background: participanteColor(name) }}>{name.charAt(0).toUpperCase()}</span>
-        <div>
-          <h2>{name}</h2>
-          <span>{!first ? 'Todavía no ha aportado' : empty ? 'Sin saldo en el fondo' : `${share.toFixed(0)}% del fondo`}{first ? ` · ${empty ? 'participó' : 'participa'} desde ${fmtDateShort(first)} ${normDate(first).slice(0, 4)}` : ''}</span>
+    <motion.section id="mov-persona-panel" className={`card person-panel ${estado}`} variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
+      {estado !== 'activo' && (
+        <p className="person-notice" role="status">
+          {estado === 'nuevo'
+            ? <><b>Todavía no ha aportado.</b> Sus cifras aparecerán después del primer aporte.</>
+            : <><b>Retiró todo su dinero el {fmtDateShort(ultimoRetiro)}.</b> Esto es su historial en el fondo.</>}
+        </p>
+      )}
+      <div className="person-top">
+        <div className="person-head">
+          <ShareRing name={name} share={share} />
+          <div>
+            <h2>{name} <span className={`person-status${estado === 'activo' ? ' on' : ''}`}>{estado === 'activo' ? 'Activo' : 'Inactivo'}</span></h2>
+            <span>{estado === 'activo' ? `${share.toFixed(0)}% del fondo · ` : ''}{aportes} {aportes === 1 ? 'aporte' : 'aportes'}{since ? ` · ${since}` : ''}</span>
+          </div>
         </div>
+        {estado !== 'nuevo' && (
+          <dl className="person-figs">
+            <div>
+              <dt>{hover ? `Valor al ${fmtDateShort(hover.fecha)}` : 'Valor actual'}</dt>
+              <dd>
+                <b>{fmt(hover ? hover.valor : participant.valor_actual)}</b>
+                <small>{COP(Math.round(hover ? hover.valor * hover.trm : participant.valor_cop))}</small>
+              </dd>
+            </div>
+            <div className={`person-gain ${tone(gain)}`}>
+              <dt>{hover ? `Ganancia al ${fmtDateShort(hover.fecha)}` : 'Ganancia'}</dt>
+              {hover ? (
+                <dd>
+                  <b className={tone(hoverGain)}>{signStr(hoverGain)}{fmt(Math.abs(hoverGain))} <Delta value={hoverGainPct} lead /></b>
+                  <small>Invertido {fmt(hover.invertido)}</small>
+                </dd>
+              ) : (
+                <dd>
+                  <b className={tone(participant.ganancia_monto)}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))} <Delta value={participant.ganancia_pct} lead /></b>
+                  <small className={tone(participant.ganancia_cop)}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} <Delta value={participant.ganancia_cop_pct} /></small>
+                </dd>
+              )}
+            </div>
+            <div>
+              <dt>Total aportado</dt>
+              <dd>
+                <b>{fmt(participant.aportes_monto)}</b>
+                {participant.has_cop && <small>{COP(participant.cop_invertido)} · TRM prom {fmtN0(participant.trm_avg_entrada)}</small>}
+                {participant.retiros_monto > 0 && <small>{fmt(participant.retiros_monto)} retirados</small>}
+              </dd>
+            </div>
+          </dl>
+        )}
       </div>
-      <div className="person-grid">
-        <dl className="person-kv">
-          <div>
-            <dt>{hover ? `Valor al ${fmtDateShort(hover.fecha)}` : 'Valor actual'}</dt>
-            {hover ? (
-              <dd><b>{fmt(hover.valor)}</b><small>{COP(Math.round(hover.valor * hover.trm))}</small></dd>
-            ) : empty ? (
-              <dd><b>Sin saldo</b><small>{first ? 'Retiró todo su dinero del fondo' : 'Todavía no ha aportado'}</small></dd>
-            ) : (
-              <dd><b>{fmt(participant.valor_actual)}</b><small>{COP(Math.round(participant.valor_cop))}</small></dd>
-            )}
-          </div>
-          <div>
-            <dt>{hover ? `Ganancia al ${fmtDateShort(hover.fecha)}` : 'Ganancia'}</dt>
-            {hover ? (
-              <dd>
-                <b className={tone(hoverGain)}>{signStr(hoverGain)}{fmt(Math.abs(hoverGain))} <Delta value={hoverGainPct} lead /></b>
-                <small>Invertido {fmt(hover.invertido)}</small>
-              </dd>
-            ) : (
-              <dd>
-                <b className={tone(participant.ganancia_monto)}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))} <Delta value={participant.ganancia_pct} lead /></b>
-                <small className={tone(participant.ganancia_cop)}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} <Delta value={participant.ganancia_cop_pct} /></small>
-              </dd>
-            )}
-          </div>
-          <div>
-            <dt>Total aportado</dt>
-            <dd>
-              <b>{fmt(participant.aportes_monto)}</b>
-              {participant.has_cop && <small>{COP(participant.cop_invertido)} · TRM prom {fmtN0(participant.trm_avg_entrada)}</small>}
-              {participant.retiros_monto > 0 && <small>{fmt(participant.retiros_monto)} retirados</small>}
-            </dd>
-          </div>
-        </dl>
+      {estado !== 'nuevo' && (
         <div className="person-chart">
           <div className="chart-title">Evolución de tu inversión</div>
           <AnimatePresence mode="wait" initial={false}>
@@ -81,16 +108,20 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
               <ParticipantChart name={name} range={range} onHover={setHover} />
             </motion.div>
           </AnimatePresence>
-          <div className="range-btns" role="group" aria-label="Período de evolución">
-            {RANGES.map(([value, full, short]) => (
-              <button key={value} type="button" className={`range-btn${range === value ? ' active' : ''}`} aria-pressed={range === value} aria-label={full} onClick={() => setRange(value)}>
-                {range === value && <motion.span className="control-selection" layoutId="participant-range" transition={springTransition} />}
-                <span className="control-label">{short}</span>
-              </button>
-            ))}
+          <div className="range-pills" role="group" aria-label="Período de evolución">
+            {RANGES.map(([value, full, short]) => {
+              const pct = rangeReturns[value];
+              return (
+                <button key={value} type="button" className={`range-pill${range === value ? ' active' : ''}`} aria-pressed={range === value} aria-label={`${full}${pct === null ? '' : `, rendimiento del fondo ${signStr(pct)}${fmtPct(Math.abs(pct))}%`}`} onClick={() => setRange(value)}>
+                  {range === value && <motion.span className="control-selection" layoutId="participant-range" transition={springTransition} />}
+                  <span className="control-label">{short}</span>
+                  {pct !== null && <small className={`control-label ${tone(pct)}`}>{signStr(pct)}{fmtPct(Math.abs(pct))}%</small>}
+                </button>
+              );
+            })}
           </div>
         </div>
-      </div>
+      )}
     </motion.section>
   );
 }

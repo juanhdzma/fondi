@@ -136,9 +136,11 @@ The valuation submit path in `src/components/Admin.tsx` is different: it records
 - **Hovering the hero chart drives the figures above it**: `onHover` sends the point to `Summary`, which swaps the USD/COP values and changes for that date. Because that re-renders `Summary` on every mouse move, `heroSeries(range)` is memoized on `S.historial`/`S.movimientos` — recomputing it inline would give `HeroChart` a new array each render and rebuild the chart on every hover.
 - **Period returns use the share price, not the fund value**: the range pills and the hero change call `periodPct(rows, 'precio_cuota')`. `valor_total` includes contributions, so over a year it showed things like +116% for a fund that actually earned ~2%.
 
-### The persona chart has no tooltip
+### The participant panel (Movimientos)
 
-Like the hero chart, the participant chart in `src/components/Charts.tsx` works as a slider: `tooltip: { enabled: false }`, a dashed crosshair (`crosshairHooks()`, shared with the hero) and `onHover` sends the row to `PersonPanel` (`Movements.tsx`), which swaps "Valor actual"/"Ganancia" for that date. `historialParticipante()` carries each snapshot's `trm` so the hovered COP value uses that day's rate.
+`PersonPanel` (`Movements.tsx`) is driven by `estadoParticipante()` (`src/computed.js`): `nuevo` (no movements → only a notice, no figures or chart), `cerrado` (all shares withdrawn → notice with the last withdrawal date, figures and chart dimmed as history) or `activo`. The Activo/Inactivo tag follows that state, i.e. whether the person has money in the fund, not the `participantes_config` log. The header has the avatar inside a ring filled to their share, and the three figures sit to its right as tonal tiles (a container query stacks them under 780px of panel width).
+
+The chart works as a slider like the hero: `tooltip: { enabled: false }`, a dashed crosshair plus a date chip drawn on the canvas (`crosshairHooks()`, shared with the hero, which passes no chip), and `onHover` sends the row to `PersonPanel`, which swaps "Valor actual"/"Ganancia" for that date. `historialParticipante()` carries each snapshot's `trm` so the hovered COP value uses that day's rate. The value dataset fills to the invested one (`fill: { target: 1, above, below }`): green above, red below. **`ParticipantChart` memoizes its rows** — a new array per render rebuilt the chart on every hover, and the rebuild's cleanup reset the hover. The range pills show the share-price return per period (`periodPct()`), same as the hero.
 
 ### The Admin form is controlled by React state
 
@@ -148,7 +150,7 @@ The movement form is a three-step flow (Quién → Montos → Confirmar) over th
 
 ### Theme, fonts and colors
 
-- **Dark (Noche) is the default; light (Petróleo) is opt-in** via `data-theme="light"` on `<html>`, persisted in `localStorage` (`fondi-theme`). `public/theme.js` applies it before the first paint and is an external file on purpose: the CSP has `script-src 'self'`, which blocks an inline `<script>`.
+- **Dark (Noche) is the default; light (neutral white with a petrol accent, cards with a hairline border and minimal shadow) is opt-in** via `data-theme="light"` on `<html>`, persisted in `localStorage` (`fondi-theme`). `public/theme.js` applies it before the first paint and is an external file on purpose: the CSP has `script-src 'self'`, which blocks an inline `<script>`.
 - **All colors are CSS tokens** (`--bg`, `--surface`, `--text`, `--muted`, `--accent`, `--pos`, `--neg`, …) defined for both themes at the top of `style.css`. Chart.js can't read CSS variables, so charts call `cssVar()` when they're created and include `useTheme()` in their effect deps to rebuild on a theme change; canvas gradients go through `withAlpha()` because `color-mix()` isn't reliable in canvas across browsers.
 - **Geist is self-hosted** through `@fontsource-variable/geist`, bundled by Vite into same-origin `.woff2` files. Google Fonts would be blocked by the CSP (`default-src 'self'`), and so would a font inlined as `data:` — keep the files above Vite's inline limit.
 - **Participant colors are pastels**, so any text on them uses `--on-pastel` (dark), never white.

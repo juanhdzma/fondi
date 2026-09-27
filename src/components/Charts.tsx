@@ -179,7 +179,7 @@ function dismissTooltipOutside(chart: Chart, canvas: HTMLCanvasElement) {
   return () => document.removeEventListener('pointerdown', dismiss);
 }
 
-function crosshairHooks(color: string, onLeave: () => void) {
+function crosshairHooks(color: string, onLeave: () => void, chip?: { background: string; text: string }) {
   return {
     afterDatasetsDraw(chart: Chart) {
       const active = chart.getActiveElements()[0];
@@ -193,6 +193,20 @@ function crosshairHooks(color: string, onLeave: () => void) {
       ctx.moveTo(x, chartArea.top);
       ctx.lineTo(x, chartArea.bottom);
       ctx.stroke();
+      if (chip) {
+        const label = formatTimestamp((chart.data.datasets[active.datasetIndex].data[active.index] as { x: number }).x);
+        ctx.font = '600 11px Geist Variable, system-ui, sans-serif';
+        const width = ctx.measureText(label).width + 14;
+        const left = Math.min(Math.max(x - width / 2, chartArea.left), chartArea.right - width);
+        ctx.setLineDash([]);
+        ctx.fillStyle = chip.background;
+        ctx.beginPath();
+        ctx.roundRect(left, chartArea.bottom - 20, width, 20, 6);
+        ctx.fill();
+        ctx.fillStyle = chip.text;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, left + 7, chartArea.bottom - 10);
+      }
       ctx.restore();
     },
     afterEvent(chart: Chart, args: any) {
@@ -602,11 +616,11 @@ export function ParticipantChart({ name, range, onHover }: { name: string; range
       type: 'line',
       data: {
         datasets: [
-          { ...dataset(current, participanteColor(name)), label: 'Valor actual', fill: false, borderWidth: 2.5, pointRadius: 0 },
+          { ...dataset(current, participanteColor(name)), label: 'Valor actual', fill: { target: 1, above: withAlpha(cssVar('--pos'), 0.2), below: withAlpha(cssVar('--neg'), 0.2) }, borderWidth: 2.5, pointRadius: 0 },
           { ...dataset(invested, cssVar('--muted')), label: 'Invertido', fill: false, borderDash: [5, 5], borderWidth: 1.5, stepped: 'before', pointRadius: 0, pointHoverRadius: 0 },
         ] as any,
       },
-      plugins: [{ id: 'participantCrosshair', ...crosshairHooks(muted, () => hoverRef.current(null)) }],
+      plugins: [{ id: 'participantCrosshair', ...crosshairHooks(muted, () => hoverRef.current(null), { background: cssVar('--accent'), text: cssVar('--on-accent') }) }],
       options,
     });
     const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
