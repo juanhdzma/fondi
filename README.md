@@ -1,244 +1,122 @@
+<div align="center">
+
+<img src="docs/img/logo.png" width="72" alt="">
+
 # Fondi
 
-Web dashboard for managing a mutual-fund-style investment pool: several participants contribute/withdraw USD at different times, each owning a fraction of the fund measured in "shares." Shows fund value, share price, individual ownership, and returns in USD and COP.
+**A shared investment pool, run like a mutual fund.**
 
-![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue) ![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20SQLite-009688) ![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20TypeScript-3178c6) [![Build & push to GHCR](https://github.com/juanhdzma/fondi/actions/workflows/docker.yml/badge.svg)](https://github.com/juanhdzma/fondi/actions/workflows/docker.yml)
+<img src="https://cdn.simpleicons.org/react" height="14" alt=""> React &nbsp;·&nbsp; <img src="https://cdn.simpleicons.org/typescript" height="14" alt=""> TypeScript &nbsp;·&nbsp; <img src="https://cdn.simpleicons.org/fastapi" height="14" alt=""> FastAPI &nbsp;·&nbsp; <img src="https://cdn.simpleicons.org/sqlite" height="14" alt=""> SQLite &nbsp;·&nbsp; <img src="https://cdn.simpleicons.org/docker" height="14" alt=""> Docker
 
-![Resumen](docs/screenshots/desktop-resumen.png)
+[Features](#features) · [Docs](docs/ARCHITECTURE.md) · [License](LICENSE)
 
-> ## PRIVATE USE ONLY — NO REAL AUTH BOUNDARY
-> The Admin panel's password (`ADMIN_PASSWORD`) is checked server-side, so it isn't trivially bypassable from the browser, and failed attempts are rate-limited per IP (10 per 5 minutes) — but there's no session/token, and the read endpoints (`/api/all`, `/api/export`) require **no auth at all**: anyone who can reach the URL can read every contribution, the fund value, and each person's shares.
->
-> **Do not expose this to the public internet** (no open port-forward, no public reverse proxy) without putting your own auth layer in front of it (e.g. a reverse proxy with basic auth, a VPN/Tailscale, etc.), and **always set your own `ADMIN_PASSWORD`** — it defaults to `admin` if unset.
->
-> Behind a reverse proxy every request arrives with the proxy's IP, so one person's failed attempt rate-limits everyone. Set `TRUST_PROXY=1` there to count per real client (`X-Forwarded-For`). Leave it unset when the port is exposed directly — that header is client-supplied, and trusting it would let anyone skip the limit by sending a different one each try.
+</div>
 
-## Contents
+**The problem:** pooling money with family in a spreadsheet works until someone joins late. Splitting gains by hand either shortchanges the early members or gives newcomers a free ride.
 
-- [Features](#features)
-- [How it fits together](#how-it-fits-together)
-- [Running locally](#running-locally)
-- [Running via Docker](#running-via-docker)
-- [Deploying](#deploying)
-- [Configuration](#configuration)
-- [Backups](#backups)
-- [Testing](#testing)
-- [License](#license)
+**What Fondi does:** it runs the pool like a mutual fund. Money in or out converts to shares at the share price right before the movement, so each person's stake is just their share count and gains split themselves, in USD and COP.
+
+<!-- demo-video:start -->
+<!-- Pending: run /brag-slim, drag brag-output/brag.mp4 (<10 MB) into a GitHub issue comment,
+     paste the user-attachments URL on its own line here, then remove this comment. -->
+<!-- demo-video:end -->
+
+![Resumen](docs/img/resumen.png)
+
+> [!WARNING]
+> Private use only. The read endpoints have no auth: anyone who can reach the URL sees every figure. Keep it on your LAN or behind a VPN, and set `ADMIN_PASSWORD`. Details in [Security](#security).
+
+[Features](#features) · [How do I…](#how-do-i) · [Running](#running) · [Configuration](#configuration) · [Documentation](#documentation) · [Security](#security)
 
 ## Features
 
-Modeled like a real mutual fund: every contribution/withdrawal buys "shares" at the price in effect that moment, so each participant's stake is just their share count — the fund can grow or shrink and everyone's value moves proportionally, no manual gain-splitting. Everything is an append-only log; nothing is ever edited or deleted.
+**Resumen**
 
-### Resumen
+- Value vs. contributed chart with every movement marked
+- Hover the chart to see the fund on any past date
+- Ownership waffle and a card per participant
 
-Fund value in USD and COP on one line, over a chart of the fund's value against what's been contributed, labeled at the end of each line, with every contribution and withdrawal marked on the line. Hovering the chart updates the figures above it; each period button shows that period's return by share price. Next to it: totals with sparklines, a 10×10 waffle of who owns what and a card per participant with their value, return in USD and COP and their own sparkline. Dark by default, with a light theme toggle.
+<table><tr>
+<td width="74%"><img src="docs/img/resumen.png" alt="Resumen, desktop"></td>
+<td><img src="docs/img/resumen-mobile.png" alt="Resumen, mobile"></td>
+</tr></table>
 
-![Resumen](docs/screenshots/desktop-resumen.png)
+**Movimientos**
 
-### Movimientos
+- Per-person value, gain and total contributed
+- Personal chart with its own date range
+- Timeline grouped by month, with search and filters
 
-The full history of contributions and withdrawals as a timeline grouped by month, filterable by participant (chips), text search (name or amount), type and period. Pick someone for their personal breakdown — current value, gain in USD and COP, total contributed — next to a chart of their investment's value against what they've put in, with its own independent date range.
+<table><tr>
+<td width="74%"><img src="docs/img/movimientos.png" alt="Movimientos, desktop"></td>
+<td><img src="docs/img/movimientos-mobile.png" alt="Movimientos, mobile"></td>
+</tr></table>
 
-![Movimientos](docs/screenshots/desktop-movimientos.png)
+**Admin**
 
-### Admin
+- Three-step movement form with a share-math receipt
+- Valuations, participants, `.xlsx` export and import
+- Server-side password with rate limiting
 
-Register a contribution/withdrawal in three steps (who, amounts, confirm) ending in a receipt with the share math — price, shares, ownership before and after — or a plain valuation. Also where you add, hide or remove participants and export/import the whole dataset as `.xlsx`. Gated behind a password checked server-side.
+<table><tr>
+<td width="74%"><img src="docs/img/admin.png" alt="Admin, desktop"></td>
+<td><img src="docs/img/admin-mobile.png" alt="Admin, mobile"></td>
+</tr></table>
 
-![Admin](docs/screenshots/desktop-admin.png)
+Screenshots use placeholder data, not a real fund.
 
-Screenshots above use placeholder data for illustration, not a real fund's figures.
+## How do I…
 
-### Mobile
+### Register a contribution
+Admin → Movimiento → pick the person, type the USD amount, the COP you paid and the fund value right after. The confirmation step shows the shares bought and the ownership before and after.
 
-Below 820px the icon rail becomes a top bar with the sections as icons. Inputs are sized to avoid iOS's zoom-on-focus.
+### Update the fund value
+Admin → Actualizar valor → type the total the broker shows. Only the share price changes; nobody's share count does.
 
-<table>
-<tr>
-<td><img src="docs/screenshots/mobile-resumen.png" width="260" alt="Resumen, mobile"></td>
-<td><img src="docs/screenshots/mobile-movimientos.png" width="260" alt="Movimientos, mobile"></td>
-<td><img src="docs/screenshots/mobile-admin.png" width="260" alt="Admin, mobile"></td>
-</tr>
-</table>
+### Hide someone who left
+Admin → Participantes. Removing a person takes them out of the movement form; hiding them takes them out of Resumen and Movimientos. Neither deletes their history or shares.
 
-## How it fits together
+### Fix a wrong entry
+Export the `.xlsx` (Admin → Exportar respaldo), edit the row, and import it back (Admin → Restaurar desde archivo). A database backup is taken before every import.
 
-By default, one image and one container: a multi-stage `Dockerfile` builds the Vite frontend, then a Python stage installs FastAPI and serves the built static files alongside the `/api/*` routes from a single `uvicorn` process. Data lives in a SQLite file with three append-only tables (`historial_fondo`, `movimientos`, `participantes_config`) — nothing is ever edited or deleted, only new rows added.
+## Running
 
-The frontend is a React + TypeScript app built with Vite and the Fondi CSS system. Screen components read the small in-memory data snapshot (`S` in `state.ts`) populated from `GET /api/all`; controlled React state owns navigation and forms. Native HTML dialogs protect destructive confirmations. Any admin write — a movement, a valuation, adding a participant — goes through the API and then refetches the authoritative snapshot; there's no optimistic data patching by design.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module ownership, request contract and the future frontend/API split.
-
-## Running locally
-
-Needs Node.js 20+ and Python 3.12. The frontend and backend run as two separate processes in dev.
-
-```bash
-# Backend
-cd backend
-pip install -r requirements-dev.txt
-ADMIN_PASSWORD=whatever uvicorn app.main:app --port 8000 --reload
-```
-
-```bash
-# Frontend, in another shell
-npm install
-npm run dev
-# Open http://localhost:8080
-```
-
-The frontend talks to `http://localhost:8000` in dev (see `API_BASE_URL` in `src/config.js`) — CORS is enabled on the backend for this cross-origin setup. To build against a separately deployed API, set `VITE_API_BASE_URL=https://api.example.com` before `npm run build`. To test the UI without a running backend, set `MOCK_MODE = true` in `src/config.js`.
-
-`npm run build` generates `dist/` (what the Dockerfile copies into the image); `npm run preview` serves it locally to check before deploying.
-
-### Structure
-
-```
-  index.html          Vite entry shell
-src/
-  main.tsx             React entry point and reduced-motion provider
-  App.tsx              Data refresh, navigation, theme toggle and load errors
-  components/          Summary, Movements, Admin and Chart.js React components
-  config.js            API_BASE_URL, MOCK_MODE and mock fixtures
-  state.ts             Typed in-memory API snapshot
-  computed.js          Derived state (share price, shares per participant, ...)
-  style.css            Fondi visual system
-  api/backend.js       All HTTP I/O
-  domain/cuotas.js     Pure share math
-  utils/               Formatters, dates and money inputs
-  *.test.{js,ts}       Vitest tests next to the behavior they cover
-backend/
-  app/main.py          FastAPI app: auth dependency, routes, optional static file mount
-  app/db.py            Schema + sqlite3 connection helper
-  app/domain.py        Authoritative share calculations
-  app/xlsx.py          xlsx export/import format
-  tests/               pytest + FastAPI TestClient
-```
-
-## Running via Docker
-
-```bash
-docker compose up -d --build
-# Open http://localhost:8080
-```
-
-Uses `docker-compose.yml` at the repo root (local build, no dependency on GHCR). Copy `.env.example` to `.env` and set `ADMIN_PASSWORD` before running — it defaults to `admin` otherwise.
-
-> **Upgrading from an image built before the container ran as a non-root user**: the process now runs as uid `10001`, and a `fondi-db` volume created by an older image is still owned by root, so SQLite can't write to it. The container refuses to start in that case (`attempt to write a readonly database`) rather than coming up healthy and failing one save at a time. Fix it once:
->
-> ```bash
-> docker run --rm -v fondi-db:/data alpine chown -R 10001:10001 /data
-> ```
->
-> A volume created fresh by the current image already has the right owner.
-
-Or build/run manually:
-
-```bash
-docker build -t fondi .
-docker run -p 8080:8000 -e ADMIN_PASSWORD=whatever -v fondi-db:/data fondi
-```
-
-**Reachable from any device on your network**: the container listens on all interfaces, so you're not limited to `localhost` — find your machine's LAN IP (`ipconfig getifaddr en0` on Mac, `hostname -I` on Linux, `ipconfig` on Windows) and open `http://<that-ip>:8080` from your phone, tablet, or any other device on the same Wi-Fi.
-
-## Deploying
-
-Image to pull:
-
-```
-ghcr.io/juanhdzma/fondi:latest
-```
-
-```bash
-# On the server where Docker runs, authenticate first (PAT needs the read:packages scope,
-# created at GitHub → Settings → Developer settings → Personal access tokens):
-echo <GITHUB_PAT> | docker login ghcr.io -u juanhdzma --password-stdin
-```
-
-`docker-compose.yml` for a reverse-proxied deploy (e.g. via Portainer):
-
-```yaml
-services:
-  fondi:
-    image: ghcr.io/juanhdzma/fondi:latest
-    container_name: fondi
-    restart: unless-stopped
-    environment:
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      # There's a proxy in front, so rate-limit failed logins per real client, not per proxy IP.
-      - TRUST_PROXY=1
-    volumes:
-      - fondi-db:/data
-    networks:
-      - proxy
-
-networks:
-  proxy:
-    external: true
-
-volumes:
-  fondi-db:
-    name: fondi_db
-```
-
-The `proxy` network must already exist (Traefik or another reverse proxy) and must be told to route to container port **8000**. Without the `fondi-db` volume, the SQLite database is wiped every time the container is recreated.
-
-`name: fondi_db` pins the real volume name. Without it Compose prefixes the project/stack name (`fondi_fondi-db`), so renaming the stack later makes it create a **new, empty** volume — the app starts up perfectly healthy showing a fund of zero, while the actual history sits in the old volume nobody is looking at. Note this also means the manual `docker run -v fondi-db:/data` above uses a *different* volume than the stack does; pick one.
-
-### Separating frontend and API
-
-The default remains one container. If the frontend later needs its own host or service, build it with the API URL and turn off static serving in the backend:
-
-```bash
-VITE_API_BASE_URL=https://api.example.com docker compose build
-SERVE_STATIC=0 ALLOWED_ORIGINS=https://app.example.com docker compose up -d
-```
-
-Serve the resulting frontend with the existing reverse proxy or any static host. The API contract and SQLite volume stay unchanged.
-
-**After a new image is published, a plain restart/recreate is not enough** — Docker won't re-fetch an already-pulled `:latest` tag on its own. Pull explicitly (`docker compose pull`, or Portainer's "re-pull image" option) before recreating.
+| I want to… | Run |
+|---|---|
+| Try it | `docker run -p 8080:8000 -e ADMIN_PASSWORD=change-me -v fondi-db:/data ghcr.io/juanhdzma/fondi:latest` |
+| Work on the frontend | `npm install && npm run dev` (backend on :8000, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)) |
+| Work on the backend | `cd backend && uvicorn app.main:app --port 8000 --reload` |
+| Deploy | A Portainer stack with the compose file in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
 
 ## Configuration
 
-The backend uses environment variables; `VITE_API_BASE_URL` is read while building the frontend. `.env.example` has the same list with the reasoning. None are required — the defaults run.
-
-| Variable | Default | What it does |
-|---|---|---|
-| `ADMIN_PASSWORD` | `admin` | Password for the Admin panel. **Set your own.** The default exists so a missing variable never makes the app unusable, not because it's safe. |
-| `TRUST_PROXY` | off | Read `X-Forwarded-For` when counting failed logins. Turn it on **only** behind a reverse proxy — see the warning at the top. |
-| `BACKUP_INTERVAL_H` | `24` | Hours between automatic DB snapshots. `0` disables them. |
-| `ALLOWED_ORIGINS` | `*` | Comma-separated CORS origins. Only matters for `npm run dev`, where frontend and backend are on different ports; production is same-origin. |
-| `SERVE_STATIC` | `1` | Set `0` when the frontend is hosted separately; FastAPI will not mount frontend files. |
-| `VITE_API_BASE_URL` | same origin | Build-time URL for a separately hosted frontend. |
-| `DB_PATH` | `/data/fondi.db` | SQLite file. Must be on the mounted volume, or the history dies with the container. |
-| `LOG_LEVEL` | `INFO` | Backend log level. |
-| `STATIC_DIR` | `../static` | Where the built frontend lives inside the image. If the directory doesn't exist, no static routes are mounted and only the API is served — which is what running the backend standalone for frontend dev relies on. |
-
-## Backups
-
-The database is the only copy of the fund's history, and the app has no UPDATE/DELETE to fix a bad write from the UI. Two things guard it, both inside the `/data` volume next to `fondi.db` (last 5 kept, named `fondi.db.<timestamp>.bak`):
-
-- a snapshot taken right before every `.xlsx` import, since that's the one destructive operation;
-- a periodic snapshot every `BACKUP_INTERVAL_H` hours (default 24, `0` disables it).
-
-Both live on the same volume, so they cover corruption and bad writes — **not** losing the volume itself. For that, pull the export off the box on a schedule:
+Copy `.env.example` to `.env`. Everything has a default; only the password matters. The full list is in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#configuration).
 
 ```bash
-curl -sf http://<host>:8080/api/export -o "fondi-$(date +%F).xlsx"
+ADMIN_PASSWORD=change-me   # Admin panel password. Defaults to "admin".
+TRUST_PROXY=               # Set to 1 only behind a reverse proxy.
+BACKUP_INTERVAL_H=24       # Hours between DB snapshots. 0 disables them.
+LOG_LEVEL=INFO             # Backend log level.
 ```
 
-That file is a full restore: Admin → Datos → Importar replaces everything with its contents.
+## Documentation
 
-## Testing
+| Doc | Read it when |
+|---|---|
+| [Architecture](docs/ARCHITECTURE.md) | You want to know how it works and why it's built this way |
+| [Deployment](docs/DEPLOYMENT.md) | You're running it on a server, upgrading or restoring a backup |
+| [Development](docs/DEVELOPMENT.md) | You're changing code: setup, tests, conventions |
 
-```bash
-cd backend && python -m pytest   # API, auth, import/export, share-balance rules
-npm test                         # vitest — share math, per-participant figures, money input
-npm run typecheck                # TypeScript validation
-```
+## Security
 
-Covered on the frontend: share math (`src/domain/`), derived participant figures (`src/computed.js`), money inputs (`src/utils/`) and the chart's calendar/zero-crossing transforms. TypeScript checks the React component boundary; backend tests remain authoritative for every financial write.
+Fondi is built for a trusted home network, not the public internet.
 
-## License
+- **Reads are public.** `GET /api/all` and `/api/export` need no auth: anyone who can reach the URL can read every contribution, the fund value and each person's shares.
+- **Writes need `ADMIN_PASSWORD`**, checked server-side on every request. It defaults to `admin` so a missing variable never locks you out; set your own.
+- **Failed logins are rate-limited** per IP (10 per 5 minutes). Behind a reverse proxy set `TRUST_PROXY=1` so the limit counts real clients; leave it off when the port is exposed directly.
 
-[AGPL-3.0](LICENSE)
+To reach it from outside, put your own auth in front: a VPN such as Tailscale, or a reverse proxy with basic auth.
+
+---
+
+AGPL-3.0 · [LICENSE](LICENSE)
