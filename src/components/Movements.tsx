@@ -50,7 +50,7 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
   const since = desde ? `desde ${fmtDateShort(desde)} ${normDate(desde).slice(0, 4)}` : '';
 
   return (
-    <motion.section id="mov-persona-panel" className={`card person-panel ${estado}`} variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={springTransition}>
+    <motion.section id="mov-persona-panel" className={`card person-panel ${estado}`} variants={surfaceMotion} initial="hidden" animate="visible" transition={springTransition}>
       {estado !== 'activo' && (
         <p className="person-notice" role="status">
           {estado === 'nuevo'
@@ -127,7 +127,10 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
 }
 
 export function Movements({ loading }: { loading: boolean }) {
-  const names = participantesTodos();
+  const names = participantesTodos()
+    .map(name => ({ name, cuotas: calcParticipante(name).cuotas }))
+    .sort((a, b) => b.cuotas - a.cuotas)
+    .map(({ name }) => name);
   const activeNames = new Set(participantesVisiblesActivos());
   const [selected, setSelected] = useState('');
   const [type, setType] = useState('all');
@@ -154,7 +157,17 @@ export function Movements({ loading }: { loading: boolean }) {
       </div>
 
       <AnimatePresence initial={false}>
-        {selectedName && <PersonPanel key="person-panel" name={selectedName} range={range} setRange={setRange} />}
+        {selectedName && (
+          <motion.div
+            key="person-panel"
+            initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
+            animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }}
+            exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
+            transition={quickTransition}
+          >
+            <PersonPanel name={selectedName} range={range} setRange={setRange} />
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <div className="mov-filters">
