@@ -4,7 +4,7 @@ Frontend and backend run as two processes in development: Vite on `:8080` and Fa
 
 ## Prerequisites
 
-- Node.js 20 (the version the Docker build uses)
+- Node.js 24 (the version the Docker build uses)
 - Python 3.12
 
 ## Setup
@@ -38,7 +38,7 @@ cd backend && python -m pytest   # pytest
 - **vitest** covers DOM-free logic: share math (`src/domain/`), derived participant figures (`src/computed.js`), money inputs, formatting, dates, movement filters and chart transforms.
 - **pytest** covers the API end to end with `TestClient`: auth and rate limit, validation, the withdrawal balance check, movement plus valuation in one transaction, import/export and the backend share math (`app/domain.py`).
 
-CI runs both suites on every push to `main` and publishes the image only if they pass.
+CI runs both suites on every push to `main` and on every pull request, and publishes the image only from `main` when they pass. Dependabot opens weekly update PRs, which that same run validates.
 
 ## Build
 

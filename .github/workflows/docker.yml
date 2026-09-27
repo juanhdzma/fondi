@@ -9,7 +9,20 @@ on:
       - public/**
       - package.json
       - package-lock.json
-      - vite.config.js
+      - vite.config.ts
+      - tsconfig.json
+      - Dockerfile
+      - backend/**
+      - .github/workflows/docker.yml
+  pull_request:
+    paths:
+      - index.html
+      - src/**
+      - public/**
+      - package.json
+      - package-lock.json
+      - vite.config.ts
+      - tsconfig.json
       - Dockerfile
       - backend/**
       - .github/workflows/docker.yml
@@ -34,7 +47,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm test
@@ -42,6 +55,7 @@ jobs:
 
   build:
     needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
