@@ -17,7 +17,7 @@
 **What Fondi does:** it runs the pool like a mutual fund. Money in or out converts to shares at the share price right before the movement, so each person's stake is just their share count and gains split themselves, in USD and COP.
 
 <!-- demo-video:start -->
-https://github.com/user-attachments/assets/ac8b7e34-c74e-4765-8362-77c3ba2fd7a1
+https://github.com/user-attachments/assets/dad26a1d-c2f3-40fc-845d-3de9d9268754
 <!-- demo-video:end -->
 
 ![Resumen](docs/img/resumen.png)
