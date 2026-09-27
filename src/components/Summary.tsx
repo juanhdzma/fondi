@@ -6,7 +6,7 @@ import { springTransition, staggered, surfaceMotion } from '../motion';
 import { COP, fmt0, fmtN, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort } from '../utils/dates.js';
 import { cssVar, useTheme } from '../theme';
-import { HeroChart, heroSeries, periodPct, RANGE_LABELS, RANGES, type HeroPoint } from './Charts';
+import { heroChange, HeroChart, heroSeries, RANGE_LABELS, RANGES, type HeroPoint } from './Charts';
 import { CountUp } from './CountUp';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
@@ -83,7 +83,10 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
 
   const points = useMemo(() => heroSeries(range), [range, S.historial, S.movimientos]);
   const rangeReturns = useMemo(
-    () => Object.fromEntries(RANGES.map(([value]) => [value, periodPct(heroSeries(value), 'precio_cuota')])),
+    () => Object.fromEntries(RANGES.map(([value]) => {
+      const series = heroSeries(value);
+      return [value, heroChange(series[0], series.at(-1))];
+    })),
     [S.historial, S.movimientos],
   );
   const history = useMemo(() => historialGananciaFondo(), [S.historial, S.movimientos]);
@@ -91,9 +94,9 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
   const base = points[0];
   const shownUsd = hover ? hover.valor : current?.valor_total ?? 0;
   const shownTrm = hover ? hover.trm : S.trm || 1;
-  const shownPrice = hover ? hover.precio_cuota : current?.precio_cuota ?? 0;
-  const usdChange = base && base.precio_cuota > 0 ? (shownPrice / base.precio_cuota - 1) * 100 : null;
-  const copChange = base && base.precio_cuota > 0 ? (shownPrice * shownTrm / (base.precio_cuota * base.trm) - 1) * 100 : null;
+  const shownPoint = hover ?? points.at(-1);
+  const usdChange = heroChange(base, shownPoint);
+  const copChange = heroChange(base, shownPoint, 'cop');
   const when = hover ? `${fmtDateShort(hover.fecha)} · desde el inicio del período` : `cambio en ${RANGE_LABELS[range]}`;
 
   const totalShares = cuotasCirc();

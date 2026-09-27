@@ -58,11 +58,19 @@ function filteredWithFill(range: string, source: Row[]) {
   return result;
 }
 
-export function periodPct(data: Row[], key: string) {
-  if (data.length < 2) return null;
-  const start = Number(data[0][key]);
-  const end = Number(data.at(-1)?.[key]);
-  return start > 0 ? (end - start) / start * 100 : null;
+// Ganancia del período sobre el capital en juego (valor inicial + aportes netos del período):
+// capital = valorFinal - ganado. Con valor inicial 0 coincide con ganancia / aportado.
+export function periodGainPct(startGain: number, endGain: number, endValue: number) {
+  const gained = endGain - startGain;
+  const capital = endValue - gained;
+  return capital > 0 ? gained / capital * 100 : null;
+}
+
+export function participantRangePct(name: string, range: string) {
+  const rows = filteredWithFill(range, historialParticipante(name) as Row[]);
+  const [start, end] = [rows[0], rows.at(-1)];
+  if (rows.length < 2 || !start || !end) return null;
+  return periodGainPct(Number(start.valor) - Number(start.invertido), Number(end.valor) - Number(end.invertido), Number(end.valor));
 }
 
 export function rangeHistory(range: string) {
@@ -277,7 +285,14 @@ function standardOptions(ticks: number[]) {
   };
 }
 
-export type HeroPoint = { ts: number; fecha: string; valor: number; aportado: number; ganancia: number; precio_cuota: number; trm: number };
+export type HeroPoint = { ts: number; fecha: string; valor: number; aportado: number; ganancia: number; ganancia_cop: number; trm: number };
+
+export function heroChange(start: HeroPoint | undefined, end: HeroPoint | undefined, currency: 'usd' | 'cop' = 'usd') {
+  if (!start || !end || start === end) return null;
+  return currency === 'usd'
+    ? periodGainPct(start.ganancia, end.ganancia, end.valor)
+    : periodGainPct(start.ganancia_cop, end.ganancia_cop, end.valor * end.trm);
+}
 
 export type Grain = 'day' | 'week' | 'month';
 

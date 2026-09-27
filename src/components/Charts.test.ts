@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketStart, computeCalendarTicks, downsample, grainFor, nextTooltipTap, spreadLabels, valueAt } from './Charts';
+import { bucketStart, computeCalendarTicks, downsample, grainFor, nextTooltipTap, periodGainPct, spreadLabels, valueAt } from './Charts';
 
 describe('chart data helpers', () => {
   it('interpolates the line value between points and clamps at the ends', () => {
@@ -59,5 +59,19 @@ describe('grouping and downsampling', () => {
     expect(kept.at(-1)).toBe(points[99]);
     expect(kept.every(point => points.includes(point))).toBe(true);
     expect(kept.some(point => point.valor === -500)).toBe(true);
+  });
+});
+
+describe('periodGainPct', () => {
+  it('equals gain over contributed when the period starts empty', () => {
+    expect(periodGainPct(0, 1542.85, 26476.77)).toBeCloseTo(1542.85 / 24933.92 * 100);
+  });
+
+  it('ignores contributions made during the period', () => {
+    expect(periodGainPct(100, 150, 2050)).toBeCloseTo(2.5);
+  });
+
+  it('returns null without capital', () => {
+    expect(periodGainPct(0, 0, 0)).toBeNull();
   });
 });

@@ -6,7 +6,7 @@ import { quickTransition, springTransition, staggered, surfaceMotion } from '../
 import { COP, fmt, fmtN0, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, normDate } from '../utils/dates.js';
 import { filterMovements, groupByMonth, PERIODS } from '../utils/movements.js';
-import { heroSeries, ParticipantChart, periodPct, RANGES, type ParticipantPoint } from './Charts';
+import { participantRangePct, ParticipantChart, RANGES, type ParticipantPoint } from './Charts';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
 import { SelectMenu } from './SelectMenu';
@@ -41,8 +41,8 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
   const { estado, aportes, desde, ultimoRetiro } = estadoParticipante(name, SHARE_TOLERANCE);
   const [hover, setHover] = useState<ParticipantPoint | null>(null);
   const rangeReturns = useMemo(
-    () => Object.fromEntries(RANGES.map(([value]) => [value, periodPct(heroSeries(value), 'precio_cuota')])),
-    [S.historial, S.movimientos],
+    () => Object.fromEntries(RANGES.map(([value]) => [value, participantRangePct(name, value)])),
+    [name, S.historial, S.movimientos],
   );
   const hoverGain = hover ? hover.valor - hover.invertido : 0;
   const hoverGainPct = hover && hover.invertido > 0 ? hoverGain / hover.invertido * 100 : 0;
@@ -112,7 +112,7 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
             {RANGES.map(([value, full, short]) => {
               const pct = rangeReturns[value];
               return (
-                <button key={value} type="button" className={`range-pill${range === value ? ' active' : ''}`} aria-pressed={range === value} aria-label={`${full}${pct === null ? '' : `, rendimiento del fondo ${signStr(pct)}${fmtPct(Math.abs(pct))}%`}`} onClick={() => setRange(value)}>
+                <button key={value} type="button" className={`range-pill${range === value ? ' active' : ''}`} aria-pressed={range === value} aria-label={`${full}${pct === null ? '' : `, ganancia ${signStr(pct)}${fmtPct(Math.abs(pct))}%`}`} onClick={() => setRange(value)}>
                   {range === value && <motion.span className="control-selection" layoutId="participant-range" transition={springTransition} />}
                   <span className="control-label">{short}</span>
                   {pct !== null && <small className={`control-label ${tone(pct)}`}>{signStr(pct)}{fmtPct(Math.abs(pct))}%</small>}

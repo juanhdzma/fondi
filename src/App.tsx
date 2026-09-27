@@ -50,6 +50,10 @@ export function App() {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [tab]);
+
   const retry = () => {
     setLoading(true);
     void refresh();
