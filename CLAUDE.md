@@ -27,7 +27,7 @@ docker build -t fondi .
 docker run -p 8080:8000 -e ADMIN_PASSWORD=whatever -v fondi-db:/data fondi
 ```
 
-There's no linter configured. Tests: `pytest` for the backend and `vitest` for DOM-free frontend logic. `npm run typecheck` validates the React/TypeScript boundary. Keep financial calculations outside JSX so they remain unit-testable. The only CI is `.github/workflows/docker.yml`: on every push to `main` and every pull request touching the app it runs both test suites; only a push to `main` whose tests pass publishes `ghcr.io/<user>/fondi:latest`. Dependabot (`.github/dependabot.yml`) opens weekly PRs for npm, pip, Actions and Docker; Node majors are ignored so the image stays on an LTS.
+There's no linter configured. Tests: `pytest` for the backend and `vitest` for DOM-free frontend logic. `npm run typecheck` validates the React/TypeScript boundary. Keep financial calculations outside JSX so they remain unit-testable. The only CI is `.github/workflows/docker.yml`: on every push to `main` and every pull request touching the app it runs both test suites; only a push to `main` whose tests pass publishes `ghcr.io/<user>/fondi:latest`.
 
 To test changes without hitting the real backend, set `MOCK_MODE = true` in `src/config.js`.
 
