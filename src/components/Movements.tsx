@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { S, type Movement } from '../state.js';
-import { calcParticipante, cuotasCirc, estadoParticipante, participanteColor, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
+import { calcParticipante, cuotasCirc, estadoParticipante, historialParticipante, participanteColor, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
 import { quickTransition, springTransition, staggered, surfaceMotion } from '../motion';
 import { COP, fmt, fmtN0, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, normDate } from '../utils/dates.js';
 import { filterMovements, groupByMonth, PERIODS } from '../utils/movements.js';
-import { participantRangePct, ParticipantChart, RANGES, type ParticipantPoint } from './Charts';
+import { ParticipantBars, CHART_PERIODS, periodLabel, periodSummary, type Period, type PeriodPoint } from './Charts';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
 import { SelectMenu } from './SelectMenu';
@@ -34,19 +34,17 @@ function ShareRing({ name, share }: { name: string; share: number }) {
   );
 }
 
-function PersonPanel({ name, range, setRange }: { name: string; range: string; setRange: (range: string) => void }) {
+function PersonPanel({ name, period, setPeriod }: { name: string; period: Period; setPeriod: (period: Period) => void }) {
   const participant = calcParticipante(name);
   const total = cuotasCirc();
   const share = total > 0 ? Math.max(0, participant.cuotas) / total * 100 : 0;
   const { estado, aportes, desde, ultimoRetiro } = estadoParticipante(name, SHARE_TOLERANCE);
-  const [hover, setHover] = useState<ParticipantPoint | null>(null);
-  const rangeReturns = useMemo(
-    () => Object.fromEntries(RANGES.map(([value]) => [value, participantRangePct(name, value)])),
-    [name, S.historial, S.movimientos],
-  );
-  const hoverGain = hover ? hover.valor - hover.invertido : 0;
-  const hoverGainPct = hover && hover.invertido > 0 ? hoverGain / hover.invertido * 100 : 0;
-  const gain = hover ? hoverGain : participant.ganancia_monto;
+  const [hover, setHover] = useState<PeriodPoint | null>(null);
+  const summaries = useMemo(() => {
+    const rows = historialParticipante(name);
+    return Object.fromEntries(CHART_PERIODS.map(([value]) => [value, periodSummary(rows, value)])) as Record<Period, PeriodPoint[]>;
+  }, [name, S.historial, S.movimientos]);
+  const gain = hover ? hover.periodo : participant.ganancia_monto;
   const since = desde ? `desde ${fmtDateShort(desde)} ${normDate(desde).slice(0, 4)}` : '';
 
   return (
@@ -76,11 +74,11 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
               </dd>
             </div>
             <div className={`person-gain ${tone(gain)}`}>
-              <dt>{hover ? `Ganancia al ${fmtDateShort(hover.fecha)}` : 'Ganancia'}</dt>
+              <dt>{hover ? `Ganancia ${periodLabel(hover.ts, period)}` : 'Ganancia'}</dt>
               {hover ? (
                 <dd>
-                  <b className={tone(hoverGain)}>{signStr(hoverGain)}{fmt(Math.abs(hoverGain))} <Delta value={hoverGainPct} lead /></b>
-                  <small>Invertido {fmt(hover.invertido)}</small>
+                  <b className={tone(hover.periodo)}>{signStr(hover.periodo)}{fmt(Math.abs(hover.periodo))} <Delta value={hover.periodo_pct} lead /></b>
+                  <small className={tone(hover.periodo_cop)}>{signStr(hover.periodo_cop)}{COP(Math.round(Math.abs(hover.periodo_cop)))} <Delta value={hover.periodo_cop_pct} /></small>
                 </dd>
               ) : (
                 <dd>
@@ -90,31 +88,38 @@ function PersonPanel({ name, range, setRange }: { name: string; range: string; s
               )}
             </div>
             <div>
-              <dt>Total aportado</dt>
-              <dd>
-                <b>{fmt(participant.aportes_monto)}</b>
-                {participant.has_cop && <small>{COP(participant.cop_invertido)} · TRM prom {fmtN0(participant.trm_avg_entrada)}</small>}
-                {participant.retiros_monto > 0 && <small>{fmt(participant.retiros_monto)} retirados</small>}
-              </dd>
+              <dt>{hover ? `Aportado al ${fmtDateShort(hover.fecha)}` : 'Total aportado'}</dt>
+              {hover ? (
+                <dd>
+                  <b>{fmt(hover.invertido)}</b>
+                  <small>{COP(Math.round(hover.aportado_cop))}</small>
+                </dd>
+              ) : (
+                <dd>
+                  <b>{fmt(participant.aportes_monto)}</b>
+                  {participant.has_cop && <small>{COP(participant.cop_invertido)} · TRM prom {fmtN0(participant.trm_avg_entrada)}</small>}
+                  {participant.retiros_monto > 0 && <small>{fmt(participant.retiros_monto)} retirados</small>}
+                </dd>
+              )}
             </div>
           </dl>
         )}
       </div>
       {estado !== 'nuevo' && (
         <div className="person-chart">
-          <div className="chart-title">Evolución de tu inversión</div>
+          <div className="chart-title">Resumen por período</div>
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={`${name}-${range}`} className="chart-wrap" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-              <ParticipantChart name={name} range={range} onHover={setHover} />
+            <motion.div key={`${name}-${period}`} className="person-bars" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
+              <ParticipantBars name={name} period={period} points={summaries[period]} onHover={setHover} />
             </motion.div>
           </AnimatePresence>
-          <div className="range-pills" role="group" aria-label="Período de evolución">
-            {RANGES.map(([value, full, short]) => {
-              const pct = rangeReturns[value];
+          <div className="range-pills periods" role="group" aria-label="Agrupar por">
+            {CHART_PERIODS.map(([value, label]) => {
+              const pct = summaries[value].at(-1)?.periodo_pct ?? null;
               return (
-                <button key={value} type="button" className={`range-pill${range === value ? ' active' : ''}`} aria-pressed={range === value} aria-label={`${full}${pct === null ? '' : `, ganancia ${signStr(pct)}${fmtPct(Math.abs(pct))}%`}`} onClick={() => setRange(value)}>
-                  {range === value && <motion.span className="control-selection" layoutId="participant-range" transition={springTransition} />}
-                  <span className="control-label">{short}</span>
+                <button key={value} type="button" className={`range-pill${period === value ? ' active' : ''}`} aria-pressed={period === value} aria-label={`${label}${pct === null ? '' : `, período actual ${signStr(pct)}${fmtPct(Math.abs(pct))}%`}`} onClick={() => setPeriod(value)}>
+                  {period === value && <motion.span className="control-selection" layoutId="participant-range" transition={springTransition} />}
+                  <span className="control-label">{label}</span>
                   {pct !== null && <small className={`control-label ${tone(pct)}`}>{signStr(pct)}{fmtPct(Math.abs(pct))}%</small>}
                 </button>
               );
@@ -136,7 +141,7 @@ export function Movements({ loading }: { loading: boolean }) {
   const [type, setType] = useState('all');
   const [query, setQuery] = useState('');
   const [period, setPeriod] = useState('todo');
-  const [range, setRange] = useState('todo');
+  const [chartPeriod, setChartPeriod] = useState<Period>('month');
   const selectedName = names.includes(selected) ? selected : '';
   const visible = new Set(names);
   const movements: Movement[] = filterMovements(S.movimientos.filter(movement => visible.has(movement.persona)), { person: selectedName, type, query, period });
@@ -165,7 +170,7 @@ export function Movements({ loading }: { loading: boolean }) {
             exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
             transition={quickTransition}
           >
-            <PersonPanel name={selectedName} range={range} setRange={setRange} />
+            <PersonPanel name={selectedName} period={chartPeriod} setPeriod={setChartPeriod} />
           </motion.div>
         )}
       </AnimatePresence>

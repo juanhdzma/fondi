@@ -13,4 +13,4 @@ export const fmtPct = n => NF2.format(n);
 export const fmtQuota = n => NF4.format(n);
 export const COP = n => '$ ' + NF0.format(n);
 export const signStr = n => n >= 0 ? '+' : '−';
-export const compact = n => Math.abs(n) >= 1e4 ? NF1.format(n / 1e3) + 'k' : NF0.format(n);
+export const compact = n => Math.abs(n) >= 1e6 ? NF1.format(n / 1e6) + 'M' : Math.abs(n) >= 1e4 ? NF1.format(n / 1e3) + 'k' : NF0.format(n);

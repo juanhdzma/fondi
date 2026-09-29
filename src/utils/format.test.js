@@ -14,5 +14,6 @@ describe('money formatting', () => {
   it('abbreviates large axis values', () => {
     expect(compact(12450)).toBe('12,5k');
     expect(compact(950)).toBe('950');
+    expect(compact(5034871)).toBe('5,0M');
   });
 });

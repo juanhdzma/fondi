@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
-import { historialGananciaFondo, historialParaGrafica, historialParticipante, participanteColor } from '../computed.js';
+import { historialGananciaFondo, historialParaGrafica, participanteColor } from '../computed.js';
 import { S } from '../state.js';
-import { compact, fmt, fmt0 } from '../utils/format.js';
+import { compact, COP, fmt, fmt0 } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
 import { useReducedMotion } from 'motion/react';
 import { cssVar, useTheme, withAlpha } from '../theme';
@@ -64,13 +64,6 @@ export function periodGainPct(startGain: number, endGain: number, endValue: numb
   const gained = endGain - startGain;
   const capital = endValue - gained;
   return capital > 0 ? gained / capital * 100 : null;
-}
-
-export function participantRangePct(name: string, range: string) {
-  const rows = filteredWithFill(range, historialParticipante(name) as Row[]);
-  const [start, end] = [rows[0], rows.at(-1)];
-  if (rows.length < 2 || !start || !end) return null;
-  return periodGainPct(Number(start.valor) - Number(start.invertido), Number(end.valor) - Number(end.invertido), Number(end.valor));
 }
 
 export function rangeHistory(range: string) {
@@ -294,7 +287,7 @@ export function heroChange(start: HeroPoint | undefined, end: HeroPoint | undefi
     : periodGainPct(start.ganancia_cop, end.ganancia_cop, end.valor * end.trm);
 }
 
-export type Grain = 'day' | 'week' | 'month';
+export type Grain = 'day' | 'week' | 'month' | 'year';
 
 export function grainFor(spanDays: number): Grain {
   return spanDays > 150 ? 'month' : spanDays > 45 ? 'week' : 'day';
@@ -302,6 +295,7 @@ export function grainFor(spanDays: number): Grain {
 
 export function bucketStart(ts: number, grain: Grain) {
   const date = new Date(ts);
+  if (grain === 'year') return new Date(date.getFullYear(), 0, 1).getTime();
   if (grain === 'month') return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
   const back = grain === 'week' ? (date.getDay() + 6) % 7 : 0;
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() - back).getTime();
@@ -362,7 +356,8 @@ function contributedSeries(range: string) {
 
 const monthYearFormatter = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
 
-function periodLabel(ts: number, grain: Grain) {
+export function periodLabel(ts: number, grain: Grain) {
+  if (grain === 'year') return String(new Date(ts).getFullYear());
   if (grain === 'month') return monthYearFormatter.format(new Date(ts));
   if (grain === 'week') return `semana del ${formatTimestamp(ts)}`;
   return formatTimestamp(ts);
@@ -596,66 +591,204 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
   );
 }
 
-export type ParticipantPoint = { fecha: string; valor: number; invertido: number; trm: number };
+export const CHART_PERIODS = [['week', 'Semana'], ['month', 'Mes'], ['year', 'Año']] as const;
+export type Period = typeof CHART_PERIODS[number][0];
+const PERIOD_LIMIT: Record<Period, number> = { week: 12, month: 12, year: Infinity };
 
-export function ParticipantChart({ name, range, onHover }: { name: string; range: string; onHover: (point: ParticipantPoint | null) => void }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
+type ParticipantRow = { fecha: string; valor: number; invertido: number; aportado_cop: number; trm: number };
+export type PeriodPoint = ParticipantRow & { ts: number; periodo: number; periodo_cop: number; periodo_pct: number | null; periodo_cop_pct: number | null };
+
+// Último snapshot de cada período y su ganancia contra el período anterior, sin contar aportes:
+// diferencia de (valor - aportado), en USD y en COP. El primer período arranca de ganancia 0.
+export function periodSummary(rows: ParticipantRow[], period: Period): PeriodPoint[] {
+  const lastByBucket = new Map<number, ParticipantRow>();
+  for (const row of rows) {
+    if (!lastByBucket.size && !row.valor && !row.invertido) continue;
+    lastByBucket.set(bucketStart(toTimestamp(row.fecha), period), row);
+  }
+  let previous = { usd: 0, cop: 0 };
+  const points = [...lastByBucket].map(([ts, row]) => {
+    const trm = row.trm || S.trm || 1;
+    const gain = { usd: row.valor - row.invertido, cop: row.valor * trm - row.aportado_cop };
+    const point = {
+      ...row,
+      trm,
+      ts,
+      periodo: gain.usd - previous.usd,
+      periodo_cop: gain.cop - previous.cop,
+      periodo_pct: periodGainPct(previous.usd, gain.usd, row.valor),
+      periodo_cop_pct: periodGainPct(previous.cop, gain.cop, row.valor * trm),
+    };
+    previous = gain;
+    return point;
+  });
+  return points.slice(-PERIOD_LIMIT[period]);
+}
+
+const monthShortFormatter = new Intl.DateTimeFormat('es-CO', { month: 'short' });
+
+function barLabel(ts: number, period: Period) {
+  const date = new Date(ts);
+  if (period === 'year') return String(date.getFullYear());
+  if (period === 'week') return formatTimestamp(ts);
+  return `${monthShortFormatter.format(date).replace('.', '')} ${String(date.getFullYear()).slice(2)}`;
+}
+
+function barOptions(onHover: (index: number | null) => void, legend: boolean) {
+  return {
+    animation: false as const,
+    events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 18 } },
+    interaction: { mode: 'index' as const, intersect: false },
+    onHover: (_event: any, elements: Array<{ index: number }>) => onHover(elements.length ? elements[0].index : null),
+    plugins: {
+      legend: legend
+        ? { display: true, position: 'bottom' as const, labels: { color: cssVar('--muted'), font: { size: 12 }, padding: 14, usePointStyle: true, pointStyle: 'rectRounded' } }
+        : { display: false },
+      tooltip: { enabled: false },
+    },
+    scales: {
+      x: { grid: { display: false }, border: { display: false }, ticks: { color: cssVar('--muted'), font: { size: 11 }, maxRotation: 0, autoSkip: true } },
+      y: {
+        beginAtZero: true,
+        grace: legend ? 0 : '15%',
+        ticks: { display: false, maxTicksLimit: legend ? 6 : 4 },
+        grid: { color: cssVar('--line') },
+        border: { display: false },
+      },
+    },
+  };
+}
+
+const barThickness = (count: number) => count <= 4 ? 34 : count <= 8 ? 22 : 14;
+
+// Con barThickness fijo Chart.js junta las barras del grupo sin espacio; el borde transparente
+// deja una separación de 2px sin volver al reparto por categoría que las separaba demasiado.
+function bars(count: number) {
+  return { barThickness: barThickness(count), borderRadius: 4, borderWidth: { left: 1, right: 1 }, borderColor: 'transparent' };
+}
+
+function valueLabels(format: (value: number, datasetIndex: number) => string) {
+  const color = cssVar('--muted');
+  return {
+    id: 'valueLabels',
+    afterDatasetsDraw(chart: Chart) {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = '600 10px Geist Variable, system-ui, sans-serif';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      chart.data.datasets.forEach((dataset, datasetIndex) => {
+        if (!chart.isDatasetVisible(datasetIndex)) return;
+        chart.getDatasetMeta(datasetIndex).data.forEach((bar: any, index) => {
+          const value = Number(dataset.data[index]);
+          const text = format(value, datasetIndex);
+          if (ctx.measureText(text).width > bar.width + 2) return;
+          ctx.textBaseline = value < 0 ? 'top' : 'bottom';
+          ctx.fillText(text, bar.x, value < 0 ? bar.y + 3 : bar.y - 3);
+        });
+      });
+      ctx.restore();
+    },
+  };
+}
+
+// Rangos por eje para dos series de escalas distintas (USD y COP) con el cero a la misma altura:
+// ambos ejes reservan la misma fracción `below` para negativos, la mayor que pida cualquiera.
+export function alignedRanges(series: number[][], grace = 0.15) {
+  const extents = series.map(values => ({ pos: Math.max(0, ...values), neg: Math.max(0, ...values.map(value => -value)) }));
+  const below = Math.min(0.9, Math.max(0, ...extents.map(({ pos, neg }) => pos + neg > 0 ? neg / (pos + neg) : 0)));
+  return extents.map(({ pos, neg }) => {
+    const span = Math.max(pos / (1 - below), below > 0 ? neg / below : 0, 1) * (1 + grace);
+    return { min: -below * span, max: (1 - below) * span };
+  });
+}
+
+const signedCompact = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${compact(Math.abs(value))}`;
+
+const COP_ALPHA = 0.45;
+
+function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], labels: string[], onHover: (index: number | null) => void, leave: { id: string }) {
+  const usd = points.map(point => point.periodo);
+  const cop = points.map(point => point.periodo_cop);
+  const [usdRange, copRange] = alignedRanges([usd, cop]);
+  const pos = cssVar('--pos');
+  const neg = cssVar('--neg');
+  const colors = (values: number[], alpha: number) => values.map(value => withAlpha(value >= 0 ? pos : neg, alpha));
+  const options = barOptions(onHover, true) as any;
+  options.scales.y = { ...options.scales.y, min: usdRange.min, max: usdRange.max };
+  options.scales.y1 = { display: false, min: copRange.min, max: copRange.max };
+  options.plugins.legend.labels.generateLabels = () => [
+    { text: 'USD', datasetIndex: 0, fillStyle: pos, strokeStyle: pos, lineWidth: 0, fontColor: cssVar('--muted'), pointStyle: 'rectRounded' },
+    { text: 'COP', datasetIndex: 1, fillStyle: withAlpha(pos, COP_ALPHA), strokeStyle: withAlpha(pos, COP_ALPHA), lineWidth: 0, fontColor: cssVar('--muted'), pointStyle: 'rectRounded' },
+  ];
+  return new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'USD', data: usd, yAxisID: 'y', backgroundColor: colors(usd, 1), ...bars(points.length) },
+        { label: 'COP', data: cop, yAxisID: 'y1', backgroundColor: colors(cop, COP_ALPHA), ...bars(points.length) },
+      ] as any,
+    },
+    plugins: [leave, valueLabels(signedCompact)],
+    options,
+  });
+}
+
+export function ParticipantBars({ name, period, points, onHover }: { name: string; period: Period; points: PeriodPoint[]; onHover: (point: PeriodPoint | null) => void }) {
+  const totals = useRef<HTMLCanvasElement>(null);
+  const gains = useRef<HTMLCanvasElement>(null);
   const hoverRef = useRef(onHover);
   hoverRef.current = onHover;
   const theme = useTheme();
-  const rows = useMemo(() => filteredWithFill(range, historialParticipante(name) as Row[]), [name, range, S.historial, S.movimientos]);
 
   useEffect(() => {
-    if (!canvas.current || !rows.length) return;
-    const cutoff = rangeCutoff(range)?.getTime();
-    const timestamps = rows.map((row, index) => {
-      const value = toTimestamp(row.fecha);
-      return index === 0 && cutoff && value < cutoff ? cutoff : value;
-    });
-    const ticks = computeCalendarTicks(timestamps);
-    const current = rows.map((row, index) => ({ x: timestamps[index], y: row.valor }));
-    const invested = rows.map((row, index) => ({ x: timestamps[index], y: row.invertido }));
-    const options = standardOptions(ticks) as any;
-    options.plugins.legend = {
-      display: true,
-      position: 'bottom',
-      labels: { color: cssVar('--muted'), font: { size: 12 }, padding: 14, usePointStyle: true, pointStyle: 'line' },
-    };
-    options.plugins.tooltip = { enabled: false };
-    options.events = ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'];
-    options.onHover = (_event: any, elements: Array<{ index: number }>) => {
-      hoverRef.current(elements.length ? rows[elements[0].index] as ParticipantPoint : null);
-    };
-    const muted = cssVar('--muted');
-    const chart = new Chart(canvas.current, {
-      type: 'line',
-      data: {
-        datasets: [
-          { ...dataset(current, participanteColor(name)), label: 'Valor actual', fill: { target: 1, above: withAlpha(cssVar('--pos'), 0.2), below: withAlpha(cssVar('--neg'), 0.2) }, borderWidth: 2.5, pointRadius: 0 },
-          { ...dataset(invested, cssVar('--muted')), label: 'Invertido', fill: false, borderDash: [5, 5], borderWidth: 1.5, stepped: 'before', pointRadius: 0, pointHoverRadius: 0 },
-        ] as any,
-      },
-      plugins: [{ id: 'participantCrosshair', ...crosshairHooks(muted, () => hoverRef.current(null), { background: cssVar('--accent'), text: cssVar('--on-accent') }) }],
-      options,
-    });
-    const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
+    if (!totals.current || !gains.current || !points.length) return;
+    const labels = points.map(point => barLabel(point.ts, period));
+    const hover = (index: number | null) => hoverRef.current(index === null ? null : points[index]);
+    const leave = { id: 'barsLeave', afterEvent: (_chart: Chart, args: any) => { if (args.event.type === 'mouseout') hover(null); } };
+    const pos = cssVar('--pos');
+    const neg = cssVar('--neg');
+    const charts = [
+      new Chart(totals.current, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Aportado', data: points.map(point => point.invertido), backgroundColor: withAlpha(cssVar('--muted'), 0.45), ...bars(points.length) },
+            { label: 'Valor total', data: points.map(point => point.valor), backgroundColor: participanteColor(name), ...bars(points.length) },
+          ],
+        },
+        plugins: [leave, valueLabels(compact)],
+        options: barOptions(hover, true) as any,
+      }),
+      gainChart(gains.current, points, labels, hover, leave),
+    ];
+    const stopDismiss = charts.map(chart => dismissTooltipOutside(chart, chart.canvas));
     return () => {
-      stopOutsideDismiss();
-      chart.destroy();
+      stopDismiss.forEach(stop => stop());
+      charts.forEach(chart => chart.destroy());
       hoverRef.current(null);
     };
-  }, [name, range, rows, theme]);
+  }, [name, period, points, theme]);
 
-  if (!rows.length) return <div className="empty"><div className="empty-title">Sin historial</div></div>;
-  const first = rows[0];
-  const last = rows.at(-1)!;
-  const trend = last.valor > first.valor ? 'subió' : last.valor < first.valor ? 'bajó' : 'se mantuvo';
+  if (!points.length) return <div className="empty"><div className="empty-title">Sin historial</div></div>;
+  const last = points.at(-1)!;
 
   return (
     <>
-      <canvas ref={canvas} role="img" aria-label={`Evolución de ${name}`} aria-describedby="chart-persona-summary" />
+      <div className="chart-wrap">
+        <canvas ref={totals} role="img" aria-label={`Aportado y valor total de ${name} por período`} aria-describedby="chart-persona-summary" />
+      </div>
+      <div className="chart-subtitle">Ganancia del período</div>
+      <div className="chart-wrap gain-wrap">
+        <canvas ref={gains} role="img" aria-label={`Ganancia en dólares y pesos de ${name} por período`} aria-describedby="chart-persona-summary" />
+      </div>
       <p className="sr-only" id="chart-persona-summary" aria-live="polite">
-        La inversión de {name} en {RANGE_LABELS[range]} {trend} de {fmt(first.valor)} a {fmt(last.valor)}.
+        En {periodLabel(last.ts, period)} {name} tiene {fmt(last.valor)} con {fmt(last.invertido)} aportado; el período {last.periodo >= 0 ? 'ganó' : 'perdió'} {fmt(Math.abs(last.periodo))} y {COP(Math.round(Math.abs(last.periodo_cop)))}.
       </p>
     </>
   );

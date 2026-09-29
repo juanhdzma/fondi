@@ -233,7 +233,7 @@ describe('historialParticipante', () => {
     ];
 
     const h = historialParticipante('Ana');
-    expect(h[0]).toEqual({ fecha: '2026-01-01', valor: 1000, invertido: 1000, trm: 4000 });
+    expect(h[0]).toEqual({ fecha: '2026-01-01', valor: 1000, invertido: 1000, aportado_cop: 0, trm: 4000 });
     expect(h[1].valor).toBeCloseTo(2200, 10);
     expect(h[1].invertido).toBeCloseTo(2100, 10);
   });
@@ -242,7 +242,7 @@ describe('historialParticipante', () => {
     S.historial = [{ fecha: '2026-01-01', valor_total: 1000, precio_cuota: 1, cuotas_circ: 1000, trm: 4000 }];
     S.movimientos = [mov('Ana', 'aporte', 500, 500, '2026-06-01')];
 
-    expect(historialParticipante('Ana')[0]).toEqual({ fecha: '2026-01-01', valor: 0, invertido: 0, trm: 4000 });
+    expect(historialParticipante('Ana')[0]).toEqual({ fecha: '2026-01-01', valor: 0, invertido: 0, aportado_cop: 0, trm: 4000 });
   });
 });
 

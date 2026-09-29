@@ -175,7 +175,7 @@ export function historialParticipante(nombre) {
     const hasta = movs.filter(m => m.fecha <= h.fecha);
     const cuotas = hasta.reduce((s, m) => s + m.cuotas, 0);
     const invertido = hasta.reduce((s, m) => s + (m.tipo === 'retiro' ? -m.monto : m.monto), 0);
-    return { fecha: h.fecha, valor: cuotas * h.precio_cuota, invertido, trm: h.trm };
+    return { fecha: h.fecha, valor: cuotas * h.precio_cuota, invertido, aportado_cop: aportadoNetoCop(hasta), trm: h.trm };
   });
 }
 

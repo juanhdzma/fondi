@@ -425,7 +425,11 @@ button { color: inherit; }
 .person-figs .pos { color: var(--pos); }
 .person-figs .neg { color: var(--neg); }
 .person-chart { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.person-chart .chart-wrap { height: 320px; }
+.person-chart .chart-wrap { height: 230px; }
+.person-chart .chart-wrap.gain-wrap { height: 200px; }
+.person-bars { display: flex; flex-direction: column; gap: 8px; }
+.chart-subtitle { font-size: 12px; font-weight: 600; color: var(--muted); }
+.range-pills.periods { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .person-panel.cerrado .person-figs, .person-panel.cerrado .person-chart .chart-wrap { opacity: 0.55; }
 @container (max-width: 780px) {
   .person-top { grid-template-columns: minmax(0, 1fr); gap: 16px; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketStart, computeCalendarTicks, downsample, grainFor, nextTooltipTap, periodGainPct, spreadLabels, valueAt } from './Charts';
+import { alignedRanges, bucketStart, computeCalendarTicks, downsample, grainFor, nextTooltipTap, periodGainPct, periodSummary, spreadLabels, valueAt } from './Charts';
 
 describe('chart data helpers', () => {
   it('interpolates the line value between points and clamps at the ends', () => {
@@ -73,5 +73,54 @@ describe('periodGainPct', () => {
 
   it('returns null without capital', () => {
     expect(periodGainPct(0, 0, 0)).toBeNull();
+  });
+});
+
+describe('periodSummary', () => {
+  const row = (fecha: string, valor: number, invertido: number, aportado_cop = invertido * 4000, trm = 4000) => ({ fecha, valor, invertido, aportado_cop, trm });
+
+  it('keeps the last snapshot per month and nets out contributions', () => {
+    const rows = [
+      row('2026-05-20', 0, 0),
+      row('2026-06-01', 1000, 1000),
+      row('2026-06-30', 1100, 1000),
+      row('2026-07-10', 2100, 2000),
+      row('2026-07-31', 2050, 2000),
+    ];
+    const points = periodSummary(rows, 'month');
+    expect(points.map(point => point.fecha)).toEqual(['2026-06-30', '2026-07-31']);
+    expect(points[0].periodo).toBeCloseTo(100);
+    expect(points[1].periodo).toBeCloseTo(-50);
+    expect(points[1].periodo_pct).toBeCloseTo(-50 / 2100 * 100);
+    expect(points[1].periodo_cop).toBeCloseTo(-50 * 4000);
+  });
+
+  it('reflects exchange-rate moves in the COP gain only', () => {
+    const points = periodSummary([row('2026-01-15', 1000, 1000, 4_000_000, 4000), row('2026-02-15', 1000, 1000, 4_000_000, 4400)], 'month');
+    expect(points[1].periodo).toBe(0);
+    expect(points[1].periodo_cop).toBeCloseTo(400_000);
+  });
+
+  it('limits weeks to the last 12 and groups years', () => {
+    const weekly = Array.from({ length: 20 }, (_, index) => row(new Date(2026, 0, 5 + index * 7, 12).toISOString().slice(0, 10), 100 + index, 100));
+    expect(periodSummary(weekly, 'week')).toHaveLength(12);
+    expect(periodSummary(weekly, 'year')).toHaveLength(1);
+  });
+});
+
+describe('alignedRanges', () => {
+  const zeroAt = ({ min, max }: { min: number; max: number }) => -min / (max - min);
+
+  it('puts zero at the same height on both axes and fits every value', () => {
+    const [usd, cop] = alignedRanges([[100, -50, 20], [400_000, -100_000, 900_000]]);
+    expect(zeroAt(usd)).toBeCloseTo(zeroAt(cop));
+    expect(usd.min).toBeLessThanOrEqual(-50);
+    expect(usd.max).toBeGreaterThanOrEqual(100);
+    expect(cop.min).toBeLessThanOrEqual(-100_000);
+    expect(cop.max).toBeGreaterThanOrEqual(900_000);
+  });
+
+  it('starts at zero when nothing is negative', () => {
+    expect(alignedRanges([[0, 10], [0, 40_000]]).map(range => range.min)).toEqual([-0, -0]);
   });
 });
