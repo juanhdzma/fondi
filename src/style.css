@@ -460,6 +460,8 @@ button { color: inherit; }
 .bar-axis-values .flow.pos { color: var(--accent); }
 .bar-axis-values .cop { opacity: 0.8; }
 .bar-axis-item.on .bar-axis-label { color: var(--text); font-weight: 700; }
+.bar-axis-item.gap .bar-axis-label, .bar-axis-item.gap .bar-axis-values small { opacity: 0.6; }
+.bar-axis-values .span { font-size: 9px; color: var(--muted); }
 .bar-legend { margin-top: 4px; display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; }
 .bar-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .bar-legend i { width: 12px; height: 12px; border-radius: 3px; }
@@ -472,7 +474,8 @@ button { color: inherit; }
 @container (max-width: 560px) {
   .period-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .period-stats-grid div:first-child { grid-column: 1 / -1; }
-  .bar-axis.dense .bar-axis-item.skip { visibility: hidden; }
+  .bar-axis.dense .bar-axis-item.skip:not(.solo) { visibility: hidden; }
+  .bar-axis.dense .bar-axis-item.gap { visibility: hidden; }
   .bar-axis.dense .bar-axis-item.pre .bar-axis-values { visibility: hidden; }
   .bar-axis.dense .bar-axis-values b { font-size: 9px; }
   .bar-axis.dense .bar-axis-values small { font-size: 8.5px; }

@@ -47,7 +47,9 @@ function PeriodStats({ period, points, selected, onBack }: { period: Period; poi
         <b>{heading.charAt(0).toUpperCase() + heading.slice(1)}</b>
         {picked && <button type="button" className="period-back" onClick={onBack}>Volver a hoy</button>}
       </div>
-      {point ? (
+      {point?.gap ? (
+        <p className="period-stats-empty">No hubo valuación en este período; su ganancia quedó en el siguiente período registrado.</p>
+      ) : point ? (
         <dl className="period-stats-grid">
           <div><dt>Ganancia USD</dt><dd className={tone(point.periodo)}>{signStr(point.periodo)}{fmt(Math.abs(point.periodo))}</dd></div>
           <div><dt>Ganancia COP</dt><dd className={tone(point.periodo_cop)}>{signStr(point.periodo_cop)}{COP(Math.round(Math.abs(point.periodo_cop)))}</dd></div>

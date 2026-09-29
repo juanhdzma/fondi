@@ -597,21 +597,38 @@ export type Period = typeof CHART_PERIODS[number][0];
 const PERIOD_LIMIT: Record<Period, number> = { week: 12, month: 12, year: Infinity };
 
 type ParticipantRow = { fecha: string; valor: number; invertido: number; aportado_cop: number; trm: number };
-export type PeriodPoint = ParticipantRow & { ts: number; periodo: number; periodo_cop: number; periodo_pct: number | null; periodo_cop_pct: number | null; aporte: number; first: boolean };
+export type PeriodPoint = ParticipantRow & { ts: number; periodo: number; periodo_cop: number; periodo_pct: number | null; periodo_cop_pct: number | null; aporte: number; first: boolean; gap: boolean; span: number };
+
+function nextBucket(ts: number, period: Period) {
+  const date = new Date(ts);
+  if (period === 'year') return new Date(date.getFullYear() + 1, 0, 1).getTime();
+  if (period === 'month') return new Date(date.getFullYear(), date.getMonth() + 1, 1).getTime();
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 7).getTime();
+}
+
+const gapPoint = (ts: number): PeriodPoint => ({ fecha: '', valor: 0, invertido: 0, aportado_cop: 0, trm: 0, ts, periodo: 0, periodo_cop: 0, periodo_pct: null, periodo_cop_pct: null, aporte: 0, first: false, gap: true, span: 0 });
 
 // Último snapshot de cada período y su ganancia contra el período anterior, sin contar aportes:
 // diferencia de (valor - aportado), en USD y en COP. El primer período arranca de ganancia 0.
+// Un período sin valuación queda como hueco (`gap`) para que el eje siga el calendario; la
+// ganancia de ese tramo cae en el siguiente período registrado, que lleva `span` > 1.
 export function periodSummary(rows: ParticipantRow[], period: Period): PeriodPoint[] {
   const lastByBucket = new Map<number, ParticipantRow>();
   for (const row of rows) {
     if (!lastByBucket.size && !row.valor && !row.invertido) continue;
     lastByBucket.set(bucketStart(toTimestamp(row.fecha), period), row);
   }
-  let previous = { usd: 0, cop: 0, invertido: 0 };
-  const points = [...lastByBucket].map(([ts, row], index) => {
+  let previous = { usd: 0, cop: 0, invertido: 0, ts: 0 };
+  const points: PeriodPoint[] = [];
+  for (const [ts, row] of lastByBucket) {
+    let span = 1;
+    if (points.length) for (let missing = nextBucket(previous.ts, period); missing < ts; missing = nextBucket(missing, period)) {
+      points.push(gapPoint(missing));
+      span += 1;
+    }
     const trm = row.trm || S.trm || 1;
     const gain = { usd: row.valor - row.invertido, cop: row.valor * trm - row.aportado_cop };
-    const point = {
+    points.push({
       ...row,
       trm,
       ts,
@@ -620,11 +637,12 @@ export function periodSummary(rows: ParticipantRow[], period: Period): PeriodPoi
       periodo_pct: periodGainPct(previous.usd, gain.usd, row.valor),
       periodo_cop_pct: periodGainPct(previous.cop, gain.cop, row.valor * trm),
       aporte: row.invertido - previous.invertido,
-      first: index === 0,
-    };
-    previous = { ...gain, invertido: row.invertido };
-    return point;
-  });
+      first: !points.length,
+      gap: false,
+      span,
+    });
+    previous = { ...gain, invertido: row.invertido, ts };
+  }
   return points.slice(-PERIOD_LIMIT[period]);
 }
 
@@ -750,9 +768,9 @@ function totalsChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect:
     data: {
       labels: points.map(point => point.ts),
       datasets: [
-        { label: 'Aportado', data: points.map(point => [0, Math.max(0, Math.min(point.invertido, point.valor))]), backgroundColor: withAlpha(cssVar('--muted'), 0.45), ...segment },
-        { label: 'Ganancia', data: points.map(point => point.valor > point.invertido ? [Math.max(0, point.invertido), point.valor] : null), backgroundColor: withAlpha(cssVar('--pos'), 0.7), borderRadius: 4, ...segment },
-        { label: 'Pérdida', data: points.map(point => point.valor < point.invertido ? [Math.max(0, point.valor), point.invertido] : null), backgroundColor: hatch(cssVar('--neg')), borderColor: cssVar('--neg'), borderWidth: 1, ...segment },
+        { label: 'Aportado', data: points.map(point => point.gap ? null : [0, Math.max(0, Math.min(point.invertido, point.valor))]), backgroundColor: withAlpha(cssVar('--muted'), 0.45), ...segment },
+        { label: 'Ganancia', data: points.map(point => !point.gap && point.valor > point.invertido ? [Math.max(0, point.invertido), point.valor] : null), backgroundColor: withAlpha(cssVar('--pos'), 0.7), borderRadius: 4, ...segment },
+        { label: 'Pérdida', data: points.map(point => !point.gap && point.valor < point.invertido ? [Math.max(0, point.valor), point.invertido] : null), backgroundColor: hatch(cssVar('--neg')), borderColor: cssVar('--neg'), borderWidth: 1, ...segment },
       ] as any,
     },
     plugins: [areaSync],
@@ -763,8 +781,8 @@ function totalsChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect:
 const COP_ALPHA = 0.45;
 
 function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect: (index: number | null) => void, onArea: (pad: Pad) => void) {
-  const usd = points.map(point => point.first ? null : point.periodo);
-  const cop = points.map(point => point.first ? null : point.periodo_cop);
+  const usd = points.map(point => point.first || point.gap ? null : point.periodo);
+  const cop = points.map(point => point.first || point.gap ? null : point.periodo_cop);
   const [usdRange, copRange] = alignedRanges([usd.map(Number), cop.map(Number)]);
   const pos = cssVar('--pos');
   const neg = cssVar('--neg');
@@ -798,7 +816,7 @@ function AxisRow({ points, period, pad, selected, onSelect, render }: { points: 
         <button
           key={point.ts}
           type="button"
-          className={`bar-axis-item${selected === index ? ' on' : ''}${(count - 1 - index) % 2 ? ' skip' : ''}${index === count - 3 ? ' pre' : ''}`}
+          className={`bar-axis-item${point.gap ? ' gap' : ''}${!point.gap && points[index - 1]?.gap !== false && points[index + 1]?.gap !== false ? ' solo' : ''}${selected === index ? ' on' : ''}${(count - 1 - index) % 2 ? ' skip' : ''}${index === count - 3 ? ' pre' : ''}`}
           aria-pressed={selected === index}
           aria-label={`Ver ${periodLabel(point.ts, period)}`}
           onClick={() => onSelect(index)}
@@ -812,6 +830,7 @@ function AxisRow({ points, period, pad, selected, onSelect, render }: { points: 
 }
 
 const NO_PAD: Pad = { left: 0, right: 0 };
+const SPAN_UNITS: Record<Period, string> = { week: 'semanas', month: 'meses', year: 'años' };
 
 export function ParticipantBars({ name, period, points, selected, onSelect }: { name: string; period: Period; points: PeriodPoint[]; selected: number | null; onSelect: (index: number | null) => void }) {
   const totals = useRef<HTMLCanvasElement>(null);
@@ -838,7 +857,7 @@ export function ParticipantBars({ name, period, points, selected, onSelect }: { 
       <div className="chart-wrap">
         <canvas ref={totals} role="img" aria-label={`Aportado y valor de ${name} por período`} aria-describedby="chart-persona-summary" />
       </div>
-      <AxisRow points={points} period={period} pad={pads[0]} selected={selected} onSelect={pick} render={point => (
+      <AxisRow points={points} period={period} pad={pads[0]} selected={selected} onSelect={pick} render={point => point.gap ? <small>sin valor</small> : (
         <>
           <b>US$ {compact(point.valor)}</b>
           <small className={`flow ${tone(point.aporte)}`}>{point.aporte ? signedMoney(point.aporte, 'US$') : '·'}</small>
@@ -853,10 +872,11 @@ export function ParticipantBars({ name, period, points, selected, onSelect }: { 
       <div className="chart-wrap gain-wrap">
         <canvas ref={gains} role="img" aria-label={`Ganancia en dólares y pesos de ${name} por período`} aria-describedby="chart-persona-summary" />
       </div>
-      <AxisRow points={points} period={period} pad={pads[1]} selected={selected} onSelect={pick} render={point => point.first ? null : (
+      <AxisRow points={points} period={period} pad={pads[1]} selected={selected} onSelect={pick} render={point => point.first || point.gap ? null : (
         <>
           <b className={tone(point.periodo)}>{signedMoney(point.periodo, 'US$')}</b>
           <small className={`cop ${tone(point.periodo_cop)}`}>{signedMoney(point.periodo_cop, '$')}</small>
+          {point.span > 1 && <small className="span">{point.span} {SPAN_UNITS[period]}</small>}
         </>
       )} />
       <div className="bar-legend">

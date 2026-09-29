@@ -159,3 +159,24 @@ describe('period contribution and current period', () => {
     expect(fitBarThickness(100, 50, 2, 34)).toBe(4);
   });
 });
+
+describe('periods without a valuation', () => {
+  const row = (fecha: string, valor: number, invertido: number) => ({ fecha, valor, invertido, aportado_cop: invertido * 4000, trm: 4000 });
+
+  it('leaves a gap and assigns the skipped gain to the next recorded period', () => {
+    const points = periodSummary([row('2026-06-10', 1000, 1000), row('2026-06-30', 1050, 1000), row('2026-08-20', 1200, 1000)], 'month');
+    expect(points.map(point => point.gap)).toEqual([false, true, false]);
+    expect(new Date(points[1].ts).getMonth()).toBe(6);
+    expect(points[2].span).toBe(2);
+    expect(points[2].periodo).toBeCloseTo(150);
+    expect(points[0].span).toBe(1);
+  });
+
+  it('counts the last 12 calendar weeks, not the last 12 recorded ones', () => {
+    const weeks = Array.from({ length: 20 }, (_, index) => new Date(2026, 0, 5 + index * 7, 12).toISOString().slice(0, 10));
+    const recorded = weeks.filter((_, index) => index % 2 === 0).map((fecha, index) => row(fecha, 100 + index, 100));
+    const points = periodSummary(recorded, 'week');
+    expect(points).toHaveLength(12);
+    expect(points.filter(point => point.gap)).toHaveLength(6);
+  });
+});
