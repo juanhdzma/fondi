@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alignedRanges, bucketStart, computeCalendarTicks, downsample, grainFor, nextTooltipTap, periodGainPct, periodSummary, spreadLabels, valueAt } from './Charts';
+import { alignedRanges, bucketStart, currentPeriodPoint, fitBarThickness, periodToDateLabel, computeCalendarTicks, downsample, grainFor, nextTooltipTap, periodGainPct, periodSummary, spreadLabels, valueAt } from './Charts';
 
 describe('chart data helpers', () => {
   it('interpolates the line value between points and clamps at the ends', () => {
@@ -122,5 +122,40 @@ describe('alignedRanges', () => {
 
   it('starts at zero when nothing is negative', () => {
     expect(alignedRanges([[0, 10], [0, 40_000]]).map(range => range.min)).toEqual([-0, -0]);
+  });
+});
+
+describe('period contribution and current period', () => {
+  const row = (fecha: string, valor: number, invertido: number) => ({ fecha, valor, invertido, aportado_cop: invertido * 4000, trm: 4000 });
+  const rows = [row('2026-07-10', 1000, 1000), row('2026-08-05', 1500, 1500), row('2026-08-20', 1520, 1500), row('2026-09-10', 1100, 1000)];
+
+  it('reports the net contribution of each period and flags the first one', () => {
+    const points = periodSummary(rows, 'month');
+    expect(points.map(point => point.aporte)).toEqual([1000, 500, -500]);
+    expect(points.map(point => point.first)).toEqual([true, false, false]);
+  });
+
+  it('keeps the first flag on the real first period even when it is sliced out', () => {
+    const weekly = Array.from({ length: 20 }, (_, index) => row(new Date(2026, 0, 5 + index * 7, 12).toISOString().slice(0, 10), 100, 100));
+    expect(periodSummary(weekly, 'week').some(point => point.first)).toBe(false);
+  });
+
+  it('returns the current calendar period only when it already has a valuation', () => {
+    const points = periodSummary(rows, 'month');
+    expect(currentPeriodPoint(points, 'month', '2026-09-28')?.fecha).toBe('2026-09-10');
+    expect(currentPeriodPoint(points, 'month', '2026-10-01')).toBeNull();
+    expect(currentPeriodPoint(periodSummary(rows, 'year'), 'year', '2026-12-31')?.fecha).toBe('2026-09-10');
+  });
+
+  it('labels the current period up to its last valuation', () => {
+    expect(periodToDateLabel(periodSummary(rows, 'month').at(-1)!, 'month')).toBe('Septiembre al 10');
+    expect(periodToDateLabel(periodSummary(rows, 'year').at(-1)!, 'year')).toBe('2026 a la fecha');
+    expect(periodToDateLabel(periodSummary(rows, 'week').at(-1)!, 'week')).toMatch(/^Esta semana \(desde el 7 /);
+  });
+
+  it('shrinks bars to fit narrow charts and caps them on wide ones', () => {
+    expect(fitBarThickness(1000, 4, 2, 34)).toBe(34);
+    expect(fitBarThickness(320, 12, 2, 34)).toBe(9);
+    expect(fitBarThickness(100, 50, 2, 34)).toBe(4);
   });
 });

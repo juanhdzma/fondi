@@ -596,7 +596,7 @@ export type Period = typeof CHART_PERIODS[number][0];
 const PERIOD_LIMIT: Record<Period, number> = { week: 12, month: 12, year: Infinity };
 
 type ParticipantRow = { fecha: string; valor: number; invertido: number; aportado_cop: number; trm: number };
-export type PeriodPoint = ParticipantRow & { ts: number; periodo: number; periodo_cop: number; periodo_pct: number | null; periodo_cop_pct: number | null };
+export type PeriodPoint = ParticipantRow & { ts: number; periodo: number; periodo_cop: number; periodo_pct: number | null; periodo_cop_pct: number | null; aporte: number; first: boolean };
 
 // Último snapshot de cada período y su ganancia contra el período anterior, sin contar aportes:
 // diferencia de (valor - aportado), en USD y en COP. El primer período arranca de ganancia 0.
@@ -606,8 +606,8 @@ export function periodSummary(rows: ParticipantRow[], period: Period): PeriodPoi
     if (!lastByBucket.size && !row.valor && !row.invertido) continue;
     lastByBucket.set(bucketStart(toTimestamp(row.fecha), period), row);
   }
-  let previous = { usd: 0, cop: 0 };
-  const points = [...lastByBucket].map(([ts, row]) => {
+  let previous = { usd: 0, cop: 0, invertido: 0 };
+  const points = [...lastByBucket].map(([ts, row], index) => {
     const trm = row.trm || S.trm || 1;
     const gain = { usd: row.valor - row.invertido, cop: row.valor * trm - row.aportado_cop };
     const point = {
@@ -618,11 +618,33 @@ export function periodSummary(rows: ParticipantRow[], period: Period): PeriodPoi
       periodo_cop: gain.cop - previous.cop,
       periodo_pct: periodGainPct(previous.usd, gain.usd, row.valor),
       periodo_cop_pct: periodGainPct(previous.cop, gain.cop, row.valor * trm),
+      aporte: row.invertido - previous.invertido,
+      first: index === 0,
     };
-    previous = gain;
+    previous = { ...gain, invertido: row.invertido };
     return point;
   });
   return points.slice(-PERIOD_LIMIT[period]);
+}
+
+// El período calendario en curso (esta semana, este mes o este año hasta hoy): su último snapshot,
+// o null si todavía no hay valuación en él, para no presentar el período anterior como el actual.
+export function currentPeriodPoint(points: PeriodPoint[], period: Period, today = todayLocal()) {
+  const last = points.at(-1);
+  return last && last.ts === bucketStart(toTimestamp(today), period) ? last : null;
+}
+
+const monthLongFormatter = new Intl.DateTimeFormat('es-CO', { month: 'long' });
+
+export function periodToDateLabel(point: PeriodPoint, period: Period) {
+  if (period === 'week') return `Esta semana (desde el ${formatTimestamp(point.ts)})`;
+  if (period === 'year') return `${new Date(point.ts).getFullYear()} a la fecha`;
+  const month = monthLongFormatter.format(new Date(point.ts));
+  return `${month.charAt(0).toUpperCase()}${month.slice(1)} al ${Number(point.fecha.slice(8, 10))}`;
+}
+
+export function fitBarThickness(width: number, count: number, perGroup: number, max: number) {
+  return Math.max(4, Math.min(max, Math.floor(width / Math.max(count, 1) * 0.72 / perGroup)));
 }
 
 const monthShortFormatter = new Intl.DateTimeFormat('es-CO', { month: 'short' });
