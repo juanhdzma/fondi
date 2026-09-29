@@ -83,7 +83,16 @@ A valuation with no movement is different: there `cuotasCirc()` is correct becau
 - **The y-axis never crosses zero for a non-negative series** (`suggestedMin`/`suggestedMax`, 8% pad, clamped at 0) — `grace: '8%'` pushed it to a -20k tick.
 - **The contributed line uses every snapshot with `stepped: 'before'`**, so a withdrawal steps down on its own day; `'after'` draws the jump at the previous point.
 - **Period percentages are gain over capital at stake, never share price**: gain / (start value + net contributions). A raw `valor_total` change counts contributions as return, and share-price return disagreed in sign with the person's own gain.
-- **Memoize chart rows** (`heroSeries(range)`, `ParticipantChart` rows): hover re-renders the parent, and a new array per render rebuilt the chart on every mouse move and reset the hover.
+- **Memoize chart rows** (`heroSeries(range)`, the participant `periodSummary()` points): a re-render of the parent with a new array rebuilt the chart and reset the hover or selection.
+
+### Participant period summary (Movimientos)
+
+- **Buckets are calendar periods, not rolling windows**: `periodSummary()` keeps the last snapshot of each week (Monday start), month or year. The period gain is `(valor − invertido)` minus the previous period's, so a contribution is never counted as gain; `aporte` is the net contributed in that period.
+- **The three figures are the period to date**: `currentPeriodPoint()` returns the last bucket only if it is the current calendar week/month/year (via `todayLocal()`); otherwise it shows "Todavía no hay valuaciones", never last period's numbers as if they were current. Tapping a period (canvas or axis button) switches them to that period, with "Volver a hoy".
+- **The first period has no gain bars** (it would always read 0): an "Inicio" chip is drawn at the zero line instead.
+- **Axis values are HTML, not Chart.js ticks**: each line needs its own color and unit (value + `aporte` under the stacked chart, `US$` / `$` under the gain chart). The rows are aligned to the category centers by padding them with the `chartArea` reported by the `areaSync` plugin, so keep `layout.padding` left/right at 0 and the y axes without visible ticks.
+- **Bar thickness is recomputed on resize** (`fitBarThickness()` in `onResize`): a fixed px width overlapped the grouped USD/COP bars on phones, while `categoryPercentage` split sparse groups apart.
+- **Narrow panels alternate the axis values counting back from the latest period** (`skip`/`pre` classes under `@container (max-width: 560px)`), so the current period is always labeled.
 
 ### Admin form
 
