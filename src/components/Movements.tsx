@@ -6,7 +6,8 @@ import { quickTransition, springTransition, staggered, surfaceMotion } from '../
 import { COP, fmt, fmtN0, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, normDate } from '../utils/dates.js';
 import { filterMovements, groupByMonth, PERIODS } from '../utils/movements.js';
-import { ParticipantBars, CHART_PERIODS, periodLabel, periodSummary, type Period, type PeriodPoint } from './Charts';
+import { CHART_PERIODS, currentPeriodPoint, ParticipantBars, periodLabel, periodSummary, periodToDateLabel, type Period, type PeriodPoint } from './Charts';
+import { nextTabIndex } from '../utils/tabs';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
 import { SelectMenu } from './SelectMenu';
@@ -34,17 +35,44 @@ function ShareRing({ name, share }: { name: string; share: number }) {
   );
 }
 
+const PERIOD_NAMES: Record<Period, string> = { week: 'Semana', month: 'Mes', year: 'Año' };
+
+function PeriodStats({ period, points, selected, onBack }: { period: Period; points: PeriodPoint[]; selected: number | null; onBack: () => void }) {
+  const picked = selected === null ? null : points[selected];
+  const point = picked ?? currentPeriodPoint(points, period);
+  const heading = picked ? periodLabel(picked.ts, period) : point ? periodToDateLabel(point, period) : `${PERIOD_NAMES[period]} en curso`;
+  return (
+    <section className="period-stats" aria-live="polite" aria-label="Cifras del período">
+      <div className="period-stats-head">
+        <b>{heading.charAt(0).toUpperCase() + heading.slice(1)}</b>
+        {picked && <button type="button" className="period-back" onClick={onBack}>Volver a hoy</button>}
+      </div>
+      {point ? (
+        <dl className="period-stats-grid">
+          <div><dt>Ganancia USD</dt><dd className={tone(point.periodo)}>{signStr(point.periodo)}{fmt(Math.abs(point.periodo))}</dd></div>
+          <div><dt>Ganancia COP</dt><dd className={tone(point.periodo_cop)}>{signStr(point.periodo_cop)}{COP(Math.round(Math.abs(point.periodo_cop)))}</dd></div>
+          <div><dt>Rendimiento</dt><dd className={point.periodo_pct === null ? 'zero' : tone(point.periodo_pct)}>{point.periodo_pct === null ? '—' : `${signStr(point.periodo_pct)}${fmtPct(Math.abs(point.periodo_pct))}%`}</dd></div>
+        </dl>
+      ) : (
+        <p className="period-stats-empty">Todavía no hay valuaciones en este período.</p>
+      )}
+    </section>
+  );
+}
+
 function PersonPanel({ name, period, setPeriod }: { name: string; period: Period; setPeriod: (period: Period) => void }) {
   const participant = calcParticipante(name);
   const total = cuotasCirc();
   const share = total > 0 ? Math.max(0, participant.cuotas) / total * 100 : 0;
   const { estado, aportes, desde, ultimoRetiro } = estadoParticipante(name, SHARE_TOLERANCE);
-  const [hover, setHover] = useState<PeriodPoint | null>(null);
+  const [picked, setPicked] = useState<{ key: string; index: number } | null>(null);
   const summaries = useMemo(() => {
     const rows = historialParticipante(name);
     return Object.fromEntries(CHART_PERIODS.map(([value]) => [value, periodSummary(rows, value)])) as Record<Period, PeriodPoint[]>;
   }, [name, S.historial, S.movimientos]);
-  const gain = hover ? hover.periodo : participant.ganancia_monto;
+  const pickKey = `${name}-${period}`;
+  const selected = picked?.key === pickKey && picked.index < summaries[period].length ? picked.index : null;
+  const select = (index: number | null) => setPicked(index === null ? null : { key: pickKey, index });
   const since = desde ? `desde ${fmtDateShort(desde)} ${normDate(desde).slice(0, 4)}` : '';
 
   return (
@@ -67,64 +95,70 @@ function PersonPanel({ name, period, setPeriod }: { name: string; period: Period
         {estado !== 'nuevo' && (
           <dl className="person-figs">
             <div>
-              <dt>{hover ? `Valor al ${fmtDateShort(hover.fecha)}` : 'Valor actual'}</dt>
+              <dt>Valor actual</dt>
               <dd>
-                <b>{fmt(hover ? hover.valor : participant.valor_actual)}</b>
-                <small>{COP(Math.round(hover ? hover.valor * hover.trm : participant.valor_cop))}</small>
+                <b>{fmt(participant.valor_actual)}</b>
+                <small>{COP(Math.round(participant.valor_cop))}</small>
               </dd>
             </div>
-            <div className={`person-gain ${tone(gain)}`}>
-              <dt>{hover ? `Ganancia ${periodLabel(hover.ts, period)}` : 'Ganancia'}</dt>
-              {hover ? (
-                <dd>
-                  <b className={tone(hover.periodo)}>{signStr(hover.periodo)}{fmt(Math.abs(hover.periodo))} <Delta value={hover.periodo_pct} lead /></b>
-                  <small className={tone(hover.periodo_cop)}>{signStr(hover.periodo_cop)}{COP(Math.round(Math.abs(hover.periodo_cop)))} <Delta value={hover.periodo_cop_pct} /></small>
-                </dd>
-              ) : (
-                <dd>
-                  <b className={tone(participant.ganancia_monto)}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))} <Delta value={participant.ganancia_pct} lead /></b>
-                  <small className={tone(participant.ganancia_cop)}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} <Delta value={participant.ganancia_cop_pct} /></small>
-                </dd>
-              )}
+            <div className={`person-gain ${tone(participant.ganancia_monto)}`}>
+              <dt>Ganancia</dt>
+              <dd>
+                <b className={tone(participant.ganancia_monto)}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))} <Delta value={participant.ganancia_pct} lead /></b>
+                <small className={tone(participant.ganancia_cop)}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} <Delta value={participant.ganancia_cop_pct} /></small>
+              </dd>
             </div>
             <div>
-              <dt>{hover ? `Aportado al ${fmtDateShort(hover.fecha)}` : 'Total aportado'}</dt>
-              {hover ? (
-                <dd>
-                  <b>{fmt(hover.invertido)}</b>
-                  <small>{COP(Math.round(hover.aportado_cop))}</small>
-                </dd>
-              ) : (
-                <dd>
-                  <b>{fmt(participant.aportes_monto)}</b>
-                  {participant.has_cop && <small>{COP(participant.cop_invertido)} · TRM prom {fmtN0(participant.trm_avg_entrada)}</small>}
-                  {participant.retiros_monto > 0 && <small>{fmt(participant.retiros_monto)} retirados</small>}
-                </dd>
-              )}
+              <dt>Total aportado</dt>
+              <dd>
+                <b>{fmt(participant.aportes_monto)}</b>
+                {participant.has_cop && <small>{COP(participant.cop_invertido)} · TRM prom {fmtN0(participant.trm_avg_entrada)}</small>}
+                {participant.retiros_monto > 0 && <small>{fmt(participant.retiros_monto)} retirados</small>}
+              </dd>
             </div>
           </dl>
         )}
       </div>
       {estado !== 'nuevo' && (
         <div className="person-chart">
-          <div className="chart-title">Resumen por período</div>
+          <div className="period-head">
+            <div className="chart-title">Resumen por período</div>
+            <div className="period-tabs" role="tablist" aria-label="Agrupar por">
+              {CHART_PERIODS.map(([value, label], index) => {
+                const pct = currentPeriodPoint(summaries[value], value)?.periodo_pct ?? null;
+                const active = period === value;
+                return (
+                  <button
+                    key={value}
+                    id={`period-tab-${value}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    tabIndex={active ? 0 : -1}
+                    className={`period-tab${active ? ' active' : ''}`}
+                    aria-label={`${label}${pct === null ? '' : `, período en curso ${signStr(pct)}${fmtPct(Math.abs(pct))}%`}`}
+                    onClick={() => setPeriod(value)}
+                    onKeyDown={event => {
+                      const next = nextTabIndex(index, event.key, CHART_PERIODS.length);
+                      if (next === null) return;
+                      event.preventDefault();
+                      setPeriod(CHART_PERIODS[next][0]);
+                      document.getElementById(`period-tab-${CHART_PERIODS[next][0]}`)?.focus();
+                    }}
+                  >
+                    {label}
+                    {pct !== null && <small className={tone(pct)}>{signStr(pct)}{fmtPct(Math.abs(pct))}%</small>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <PeriodStats period={period} points={summaries[period]} selected={selected} onBack={() => select(null)} />
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={`${name}-${period}`} className="person-bars" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-              <ParticipantBars name={name} period={period} points={summaries[period]} onHover={setHover} />
+              <ParticipantBars name={name} period={period} points={summaries[period]} selected={selected} onSelect={select} />
             </motion.div>
           </AnimatePresence>
-          <div className="range-pills periods" role="group" aria-label="Agrupar por">
-            {CHART_PERIODS.map(([value, label]) => {
-              const pct = summaries[value].at(-1)?.periodo_pct ?? null;
-              return (
-                <button key={value} type="button" className={`range-pill${period === value ? ' active' : ''}`} aria-pressed={period === value} aria-label={`${label}${pct === null ? '' : `, período actual ${signStr(pct)}${fmtPct(Math.abs(pct))}%`}`} onClick={() => setPeriod(value)}>
-                  {period === value && <motion.span className="control-selection" layoutId="participant-range" transition={springTransition} />}
-                  <span className="control-label">{label}</span>
-                  {pct !== null && <small className={`control-label ${tone(pct)}`}>{signStr(pct)}{fmtPct(Math.abs(pct))}%</small>}
-                </button>
-              );
-            })}
-          </div>
         </div>
       )}
     </motion.section>

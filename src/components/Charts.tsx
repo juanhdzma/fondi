@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Chart } from 'chart.js/auto';
-import { historialGananciaFondo, historialParaGrafica, participanteColor } from '../computed.js';
+import { historialGananciaFondo, historialParaGrafica } from '../computed.js';
 import { S } from '../state.js';
-import { compact, COP, fmt, fmt0 } from '../utils/format.js';
+import { compact, COP, fmt, fmt0, signStr } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
 import { useReducedMotion } from 'motion/react';
 import { cssVar, useTheme, withAlpha } from '../theme';
+import { tone } from './Delta';
 
 export const RANGES = [
   ['1W', '1 semana', '1S'],
@@ -656,67 +657,6 @@ function barLabel(ts: number, period: Period) {
   return `${monthShortFormatter.format(date).replace('.', '')} ${String(date.getFullYear()).slice(2)}`;
 }
 
-function barOptions(onHover: (index: number | null) => void, legend: boolean) {
-  return {
-    animation: false as const,
-    events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
-    responsive: true,
-    maintainAspectRatio: false,
-    layout: { padding: { top: 18 } },
-    interaction: { mode: 'index' as const, intersect: false },
-    onHover: (_event: any, elements: Array<{ index: number }>) => onHover(elements.length ? elements[0].index : null),
-    plugins: {
-      legend: legend
-        ? { display: true, position: 'bottom' as const, labels: { color: cssVar('--muted'), font: { size: 12 }, padding: 14, usePointStyle: true, pointStyle: 'rectRounded' } }
-        : { display: false },
-      tooltip: { enabled: false },
-    },
-    scales: {
-      x: { grid: { display: false }, border: { display: false }, ticks: { color: cssVar('--muted'), font: { size: 11 }, maxRotation: 0, autoSkip: true } },
-      y: {
-        beginAtZero: true,
-        grace: legend ? 0 : '15%',
-        ticks: { display: false, maxTicksLimit: legend ? 6 : 4 },
-        grid: { color: cssVar('--line') },
-        border: { display: false },
-      },
-    },
-  };
-}
-
-const barThickness = (count: number) => count <= 4 ? 34 : count <= 8 ? 22 : 14;
-
-// Con barThickness fijo Chart.js junta las barras del grupo sin espacio; el borde transparente
-// deja una separación de 2px sin volver al reparto por categoría que las separaba demasiado.
-function bars(count: number) {
-  return { barThickness: barThickness(count), borderRadius: 4, borderWidth: { left: 1, right: 1 }, borderColor: 'transparent' };
-}
-
-function valueLabels(format: (value: number, datasetIndex: number) => string) {
-  const color = cssVar('--muted');
-  return {
-    id: 'valueLabels',
-    afterDatasetsDraw(chart: Chart) {
-      const { ctx } = chart;
-      ctx.save();
-      ctx.font = '600 10px Geist Variable, system-ui, sans-serif';
-      ctx.fillStyle = color;
-      ctx.textAlign = 'center';
-      chart.data.datasets.forEach((dataset, datasetIndex) => {
-        if (!chart.isDatasetVisible(datasetIndex)) return;
-        chart.getDatasetMeta(datasetIndex).data.forEach((bar: any, index) => {
-          const value = Number(dataset.data[index]);
-          const text = format(value, datasetIndex);
-          if (ctx.measureText(text).width > bar.width + 2) return;
-          ctx.textBaseline = value < 0 ? 'top' : 'bottom';
-          ctx.fillText(text, bar.x, value < 0 ? bar.y + 3 : bar.y - 3);
-        });
-      });
-      ctx.restore();
-    },
-  };
-}
-
 // Rangos por eje para dos series de escalas distintas (USD y COP) con el cero a la misma altura:
 // ambos ejes reservan la misma fracción `below` para negativos, la mayor que pida cualquiera.
 export function alignedRanges(series: number[][], grace = 0.15) {
@@ -728,86 +668,200 @@ export function alignedRanges(series: number[][], grace = 0.15) {
   });
 }
 
-const signedCompact = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${compact(Math.abs(value))}`;
+const signedMoney = (value: number, unit: string) => `${signStr(value)}${unit} ${compact(Math.abs(value))}`;
 
-const COP_ALPHA = 0.45;
+type Pad = { left: number; right: number };
+const samePad = (a: Pad, b: Pad) => Math.abs(a.left - b.left) < 0.5 && Math.abs(a.right - b.right) < 0.5;
 
-function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], labels: string[], onHover: (index: number | null) => void, leave: { id: string }) {
-  const usd = points.map(point => point.periodo);
-  const cop = points.map(point => point.periodo_cop);
-  const [usdRange, copRange] = alignedRanges([usd, cop]);
-  const pos = cssVar('--pos');
-  const neg = cssVar('--neg');
-  const colors = (values: number[], alpha: number) => values.map(value => withAlpha(value >= 0 ? pos : neg, alpha));
-  const options = barOptions(onHover, true) as any;
-  options.scales.y = { ...options.scales.y, min: usdRange.min, max: usdRange.max };
-  options.scales.y1 = { display: false, min: copRange.min, max: copRange.max };
-  options.plugins.legend.labels.generateLabels = () => [
-    { text: 'USD', datasetIndex: 0, fillStyle: pos, strokeStyle: pos, lineWidth: 0, fontColor: cssVar('--muted'), pointStyle: 'rectRounded' },
-    { text: 'COP', datasetIndex: 1, fillStyle: withAlpha(pos, COP_ALPHA), strokeStyle: withAlpha(pos, COP_ALPHA), lineWidth: 0, fontColor: cssVar('--muted'), pointStyle: 'rectRounded' },
-  ];
+function barOptions(onSelect: (index: number | null) => void, onArea: (pad: Pad) => void, thickness: (width: number) => number) {
+  return {
+    animation: false as const,
+    events: ['click'],
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 10, left: 0, right: 0, bottom: 2 } },
+    interaction: { mode: 'index' as const, intersect: false },
+    onClick: (_event: any, elements: Array<{ index: number }>) => onSelect(elements.length ? elements[0].index : null),
+    onResize: (chart: Chart, size: { width: number }) => { chart.data.datasets.forEach((dataset: any) => { dataset.barThickness = thickness(size.width); }); },
+    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    scales: {
+      x: { display: false },
+      y: {
+        beginAtZero: true,
+        ticks: { display: false, maxTicksLimit: 4 },
+        grid: { drawTicks: false, color: (context: any) => context.tick?.value === 0 ? withAlpha(cssVar('--muted'), 0.55) : cssVar('--line') },
+        border: { display: false },
+      },
+    },
+    _onArea: onArea,
+  };
+}
+
+// Reporta el chartArea para alinear las filas HTML del eje con el centro de cada categoría.
+const areaSync = { id: 'areaSync', afterLayout: (chart: any) => chart.options._onArea?.({ left: chart.chartArea.left, right: chart.width - chart.chartArea.right }) };
+
+function hatch(color: string) {
+  const tile = document.createElement('canvas');
+  tile.width = tile.height = 6;
+  const context = tile.getContext('2d');
+  if (!context) return color;
+  context.strokeStyle = color;
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.moveTo(0, 6);
+  context.lineTo(6, 0);
+  context.stroke();
+  return context.createPattern(tile, 'repeat') ?? color;
+}
+
+function startChip(points: PeriodPoint[]) {
+  return {
+    id: 'startChip',
+    afterDatasetsDraw(chart: Chart) {
+      const index = points.findIndex(point => point.first);
+      if (index === -1) return;
+      const { ctx } = chart;
+      const x = chart.scales.x.getPixelForValue(index);
+      const y = Math.min(chart.scales.y.getPixelForValue(0), chart.chartArea.bottom - 11);
+      ctx.save();
+      ctx.font = '650 10px Geist Variable, system-ui, sans-serif';
+      const width = ctx.measureText('Inicio').width + 14;
+      ctx.fillStyle = cssVar('--surface-2');
+      ctx.strokeStyle = cssVar('--line');
+      ctx.beginPath();
+      ctx.roundRect(x - width / 2, y - 9, width, 18, 9);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = cssVar('--muted');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Inicio', x, y + 0.5);
+      ctx.restore();
+    },
+  };
+}
+
+function totalsChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect: (index: number | null) => void, onArea: (pad: Pad) => void) {
+  const thickness = (width: number) => fitBarThickness(width, points.length, 1, 44);
+  const initial = thickness(canvas.parentElement?.clientWidth ?? 600);
+  const segment = { barThickness: initial, grouped: false, borderSkipped: 'start' as const };
   return new Chart(canvas, {
     type: 'bar',
     data: {
-      labels,
+      labels: points.map(point => point.ts),
       datasets: [
-        { label: 'USD', data: usd, yAxisID: 'y', backgroundColor: colors(usd, 1), ...bars(points.length) },
-        { label: 'COP', data: cop, yAxisID: 'y1', backgroundColor: colors(cop, COP_ALPHA), ...bars(points.length) },
+        { label: 'Aportado', data: points.map(point => [0, Math.max(0, Math.min(point.invertido, point.valor))]), backgroundColor: withAlpha(cssVar('--muted'), 0.45), ...segment },
+        { label: 'Ganancia', data: points.map(point => point.valor > point.invertido ? [Math.max(0, point.invertido), point.valor] : null), backgroundColor: withAlpha(cssVar('--pos'), 0.7), borderRadius: 4, ...segment },
+        { label: 'Pérdida', data: points.map(point => point.valor < point.invertido ? [Math.max(0, point.valor), point.invertido] : null), backgroundColor: hatch(cssVar('--neg')), borderColor: cssVar('--neg'), borderWidth: 1, ...segment },
       ] as any,
     },
-    plugins: [leave, valueLabels(signedCompact)],
+    plugins: [areaSync],
+    options: barOptions(onSelect, onArea, thickness) as any,
+  });
+}
+
+const COP_ALPHA = 0.45;
+
+function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect: (index: number | null) => void, onArea: (pad: Pad) => void) {
+  const usd = points.map(point => point.first ? null : point.periodo);
+  const cop = points.map(point => point.first ? null : point.periodo_cop);
+  const [usdRange, copRange] = alignedRanges([usd.map(Number), cop.map(Number)]);
+  const pos = cssVar('--pos');
+  const neg = cssVar('--neg');
+  const colors = (values: Array<number | null>, alpha: number) => values.map(value => withAlpha((value ?? 0) >= 0 ? pos : neg, alpha));
+  const thickness = (width: number) => fitBarThickness(width, points.length, 2, 26);
+  const options = barOptions(onSelect, onArea, thickness) as any;
+  options.scales.y = { ...options.scales.y, min: usdRange.min, max: usdRange.max };
+  options.scales.y1 = { display: false, min: copRange.min, max: copRange.max };
+  // Con barThickness fijo Chart.js junta las barras del grupo sin espacio; el borde transparente
+  // deja una separación de 2px sin volver al reparto por categoría que las separaba demasiado.
+  const bars = { barThickness: thickness(canvas.parentElement?.clientWidth ?? 600), borderRadius: 4, borderWidth: { left: 1, right: 1 }, borderColor: 'transparent' };
+  return new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: points.map(point => point.ts),
+      datasets: [
+        { label: 'USD', data: usd, yAxisID: 'y', backgroundColor: colors(usd, 1), ...bars },
+        { label: 'COP', data: cop, yAxisID: 'y1', backgroundColor: colors(cop, COP_ALPHA), ...bars },
+      ] as any,
+    },
+    plugins: [areaSync, startChip(points)],
     options,
   });
 }
 
-export function ParticipantBars({ name, period, points, onHover }: { name: string; period: Period; points: PeriodPoint[]; onHover: (point: PeriodPoint | null) => void }) {
+function AxisRow({ points, period, pad, selected, onSelect, render }: { points: PeriodPoint[]; period: Period; pad: Pad; selected: number | null; onSelect: (index: number) => void; render: (point: PeriodPoint) => ReactNode }) {
+  const count = points.length;
+  return (
+    <div className={`bar-axis${count > 8 ? ' dense' : ''}`} style={{ paddingLeft: pad.left, paddingRight: pad.right }}>
+      {points.map((point, index) => (
+        <button
+          key={point.ts}
+          type="button"
+          className={`bar-axis-item${selected === index ? ' on' : ''}${(count - 1 - index) % 2 ? ' skip' : ''}${index === count - 3 ? ' pre' : ''}`}
+          aria-pressed={selected === index}
+          aria-label={`Ver ${periodLabel(point.ts, period)}`}
+          onClick={() => onSelect(index)}
+        >
+          <span className="bar-axis-label">{barLabel(point.ts, period)}</span>
+          <span className="bar-axis-values">{render(point)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const NO_PAD: Pad = { left: 0, right: 0 };
+
+export function ParticipantBars({ name, period, points, selected, onSelect }: { name: string; period: Period; points: PeriodPoint[]; selected: number | null; onSelect: (index: number | null) => void }) {
   const totals = useRef<HTMLCanvasElement>(null);
   const gains = useRef<HTMLCanvasElement>(null);
-  const hoverRef = useRef(onHover);
-  hoverRef.current = onHover;
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
   const theme = useTheme();
+  const [pads, setPads] = useState<[Pad, Pad]>([NO_PAD, NO_PAD]);
 
   useEffect(() => {
     if (!totals.current || !gains.current || !points.length) return;
-    const labels = points.map(point => barLabel(point.ts, period));
-    const hover = (index: number | null) => hoverRef.current(index === null ? null : points[index]);
-    const leave = { id: 'barsLeave', afterEvent: (_chart: Chart, args: any) => { if (args.event.type === 'mouseout') hover(null); } };
-    const pos = cssVar('--pos');
-    const neg = cssVar('--neg');
-    const charts = [
-      new Chart(totals.current, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label: 'Aportado', data: points.map(point => point.invertido), backgroundColor: withAlpha(cssVar('--muted'), 0.45), ...bars(points.length) },
-            { label: 'Valor total', data: points.map(point => point.valor), backgroundColor: participanteColor(name), ...bars(points.length) },
-          ],
-        },
-        plugins: [leave, valueLabels(compact)],
-        options: barOptions(hover, true) as any,
-      }),
-      gainChart(gains.current, points, labels, hover, leave),
-    ];
-    const stopDismiss = charts.map(chart => dismissTooltipOutside(chart, chart.canvas));
-    return () => {
-      stopDismiss.forEach(stop => stop());
-      charts.forEach(chart => chart.destroy());
-      hoverRef.current(null);
-    };
+    const select = (index: number | null) => selectRef.current(index);
+    const area = (slot: 0 | 1) => (pad: Pad) => setPads(current => samePad(current[slot], pad) ? current : (slot ? [current[0], pad] : [pad, current[1]]));
+    const charts = [totalsChart(totals.current, points, select, area(0)), gainChart(gains.current, points, select, area(1))];
+    return () => charts.forEach(chart => chart.destroy());
   }, [name, period, points, theme]);
 
   if (!points.length) return <div className="empty"><div className="empty-title">Sin historial</div></div>;
   const last = points.at(-1)!;
+  const pick = (index: number) => onSelect(index === selected ? null : index);
 
   return (
     <>
       <div className="chart-wrap">
-        <canvas ref={totals} role="img" aria-label={`Aportado y valor total de ${name} por período`} aria-describedby="chart-persona-summary" />
+        <canvas ref={totals} role="img" aria-label={`Aportado y valor de ${name} por período`} aria-describedby="chart-persona-summary" />
+      </div>
+      <AxisRow points={points} period={period} pad={pads[0]} selected={selected} onSelect={pick} render={point => (
+        <>
+          <b>US$ {compact(point.valor)}</b>
+          <small className={`flow ${tone(point.aporte)}`}>{point.aporte ? signedMoney(point.aporte, 'US$') : '·'}</small>
+        </>
+      )} />
+      <div className="bar-legend">
+        <span><i className="sw-contrib" />Aportado</span>
+        <span><i className="sw-gain" />Ganancia</span>
+        <span><i className="sw-loss" />Pérdida</span>
       </div>
       <div className="chart-subtitle">Ganancia del período</div>
       <div className="chart-wrap gain-wrap">
         <canvas ref={gains} role="img" aria-label={`Ganancia en dólares y pesos de ${name} por período`} aria-describedby="chart-persona-summary" />
+      </div>
+      <AxisRow points={points} period={period} pad={pads[1]} selected={selected} onSelect={pick} render={point => point.first ? null : (
+        <>
+          <b className={tone(point.periodo)}>{signedMoney(point.periodo, 'US$')}</b>
+          <small className={`cop ${tone(point.periodo_cop)}`}>{signedMoney(point.periodo_cop, '$')}</small>
+        </>
+      )} />
+      <div className="bar-legend">
+        <span><i className="sw-usd" />USD</span>
+        <span><i className="sw-cop" />COP</span>
       </div>
       <p className="sr-only" id="chart-persona-summary" aria-live="polite">
         En {periodLabel(last.ts, period)} {name} tiene {fmt(last.valor)} con {fmt(last.invertido)} aportado; el período {last.periodo >= 0 ? 'ganó' : 'perdió'} {fmt(Math.abs(last.periodo))} y {COP(Math.round(Math.abs(last.periodo_cop)))}.
