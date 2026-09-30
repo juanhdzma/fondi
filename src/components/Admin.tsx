@@ -337,7 +337,7 @@ export function Admin({ onRefresh }: Props) {
           <button className="btn btn-green" disabled={busy === 'auth'} onClick={() => void unlock()}>{busy === 'auth' ? 'Verificando...' : 'Entrar'}</button>
         </div>
         <div className="err-msg" role="alert">{authError}</div>
-        <p className="admin-lock-hint">Tras 10 intentos fallidos se bloquea 5 minutos.</p>
+        <p className="admin-lock-hint">Tras 10 intentos fallidos en 5 minutos, el acceso se bloquea unos minutos.</p>
       </motion.div>
     );
   }
