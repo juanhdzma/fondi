@@ -509,7 +509,7 @@ button { color: inherit; }
 .timeline-amount.neg { color: var(--neg); }
 .timeline-meta { margin-top: 2px; color: var(--muted); font-size: 12px; }
 
-.admin-lock { max-width: 540px; margin: 14vh auto 0; padding: clamp(24px, 5vw, 40px); border-radius: var(--radius); display: grid; gap: 14px; }
+.admin-lock { max-width: 540px; margin: 14vh auto 0; padding: clamp(24px, 5vw, 40px); border-radius: var(--radius); display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .admin-lock-kicker { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 620; }
 .admin-title { font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 760; line-height: 1.05; letter-spacing: -0.035em; }
 .admin-lock-field { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--text); transition: border-color 160ms ease; }

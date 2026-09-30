@@ -98,6 +98,7 @@ A valuation with no movement is different: there `cuotasCirc()` is correct becau
 ### Admin form
 
 - **Every field is controlled React state**: on iOS Safari native date/time inputs cleared when their containers were hidden or re-rendered. Keep new fields controlled.
+- **The lock screen grid is `minmax(0, 1fr)`**: with an `auto` column the password `<input>`'s intrinsic width (its `size`) set the column's minimum, so on phones the field and the Entrar button spilled out of the card.
 - **Every write is guarded against double click** (one `busy` operation): the log is append-only, and a second import would back up the already replaced DB and push a good snapshot out of the rotation.
 - **A valuation is blocked with 0 shares outstanding but existing history**: the "first record" path sets `cuotas = valor` ($1/share), and reusing it after everyone withdrew would invent unbacked shares. First record is `!latest()`, not `!cuotasCirc()`.
 - **`previewTrm()` warns above 15% deviation from `S.trm`**: the rate can't be corrected afterward, so a missing zero would go unnoticed.
