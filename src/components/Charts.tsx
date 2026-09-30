@@ -731,28 +731,34 @@ function hatch(color: string) {
   return context.createPattern(tile, 'repeat') ?? color;
 }
 
-function startChip(points: PeriodPoint[]) {
+// Chips sobre el cero en los períodos sin barras: "Inicio" en el primero (su ganancia siempre sería
+// 0) y "Sin valor" donde no hubo valuación. Si el chip no entra en el ancho del período, queda "—".
+function periodChips(points: PeriodPoint[], withStart: boolean) {
   return {
-    id: 'startChip',
+    id: 'periodChips',
     afterDatasetsDraw(chart: Chart) {
-      const index = points.findIndex(point => point.first);
-      if (index === -1) return;
-      const { ctx } = chart;
-      const x = chart.scales.x.getPixelForValue(index);
-      const y = Math.min(chart.scales.y.getPixelForValue(0), chart.chartArea.bottom - 11);
+      const { ctx, chartArea } = chart;
+      const slot = chartArea.width / Math.max(points.length, 1);
+      const y = Math.min(chart.scales.y.getPixelForValue(0), chartArea.bottom - 11);
       ctx.save();
       ctx.font = '650 10px Geist Variable, system-ui, sans-serif';
-      const width = ctx.measureText('Inicio').width + 14;
-      ctx.fillStyle = cssVar('--surface-2');
-      ctx.strokeStyle = cssVar('--line');
-      ctx.beginPath();
-      ctx.roundRect(x - width / 2, y - 9, width, 18, 9);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = cssVar('--muted');
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Inicio', x, y + 0.5);
+      points.forEach((point, index) => {
+        const label = point.gap ? 'Sin valor' : withStart && point.first ? 'Inicio' : '';
+        if (!label) return;
+        const text = ctx.measureText(label).width + 14 <= slot - 4 ? label : '—';
+        const width = ctx.measureText(text).width + 14;
+        const x = chart.scales.x.getPixelForValue(index);
+        ctx.fillStyle = cssVar('--surface-2');
+        ctx.strokeStyle = cssVar('--line');
+        ctx.beginPath();
+        ctx.roundRect(x - width / 2, y - 9, width, 18, 9);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = cssVar('--muted');
+        ctx.fillText(text, x, y + 0.5);
+      });
       ctx.restore();
     },
   };
@@ -772,7 +778,7 @@ function totalsChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onArea: (
         { label: 'Pérdida', data: points.map(point => !point.gap && point.valor < point.invertido ? [Math.max(0, point.valor), point.invertido] : null), backgroundColor: hatch(cssVar('--neg')), borderColor: cssVar('--neg'), borderWidth: 1, ...segment },
       ] as any,
     },
-    plugins: [areaSync],
+    plugins: [areaSync, periodChips(points, false)],
     options: barOptions(onArea, thickness) as any,
   });
 }
@@ -802,7 +808,7 @@ function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onArea: (pa
         { label: 'COP', data: cop, yAxisID: 'y1', backgroundColor: colors(cop, COP_ALPHA), ...bars },
       ] as any,
     },
-    plugins: [areaSync, startChip(points)],
+    plugins: [areaSync, periodChips(points, true)],
     options,
   });
 }
@@ -848,7 +854,7 @@ export function ParticipantBars({ name, period, points }: { name: string; period
       <div className="chart-wrap">
         <canvas ref={totals} role="img" aria-label={`Aportado y valor de ${name} por período`} aria-describedby="chart-persona-summary" />
       </div>
-      <AxisRow points={points} period={period} pad={pads[0]} render={point => point.gap ? <small>sin valor</small> : (
+      <AxisRow points={points} period={period} pad={pads[0]} render={point => point.gap ? null : (
         <>
           <b>US$ {compact(point.valor)}</b>
           <small className={`flow ${tone(point.aporte)}`}>{point.aporte ? signedMoney(point.aporte, 'US$') : '·'}</small>
