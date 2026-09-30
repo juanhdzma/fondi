@@ -249,7 +249,8 @@ button { color: inherit; }
 .hero-sep { width: 1px; height: 26px; background: var(--line); }
 .hero-when { width: 100%; color: var(--muted); font-size: 12px; }
 .hero-canvas { position: relative; }
-.hero-overlay { position: absolute; inset: 0; pointer-events: none; }
+.hero-overlay { position: absolute; inset: 0; pointer-events: none; opacity: 0; visibility: hidden; }
+.hero-overlay.settled { opacity: 1; visibility: visible; transition: opacity 220ms ease; }
 .end-label { position: absolute; transform: translateY(-50%); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .end-valor { color: var(--accent); }
 .end-pos { color: var(--pos); }

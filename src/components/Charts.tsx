@@ -408,6 +408,8 @@ export function valueAt(points: Array<{ ts: number; valor: number }>, ts: number
   return left.valor + (right.valor - left.valor) * (ts - left.ts) / (right.ts - left.ts);
 }
 
+const HERO_ANIMATION_MS = 900;
+
 const sameOverlay = (a: Overlay | null, b: Overlay) => JSON.stringify(a) === JSON.stringify(b);
 
 export function HeroChart({ range, onHover }: { range: string; onHover: (point: HeroPoint | null) => void }) {
@@ -416,12 +418,14 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
   const reduced = useReducedMotion();
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [activeMarker, setActiveMarker] = useState<number | null>(null);
+  const [settled, setSettled] = useState(false);
   const points = useMemo(() => heroSeries(range), [range, S.historial, S.movimientos]);
   const hoverRef = useRef(onHover);
   hoverRef.current = onHover;
 
   useEffect(() => {
     if (!canvas.current || !points.length) return;
+    setSettled(reduced === true);
     const ticks = computeCalendarTicks(points.map(point => point.ts));
     const accent = cssVar('--accent');
     const muted = cssVar('--muted');
@@ -495,7 +499,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
       },
       plugins: [overlayPlugin],
       options: {
-        animation: reduced ? false : { duration: 900, easing: 'easeOutQuart' },
+        animation: reduced ? false : { duration: HERO_ANIMATION_MS, easing: 'easeOutQuart' },
         events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
         responsive: true,
         maintainAspectRatio: false,
@@ -530,7 +534,12 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
       } as any,
     });
     const stopOutsideDismiss = dismissTooltipOutside(chart, canvas.current);
+    // Los marcadores y etiquetas del overlay van en su posición final desde el primer frame; se
+    // muestran al terminar la animación para no flotar lejos de la línea mientras sube. Timer y no
+    // `onComplete`: el update('none') del primer resize lo dispara antes de que la línea termine.
+    const settle = reduced ? undefined : window.setTimeout(() => setSettled(true), HERO_ANIMATION_MS);
     return () => {
+      window.clearTimeout(settle);
       stopOutsideDismiss();
       chart.destroy();
     };
@@ -554,7 +563,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
       <div className="hero-canvas">
         <canvas ref={canvas} role="img" aria-label="Valor del fondo y total aportado" aria-describedby="chart-hero-summary" />
         {overlay && (
-          <div className="hero-overlay" aria-hidden="true">
+          <div className={`hero-overlay${settled ? ' settled' : ''}`} aria-hidden="true">
             {showEnds && overlay.ends.map(end => (
               <span key={end.kind} className={`end-label ${endText[end.kind][1]}`} style={{ left: overlay.right + 10, top: end.y }}>{endText[end.kind][0]}</span>
             ))}
