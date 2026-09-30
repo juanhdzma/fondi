@@ -256,7 +256,7 @@ button { color: inherit; }
 .end-neg { color: var(--neg); }
 .end-muted { color: var(--muted); }
 .event-mark { position: absolute; width: 11px; height: 11px; border: 2.5px solid var(--pos); border-radius: 50%; background: var(--surface); transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; }
-.waffle { margin: 4px 0 12px; display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+.waffle { margin: 4px 0 12px; display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 3px; }
 .waffle-cell { aspect-ratio: 1; border-radius: 3px; cursor: pointer; transition: opacity 160ms ease; }
 .waffle-cell.dimmed { opacity: 0.3; }
 .waffle-legend { margin-bottom: 16px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; color: var(--muted); font-size: 12px; font-weight: 650; }
