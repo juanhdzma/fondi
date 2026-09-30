@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Chart } from 'chart.js/auto';
 import { historialGananciaFondo, historialParaGrafica } from '../computed.js';
 import { S } from '../state.js';
@@ -814,13 +814,12 @@ function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onArea: (pa
 }
 
 function AxisRow({ points, period, pad, render }: { points: PeriodPoint[]; period: Period; pad: Pad; render: (point: PeriodPoint) => ReactNode }) {
-  const count = points.length;
   return (
-    <div className={`bar-axis${count > 8 ? ' dense' : ''}`} style={{ paddingLeft: pad.left, paddingRight: pad.right }}>
-      {points.map((point, index) => (
+    <div className="bar-axis" style={{ paddingLeft: pad.left, paddingRight: pad.right }}>
+      {points.map(point => (
         <div
           key={point.ts}
-          className={`bar-axis-item${point.gap ? ' gap' : ''}${!point.gap && points[index - 1]?.gap !== false && points[index + 1]?.gap !== false ? ' solo' : ''}${(count - 1 - index) % 2 ? ' skip' : ''}${index === count - 3 ? ' pre' : ''}`}
+          className={`bar-axis-item${point.gap ? ' gap' : ''}`}
         >
           <span className="bar-axis-label">{barLabel(point.ts, period)}</span>
           <span className="bar-axis-values">{render(point)}</span>
@@ -838,6 +837,7 @@ export function ParticipantBars({ name, period, points }: { name: string; period
   const gains = useRef<HTMLCanvasElement>(null);
   const theme = useTheme();
   const [pads, setPads] = useState<[Pad, Pad]>([NO_PAD, NO_PAD]);
+  const scrollers = useRef<Array<HTMLDivElement | null>>([]);
 
   useEffect(() => {
     if (!totals.current || !gains.current || !points.length) return;
@@ -846,36 +846,55 @@ export function ParticipantBars({ name, period, points }: { name: string; period
     return () => charts.forEach(chart => chart.destroy());
   }, [name, period, points, theme]);
 
+  useEffect(() => {
+    scrollers.current.forEach(scroller => { if (scroller) scroller.scrollLeft = scroller.scrollWidth; });
+  }, [points]);
+
+  // En pantallas angostas cada gráfica se desliza (4 períodos a la vista); las dos se mueven juntas
+  // para que los períodos sigan alineados.
+  const syncScroll = (source: HTMLDivElement) => scrollers.current.forEach(scroller => {
+    if (scroller && scroller !== source && scroller.scrollLeft !== source.scrollLeft) scroller.scrollLeft = source.scrollLeft;
+  });
+  const scroller = (slot: 0 | 1, children: ReactNode) => (
+    <div className="bar-scroll" ref={element => { scrollers.current[slot] = element; }} onScroll={event => syncScroll(event.currentTarget)}>
+      <div className="bar-scroll-inner" style={{ '--periods': points.length } as CSSProperties}>{children}</div>
+    </div>
+  );
+
   if (!points.length) return <div className="empty"><div className="empty-title">Sin historial</div></div>;
   const last = points.at(-1)!;
 
   return (
     <>
-      <div className="chart-wrap">
-        <canvas ref={totals} role="img" aria-label={`Aportado y valor de ${name} por período`} aria-describedby="chart-persona-summary" />
-      </div>
-      <AxisRow points={points} period={period} pad={pads[0]} render={point => point.gap ? null : (
-        <>
-          <b>US$ {compact(point.valor)}</b>
-          <small className={`flow ${tone(point.aporte)}`}>{point.aporte ? signedMoney(point.aporte, 'US$') : '·'}</small>
-        </>
-      )} />
+      {scroller(0, <>
+        <div className="chart-wrap">
+          <canvas ref={totals} role="img" aria-label={`Aportado y valor de ${name} por período`} aria-describedby="chart-persona-summary" />
+        </div>
+        <AxisRow points={points} period={period} pad={pads[0]} render={point => point.gap ? null : (
+          <>
+            <b>US$ {compact(point.valor)}</b>
+            <small className={`flow ${tone(point.aporte)}`}>{point.aporte ? signedMoney(point.aporte, 'US$') : '·'}</small>
+          </>
+        )} />
+      </>)}
       <div className="bar-legend">
         <span><i className="sw-contrib" />Aportado</span>
         <span><i className="sw-gain" />Ganancia</span>
         <span><i className="sw-loss" />Pérdida</span>
       </div>
       <div className="chart-subtitle">Ganancia del período</div>
-      <div className="chart-wrap gain-wrap">
-        <canvas ref={gains} role="img" aria-label={`Ganancia en dólares y pesos de ${name} por período`} aria-describedby="chart-persona-summary" />
-      </div>
-      <AxisRow points={points} period={period} pad={pads[1]} render={point => point.first || point.gap ? null : (
-        <>
-          <b className={tone(point.periodo)}>{signedMoney(point.periodo, 'US$')}</b>
-          <small className={`cop ${tone(point.periodo_cop)}`}>{signedMoney(point.periodo_cop, '$')}</small>
-          {point.span > 1 && <small className="span">{point.span} {SPAN_UNITS[period]}</small>}
-        </>
-      )} />
+      {scroller(1, <>
+        <div className="chart-wrap gain-wrap">
+          <canvas ref={gains} role="img" aria-label={`Ganancia en dólares y pesos de ${name} por período`} aria-describedby="chart-persona-summary" />
+        </div>
+        <AxisRow points={points} period={period} pad={pads[1]} render={point => point.first || point.gap ? null : (
+          <>
+            <b className={tone(point.periodo)}>{signedMoney(point.periodo, 'US$')}</b>
+            <small className={`cop ${tone(point.periodo_cop)}`}>{signedMoney(point.periodo_cop, '$')}</small>
+            {point.span > 1 && <small className="span">{point.span} {SPAN_UNITS[period]}</small>}
+          </>
+        )} />
+      </>)}
       <div className="bar-legend">
         <span><i className="sw-usd" />USD</span>
         <span><i className="sw-cop" />COP</span>

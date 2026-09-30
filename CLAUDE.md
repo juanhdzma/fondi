@@ -93,7 +93,7 @@ A valuation with no movement is different: there `cuotasCirc()` is correct becau
 - **The first period has no gain bars** (it would always read 0): an "Inicio" chip is drawn at the zero line instead.
 - **Axis values are HTML, not Chart.js ticks**: each line needs its own color and unit (value + `aporte` under the stacked chart, `US$` / `$` under the gain chart). The rows are aligned to the category centers by padding them with the `chartArea` reported by the `areaSync` plugin, so keep `layout.padding` left/right at 0 and the y axes without visible ticks.
 - **Bar thickness is recomputed on resize** (`fitBarThickness()` in `onResize`): a fixed px width overlapped the grouped USD/COP bars on phones, while `categoryPercentage` split sparse groups apart.
-- **Narrow panels alternate the axis values counting back from the latest period** (`skip`/`pre` classes under `@container (max-width: 560px)`), so the current period is always labeled.
+- **Narrow panels scroll horizontally with 4 periods in view** (`.bar-scroll` under `@container (max-width: 560px)`, inner width `periods / 4`), start at the latest period and keep both charts' `scrollLeft` in sync so periods stay aligned. This replaced alternating axis labels, which hid half the values on phones.
 
 ### Admin form
 
