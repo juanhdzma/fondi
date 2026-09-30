@@ -6,7 +6,7 @@ import { quickTransition, springTransition, staggered, surfaceMotion } from '../
 import { COP, fmt, fmtN0, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, normDate } from '../utils/dates.js';
 import { filterMovements, groupByMonth, PERIODS } from '../utils/movements.js';
-import { CHART_PERIODS, currentPeriodPoint, ParticipantBars, periodLabel, periodSummary, periodToDateLabel, type Period, type PeriodPoint } from './Charts';
+import { CHART_PERIODS, currentPeriodPoint, ParticipantBars, periodSummary, periodToDateLabel, type Period, type PeriodPoint } from './Charts';
 import { nextTabIndex } from '../utils/tabs';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
@@ -37,19 +37,14 @@ function ShareRing({ name, share }: { name: string; share: number }) {
 
 const PERIOD_NAMES: Record<Period, string> = { week: 'Semana', month: 'Mes', year: 'Año' };
 
-function PeriodStats({ period, points, selected, onBack }: { period: Period; points: PeriodPoint[]; selected: number | null; onBack: () => void }) {
-  const picked = selected === null ? null : points[selected];
-  const point = picked ?? currentPeriodPoint(points, period);
-  const heading = picked ? periodLabel(picked.ts, period) : point ? periodToDateLabel(point, period) : `${PERIOD_NAMES[period]} en curso`;
+function PeriodStats({ period, points }: { period: Period; points: PeriodPoint[] }) {
+  const point = currentPeriodPoint(points, period);
   return (
-    <section className="period-stats" aria-live="polite" aria-label="Cifras del período">
+    <section className="period-stats" aria-label="Cifras del período en curso">
       <div className="period-stats-head">
-        <b>{heading.charAt(0).toUpperCase() + heading.slice(1)}</b>
-        {picked && <button type="button" className="period-back" onClick={onBack}>Volver a hoy</button>}
+        <b>{point ? periodToDateLabel(point, period) : `${PERIOD_NAMES[period]} en curso`}</b>
       </div>
-      {point?.gap ? (
-        <p className="period-stats-empty">No hubo valuación en este período; su ganancia quedó en el siguiente período registrado.</p>
-      ) : point ? (
+      {point ? (
         <dl className="period-stats-grid">
           <div><dt>Ganancia USD</dt><dd className={tone(point.periodo)}>{signStr(point.periodo)}{fmt(Math.abs(point.periodo))}</dd></div>
           <div><dt>Ganancia COP</dt><dd className={tone(point.periodo_cop)}>{signStr(point.periodo_cop)}{COP(Math.round(Math.abs(point.periodo_cop)))}</dd></div>
@@ -67,14 +62,10 @@ function PersonPanel({ name, period, setPeriod }: { name: string; period: Period
   const total = cuotasCirc();
   const share = total > 0 ? Math.max(0, participant.cuotas) / total * 100 : 0;
   const { estado, aportes, desde, ultimoRetiro } = estadoParticipante(name, SHARE_TOLERANCE);
-  const [picked, setPicked] = useState<{ key: string; index: number } | null>(null);
   const summaries = useMemo(() => {
     const rows = historialParticipante(name);
     return Object.fromEntries(CHART_PERIODS.map(([value]) => [value, periodSummary(rows, value)])) as Record<Period, PeriodPoint[]>;
   }, [name, S.historial, S.movimientos]);
-  const pickKey = `${name}-${period}`;
-  const selected = picked?.key === pickKey && picked.index < summaries[period].length ? picked.index : null;
-  const select = (index: number | null) => setPicked(index === null ? null : { key: pickKey, index });
   const since = desde ? `desde ${fmtDateShort(desde)} ${normDate(desde).slice(0, 4)}` : '';
 
   return (
@@ -155,10 +146,10 @@ function PersonPanel({ name, period, setPeriod }: { name: string; period: Period
               })}
             </div>
           </div>
-          <PeriodStats period={period} points={summaries[period]} selected={selected} onBack={() => select(null)} />
+          <PeriodStats period={period} points={summaries[period]} />
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={`${name}-${period}`} className="person-bars" variants={surfaceMotion} initial="hidden" animate="visible" exit="exit" transition={quickTransition}>
-              <ParticipantBars name={name} period={period} points={summaries[period]} selected={selected} onSelect={select} />
+              <ParticipantBars name={name} period={period} points={summaries[period]} />
             </motion.div>
           </AnimatePresence>
         </div>

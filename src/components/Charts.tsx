@@ -691,15 +691,13 @@ const signedMoney = (value: number, unit: string) => `${signStr(value)}${unit} $
 type Pad = { left: number; right: number };
 const samePad = (a: Pad, b: Pad) => Math.abs(a.left - b.left) < 0.5 && Math.abs(a.right - b.right) < 0.5;
 
-function barOptions(onSelect: (index: number | null) => void, onArea: (pad: Pad) => void, thickness: (width: number) => number) {
+function barOptions(onArea: (pad: Pad) => void, thickness: (width: number) => number) {
   return {
     animation: false as const,
-    events: ['click'],
+    events: [],
     responsive: true,
     maintainAspectRatio: false,
     layout: { padding: { top: 10, left: 0, right: 0, bottom: 2 } },
-    interaction: { mode: 'index' as const, intersect: false },
-    onClick: (_event: any, elements: Array<{ index: number }>) => onSelect(elements.length ? elements[0].index : null),
     onResize: (chart: Chart, size: { width: number }) => { chart.data.datasets.forEach((dataset: any) => { dataset.barThickness = thickness(size.width); }); },
     plugins: { legend: { display: false }, tooltip: { enabled: false } },
     scales: {
@@ -759,7 +757,7 @@ function startChip(points: PeriodPoint[]) {
   };
 }
 
-function totalsChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect: (index: number | null) => void, onArea: (pad: Pad) => void) {
+function totalsChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onArea: (pad: Pad) => void) {
   const thickness = (width: number) => fitBarThickness(width, points.length, 1, 44);
   const initial = thickness(canvas.parentElement?.clientWidth ?? 600);
   const segment = { barThickness: initial, grouped: false, borderSkipped: 'start' as const };
@@ -774,13 +772,13 @@ function totalsChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect:
       ] as any,
     },
     plugins: [areaSync],
-    options: barOptions(onSelect, onArea, thickness) as any,
+    options: barOptions(onArea, thickness) as any,
   });
 }
 
 const COP_ALPHA = 0.45;
 
-function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect: (index: number | null) => void, onArea: (pad: Pad) => void) {
+function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onArea: (pad: Pad) => void) {
   const usd = points.map(point => point.first || point.gap ? null : point.periodo);
   const cop = points.map(point => point.first || point.gap ? null : point.periodo_cop);
   const [usdRange, copRange] = alignedRanges([usd.map(Number), cop.map(Number)]);
@@ -788,7 +786,7 @@ function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect: (
   const neg = cssVar('--neg');
   const colors = (values: Array<number | null>, alpha: number) => values.map(value => withAlpha((value ?? 0) >= 0 ? pos : neg, alpha));
   const thickness = (width: number) => fitBarThickness(width, points.length, 2, 26);
-  const options = barOptions(onSelect, onArea, thickness) as any;
+  const options = barOptions(onArea, thickness) as any;
   options.scales.y = { ...options.scales.y, min: usdRange.min, max: usdRange.max };
   options.scales.y1 = { display: false, min: copRange.min, max: copRange.max };
   // Con barThickness fijo Chart.js junta las barras del grupo sin espacio; el borde transparente
@@ -808,22 +806,18 @@ function gainChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onSelect: (
   });
 }
 
-function AxisRow({ points, period, pad, selected, onSelect, render }: { points: PeriodPoint[]; period: Period; pad: Pad; selected: number | null; onSelect: (index: number) => void; render: (point: PeriodPoint) => ReactNode }) {
+function AxisRow({ points, period, pad, render }: { points: PeriodPoint[]; period: Period; pad: Pad; render: (point: PeriodPoint) => ReactNode }) {
   const count = points.length;
   return (
     <div className={`bar-axis${count > 8 ? ' dense' : ''}`} style={{ paddingLeft: pad.left, paddingRight: pad.right }}>
       {points.map((point, index) => (
-        <button
+        <div
           key={point.ts}
-          type="button"
-          className={`bar-axis-item${point.gap ? ' gap' : ''}${!point.gap && points[index - 1]?.gap !== false && points[index + 1]?.gap !== false ? ' solo' : ''}${selected === index ? ' on' : ''}${(count - 1 - index) % 2 ? ' skip' : ''}${index === count - 3 ? ' pre' : ''}`}
-          aria-pressed={selected === index}
-          aria-label={`Ver ${periodLabel(point.ts, period)}`}
-          onClick={() => onSelect(index)}
+          className={`bar-axis-item${point.gap ? ' gap' : ''}${!point.gap && points[index - 1]?.gap !== false && points[index + 1]?.gap !== false ? ' solo' : ''}${(count - 1 - index) % 2 ? ' skip' : ''}${index === count - 3 ? ' pre' : ''}`}
         >
           <span className="bar-axis-label">{barLabel(point.ts, period)}</span>
           <span className="bar-axis-values">{render(point)}</span>
-        </button>
+        </div>
       ))}
     </div>
   );
@@ -832,32 +826,28 @@ function AxisRow({ points, period, pad, selected, onSelect, render }: { points: 
 const NO_PAD: Pad = { left: 0, right: 0 };
 const SPAN_UNITS: Record<Period, string> = { week: 'semanas', month: 'meses', year: 'años' };
 
-export function ParticipantBars({ name, period, points, selected, onSelect }: { name: string; period: Period; points: PeriodPoint[]; selected: number | null; onSelect: (index: number | null) => void }) {
+export function ParticipantBars({ name, period, points }: { name: string; period: Period; points: PeriodPoint[] }) {
   const totals = useRef<HTMLCanvasElement>(null);
   const gains = useRef<HTMLCanvasElement>(null);
-  const selectRef = useRef(onSelect);
-  selectRef.current = onSelect;
   const theme = useTheme();
   const [pads, setPads] = useState<[Pad, Pad]>([NO_PAD, NO_PAD]);
 
   useEffect(() => {
     if (!totals.current || !gains.current || !points.length) return;
-    const select = (index: number | null) => selectRef.current(index);
     const area = (slot: 0 | 1) => (pad: Pad) => setPads(current => samePad(current[slot], pad) ? current : (slot ? [current[0], pad] : [pad, current[1]]));
-    const charts = [totalsChart(totals.current, points, select, area(0)), gainChart(gains.current, points, select, area(1))];
+    const charts = [totalsChart(totals.current, points, area(0)), gainChart(gains.current, points, area(1))];
     return () => charts.forEach(chart => chart.destroy());
   }, [name, period, points, theme]);
 
   if (!points.length) return <div className="empty"><div className="empty-title">Sin historial</div></div>;
   const last = points.at(-1)!;
-  const pick = (index: number) => onSelect(index === selected ? null : index);
 
   return (
     <>
       <div className="chart-wrap">
         <canvas ref={totals} role="img" aria-label={`Aportado y valor de ${name} por período`} aria-describedby="chart-persona-summary" />
       </div>
-      <AxisRow points={points} period={period} pad={pads[0]} selected={selected} onSelect={pick} render={point => point.gap ? <small>sin valor</small> : (
+      <AxisRow points={points} period={period} pad={pads[0]} render={point => point.gap ? <small>sin valor</small> : (
         <>
           <b>US$ {compact(point.valor)}</b>
           <small className={`flow ${tone(point.aporte)}`}>{point.aporte ? signedMoney(point.aporte, 'US$') : '·'}</small>
@@ -872,7 +862,7 @@ export function ParticipantBars({ name, period, points, selected, onSelect }: { 
       <div className="chart-wrap gain-wrap">
         <canvas ref={gains} role="img" aria-label={`Ganancia en dólares y pesos de ${name} por período`} aria-describedby="chart-persona-summary" />
       </div>
-      <AxisRow points={points} period={period} pad={pads[1]} selected={selected} onSelect={pick} render={point => point.first || point.gap ? null : (
+      <AxisRow points={points} period={period} pad={pads[1]} render={point => point.first || point.gap ? null : (
         <>
           <b className={tone(point.periodo)}>{signedMoney(point.periodo, 'US$')}</b>
           <small className={`cop ${tone(point.periodo_cop)}`}>{signedMoney(point.periodo_cop, '$')}</small>

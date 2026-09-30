@@ -430,7 +430,7 @@ button { color: inherit; }
 .person-bars { display: flex; flex-direction: column; gap: 6px; }
 .chart-subtitle { margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .period-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
-.period-tab, .period-back, .bar-axis-item { border: 0; background: none; cursor: pointer; }
+.period-tab { border: 0; background: none; cursor: pointer; }
 .period-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--line); }
 .period-tab { margin-bottom: -1px; padding: 4px 0 8px; border-bottom: 2px solid transparent; display: inline-flex; align-items: baseline; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 640; }
 .period-tab small { font-size: 10.5px; font-weight: 700; }
@@ -441,7 +441,6 @@ button { color: inherit; }
 .period-stats { display: grid; gap: 6px; }
 .period-stats-head { min-height: 22px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
 .period-stats-head b { font-weight: 680; }
-.period-back { padding: 2px 10px; border-radius: 99px; background: var(--soft); color: var(--accent); font-size: 12px; font-weight: 650; }
 .period-stats-grid { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .period-stats-grid div { min-width: 0; padding: 9px 12px; display: grid; gap: 2px; border-radius: var(--radius-sm); background: var(--surface-2); }
 .period-stats-grid dt { color: var(--muted); font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -450,7 +449,7 @@ button { color: inherit; }
 .period-stats-grid dd.neg { color: var(--neg); }
 .period-stats-empty { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); font-size: 13px; }
 .bar-axis { display: flex; }
-.bar-axis-item { flex: 1; min-width: 0; padding: 2px 0; display: grid; justify-items: center; gap: 1px; border-radius: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar-axis-item { flex: 1; min-width: 0; padding: 2px 0; display: grid; justify-items: center; gap: 1px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bar-axis-label { color: var(--muted); font-size: 10.5px; }
 .bar-axis-values { display: grid; justify-items: center; line-height: 1.2; }
 .bar-axis-values b { font-size: 10px; font-weight: 680; color: var(--text); }
@@ -459,7 +458,6 @@ button { color: inherit; }
 .bar-axis-values .neg { color: var(--neg); }
 .bar-axis-values .flow.pos { color: var(--accent); }
 .bar-axis-values .cop { opacity: 0.8; }
-.bar-axis-item.on .bar-axis-label { color: var(--text); font-weight: 700; }
 .bar-axis-item.gap .bar-axis-label, .bar-axis-item.gap .bar-axis-values small { opacity: 0.6; }
 .bar-axis-values .span { font-size: 9px; color: var(--muted); }
 .bar-legend { margin-top: 4px; display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; }
