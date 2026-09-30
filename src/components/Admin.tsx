@@ -331,7 +331,7 @@ export function Admin({ onRefresh }: Props) {
     return (
       <motion.div className="admin-lock" variants={surfaceMotion} initial="hidden" animate="visible" transition={springTransition}>
         <div className="admin-lock-kicker"><Icon name="lock" /> Administración</div>
-        <h1 className="admin-title">Ingresa la clave.</h1>
+        <h1 className="admin-title">Ingresa la clave</h1>
         <div className={`admin-lock-field${authError ? ' err' : ''}`}>
           <input type="password" autoComplete="current-password" aria-label="Clave de acceso" placeholder="••••••••" value={keyInput} onChange={event => setKeyInput(event.target.value)} onKeyDown={event => pressEnter(event, () => void unlock())} />
           <button className="btn btn-green" disabled={busy === 'auth'} onClick={() => void unlock()}>{busy === 'auth' ? 'Verificando...' : 'Entrar'}</button>
