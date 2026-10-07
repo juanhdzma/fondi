@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { Chart } from 'chart.js/auto';
 import { historialGananciaFondo, historialParaGrafica } from '../computed.js';
 import { S } from '../state.js';
-import { compact, COP, fmt, fmt0, signStr } from '../utils/format.js';
+import { compact, COP, fmt, signStr } from '../utils/format.js';
 import { fmtDateShort, todayLocal } from '../utils/dates.js';
 import { cssVar, useTheme, withAlpha } from '../theme';
 import { tone } from './Delta';
@@ -287,11 +287,13 @@ export function heroChange(start: HeroPoint | undefined, end: HeroPoint | undefi
     : periodGainPct(start.ganancia_cop, end.ganancia_cop, end.valor * end.trm);
 }
 
-export type Grain = 'day' | 'week' | 'month' | 'year';
-
-export function grainFor(spanDays: number): Grain {
-  return spanDays > 150 ? 'month' : spanDays > 45 ? 'week' : 'day';
+// Lo que el fondo ganó entre dos puntos: la diferencia de ganancia acumulada, así un aporte o
+// un retiro en el medio no cuenta como ganancia ni como pérdida.
+export function heroGain(start: HeroPoint | undefined, end: HeroPoint | undefined) {
+  return start && end ? end.ganancia - start.ganancia : 0;
 }
+
+export type Grain = 'day' | 'week' | 'month' | 'year';
 
 export function bucketStart(ts: number, grain: Grain) {
   const date = new Date(ts);
@@ -331,8 +333,6 @@ export function downsample<T extends { ts: number }>(points: T[], value: (point:
   return kept;
 }
 
-const spanGrain = (points: Array<{ ts: number }>) => grainFor(points.length ? (points.at(-1)!.ts - points[0].ts) / 86400000 : 0);
-
 export function heroSeries(range: string): HeroPoint[] {
   const rows = filteredWithFill(range, historialParaGrafica(historialGananciaFondo() as any) as Row[]);
   const cutoff = rangeCutoff(range)?.getTime();
@@ -340,18 +340,7 @@ export function heroSeries(range: string): HeroPoint[] {
     const value = toTimestamp(row.fecha);
     return { ...(row as any), ts: index === 0 && cutoff && value < cutoff ? cutoff : value };
   });
-  return downsample(points, point => point.valor);
-}
-
-// La línea de aportado usa todas las valuaciones, incluida la del día de un retiro que
-// historialParaGrafica() omite de la línea de valor: sin ella el escalón bajaba una semana tarde.
-function contributedSeries(range: string) {
-  const rows = filteredWithFill(range, historialGananciaFondo() as any) as Row[];
-  const cutoff = rangeCutoff(range)?.getTime();
-  return rows.map((row, index) => {
-    const value = toTimestamp(row.fecha);
-    return { ts: index === 0 && cutoff && value < cutoff ? cutoff : value, aportado: Number(row.aportado) };
-  });
+  return downsample(points, point => point.ganancia);
 }
 
 const monthYearFormatter = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
@@ -363,57 +352,9 @@ export function periodLabel(ts: number, grain: Grain) {
   return formatTimestamp(ts);
 }
 
-type Marker = { x: number; y: number; amount: number; count: number; ts: number; label: string };
-type Overlay = { width: number; left: number; right: number; bottom: number; markers: Marker[]; ends: Array<{ y: number; kind: string }> };
-
-const END_LABELS_MIN_WIDTH = 560;
-
-function eventsIn(points: HeroPoint[], grain: Grain) {
-  if (points.length < 2) return [];
-  const [from, to] = [points[0].ts, points.at(-1)!.ts];
-  const byBucket = new Map<number, { ts: number; amount: number; count: number; label: string }>();
-  for (const movement of S.movimientos) {
-    const ts = toTimestamp(movement.fecha);
-    if (ts < from || ts > to) continue;
-    const bucket = bucketStart(ts, grain);
-    const entry = byBucket.get(bucket) ?? { ts, amount: 0, count: 0, label: '' };
-    entry.ts = Math.max(entry.ts, ts);
-    entry.amount += movement.tipo === 'retiro' ? -movement.monto : movement.monto;
-    entry.count += 1;
-    entry.label = entry.count > 1 ? periodLabel(bucket, grain) : formatTimestamp(ts);
-    byBucket.set(bucket, entry);
-  }
-  return [...byBucket.values()];
-}
-
-// Separa etiquetas verticales que quedarían encimadas: las ordena y empuja hacia abajo la
-// que esté a menos de `gap` px de la anterior.
-export function spreadLabels<T extends { y: number }>(labels: T[], gap: number) {
-  const sorted = [...labels].sort((a, b) => a.y - b.y);
-  for (let index = 1; index < sorted.length; index++) {
-    if (sorted[index].y - sorted[index - 1].y < gap) sorted[index] = { ...sorted[index], y: sorted[index - 1].y + gap };
-  }
-  return sorted;
-}
-
-// Valor de la línea en un instante dado, interpolando entre los dos puntos que lo rodean: el
-// snapshot del día de un retiro se omite del gráfico, así que su marcador cae entre puntos.
-export function valueAt(points: Array<{ ts: number; valor: number }>, ts: number) {
-  if (!points.length) return 0;
-  const after = points.findIndex(point => point.ts >= ts);
-  if (after === -1) return points[points.length - 1].valor;
-  if (after === 0) return points[0].valor;
-  const [left, right] = [points[after - 1], points[after]];
-  return left.valor + (right.valor - left.valor) * (ts - left.ts) / (right.ts - left.ts);
-}
-
-const sameOverlay = (a: Overlay | null, b: Overlay) => JSON.stringify(a) === JSON.stringify(b);
-
 export function HeroChart({ range, onHover }: { range: string; onHover: (point: HeroPoint | null) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const theme = useTheme();
-  const [overlay, setOverlay] = useState<Overlay | null>(null);
-  const [activeMarker, setActiveMarker] = useState<number | null>(null);
   const points = useMemo(() => heroSeries(range), [range, S.historial, S.movimientos]);
   const hoverRef = useRef(onHover);
   hoverRef.current = onHover;
@@ -421,45 +362,40 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
   useEffect(() => {
     if (!canvas.current || !points.length) return;
     const ticks = computeCalendarTicks(points.map(point => point.ts));
-    const accent = cssVar('--accent');
     const muted = cssVar('--muted');
-    const grain = spanGrain(points);
-    const events = eventsIn(points, grain);
-    const contributed = contributedSeries(range);
-    const values = [...points.map(point => point.valor), ...contributed.map(point => point.aportado)];
-    const [low, high] = [Math.min(...values), Math.max(...values)];
-    const pad = (high - low) * 0.08;
-    const wide = () => (canvas.current?.parentElement?.clientWidth ?? 0) >= END_LABELS_MIN_WIDTH;
+    const surface = cssVar('--surface');
+    const [pos, neg] = [cssVar('--pos'), cssVar('--neg')];
+    const gains = points.map(point => heroGain(points[0], point));
+    const [low, high] = [Math.min(0, ...gains), Math.max(0, ...gains)];
+    const pad = (high - low) * 0.12;
+    const split = (chart: any, alpha: number) => {
+      const { ctx, chartArea, scales } = chart;
+      if (!chartArea) return 'transparent';
+      const zero = Math.min(1, Math.max(0, (scales.y.getPixelForValue(0) - chartArea.top) / chartArea.height));
+      const fill = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+      fill.addColorStop(0, withAlpha(pos, alpha));
+      fill.addColorStop(zero, withAlpha(pos, alpha));
+      fill.addColorStop(zero, withAlpha(neg, alpha));
+      fill.addColorStop(1, withAlpha(neg, alpha));
+      return fill;
+    };
 
-    const overlayPlugin = {
-      id: 'heroOverlay',
-      afterUpdate(chart: Chart) {
-        const { chartArea, scales } = chart;
-        if (!chartArea) return;
-        const markers = events.map(event => ({
-          x: scales.x.getPixelForValue(event.ts),
-          y: scales.y.getPixelForValue(valueAt(points, event.ts)),
-          amount: event.amount,
-          count: event.count,
-          ts: event.ts,
-          label: event.label,
-        }));
-        const last = points.at(-1)!;
-        const next: Overlay = {
-          width: chart.width,
-          left: chartArea.left,
-          right: chartArea.right,
-          bottom: chartArea.bottom,
-          markers,
-          ends: spreadLabels([
-            { y: scales.y.getPixelForValue(last.valor), kind: 'valor' },
-            { y: scales.y.getPixelForValue((last.valor + last.aportado) / 2), kind: 'ganancia' },
-            { y: scales.y.getPixelForValue(last.aportado), kind: 'aportado' },
-          ], 17),
-        };
-        setOverlay(current => sameOverlay(current, next) ? current : next);
+    const endDot = {
+      id: 'heroEnd',
+      afterDatasetsDraw(chart: Chart) {
+        const end = chart.getDatasetMeta(0).data.at(-1);
+        if (!end) return;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.fillStyle = gains.at(-1)! < 0 ? neg : pos;
+        ctx.strokeStyle = surface;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(end.x, end.y, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
       },
-      ...crosshairHooks(muted, () => hoverRef.current(null)),
     };
 
     const chart = new Chart(canvas.current, {
@@ -467,51 +403,30 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
       data: {
         datasets: [
           {
-            data: points.map(point => ({ x: point.ts, y: point.valor })),
-            borderColor: accent,
-            backgroundColor: (context: any) => gradient(context.chart, accent),
-            fill: true,
+            data: points.map((point, index) => ({ x: point.ts, y: gains[index] })),
+            borderColor: (context: any) => split(context.chart, 1),
+            backgroundColor: (context: any) => split(context.chart, 0.18),
+            fill: 'origin',
             borderWidth: 2.5,
             pointRadius: 0,
             pointHoverRadius: 5,
-            pointHoverBackgroundColor: accent,
-            pointHoverBorderColor: cssVar('--surface'),
+            pointHoverBackgroundColor: (context: any) => (context.parsed?.y ?? 0) < 0 ? neg : pos,
+            pointHoverBorderColor: surface,
             pointHoverBorderWidth: 3,
             tension: 0,
           },
-          {
-            data: contributed.map(point => ({ x: point.ts, y: point.aportado })),
-            borderColor: muted,
-            borderDash: [5, 5],
-            borderWidth: 1.5,
-            stepped: 'before',
-            fill: false,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-          },
         ] as any,
       },
-      plugins: [overlayPlugin],
+      plugins: [endDot, { id: 'heroCrosshair', ...crosshairHooks(muted, () => hoverRef.current(null)) }],
       options: {
-        // Sin animación: el overlay HTML (marcadores, etiquetas) va en la posición final desde el
-        // primer frame y flotaba lejos de la línea mientras subía; además un resize subpíxel justo
-        // después de crear el chart cortaba la animación solo en desktop.
         animation: false,
         events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { left: 2, right: wide() ? 116 : 4, top: 8, bottom: 4 } },
+        layout: { padding: { left: 2, right: 8, top: 8, bottom: 4 } },
         interaction: { mode: 'index', intersect: false },
         onHover: (_event: any, elements: Array<{ index: number }>) => {
           hoverRef.current(elements.length ? points[elements[0].index] : null);
-        },
-        onResize: (chart: Chart, size: { width: number }) => {
-          const right = size.width >= END_LABELS_MIN_WIDTH ? 116 : 4;
-          const padding = (chart.options.layout as any).padding;
-          if (padding.right !== right) {
-            padding.right = right;
-            chart.update('none');
-          }
         },
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
         scales: {
@@ -521,10 +436,10 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
           },
           y: {
             position: 'left',
-            suggestedMin: low >= 0 ? Math.max(0, low - pad) : low - pad,
-            suggestedMax: high + pad,
-            ticks: { color: muted, font: { size: 11 }, maxTicksLimit: 5, callback: (value: any) => compact(value) },
-            grid: { color: cssVar('--line') },
+            suggestedMin: low < 0 ? low - pad : 0,
+            suggestedMax: high > 0 ? high + pad : low < 0 ? 0 : 1,
+            ticks: { color: muted, font: { size: 11 }, maxTicksLimit: 5, callback: (value: any) => value === 0 ? '0' : `${signStr(value)}${compact(Math.abs(value))}` },
+            grid: { color: (context: any) => context.tick?.value === 0 ? withAlpha(muted, 0.55) : cssVar('--line') },
             border: { display: false },
           },
         },
@@ -535,59 +450,19 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
       stopOutsideDismiss();
       chart.destroy();
     };
-  }, [points, range, theme]);
+  }, [points, theme]);
 
   if (!points.length) return <div className="empty"><div className="empty-title">Sin historial</div><p className="empty-text">El gráfico aparecerá después de la primera valuación.</p></div>;
 
-  const first = points[0];
-  const last = points.at(-1)!;
-  const trend = last.valor > first.valor ? 'subió' : last.valor < first.valor ? 'bajó' : 'se mantuvo';
-  const showEnds = overlay && overlay.width >= END_LABELS_MIN_WIDTH;
-  const tipMarker = overlay?.markers.find(marker => marker.ts === activeMarker);
-  const endText: Record<string, [string, string]> = {
-    valor: [`Valor ${compact(last.valor)}`, 'end-valor'],
-    ganancia: [`${last.ganancia >= 0 ? '+' : '−'}${compact(Math.abs(last.ganancia))} ganancia`, last.ganancia >= 0 ? 'end-pos' : 'end-neg'],
-    aportado: [`Aportado ${compact(last.aportado)}`, 'end-muted'],
-  };
+  const gain = heroGain(points[0], points.at(-1));
 
   return (
     <>
       <div className="hero-canvas">
-        <canvas ref={canvas} role="img" aria-label="Valor del fondo y total aportado" aria-describedby="chart-hero-summary" />
-        {overlay && (
-          <div className="hero-overlay" aria-hidden="true">
-            {showEnds && overlay.ends.map(end => (
-              <span key={end.kind} className={`end-label ${endText[end.kind][1]}`} style={{ left: overlay.right + 10, top: end.y }}>{endText[end.kind][0]}</span>
-            ))}
-            {overlay.markers.map(marker => (
-              <span
-                key={marker.ts}
-                className={`event-mark ${marker.amount >= 0 ? 'pos' : 'neg'}`}
-                style={{ left: marker.x, top: marker.y }}
-                onPointerEnter={() => setActiveMarker(marker.ts)}
-                onPointerLeave={() => setActiveMarker(null)}
-                onClick={() => setActiveMarker(current => current === marker.ts ? null : marker.ts)}
-              />
-            ))}
-            {tipMarker && (
-              <span className="event-tip" style={{ left: tipMarker.x, top: tipMarker.y }}>
-                <small className={tipMarker.amount >= 0 ? 'pos' : 'neg'}>{tipMarker.count > 1 ? `${tipMarker.count} movimientos · neto` : tipMarker.amount >= 0 ? 'Aporte' : 'Retiro'}</small>
-                <b>{tipMarker.amount >= 0 ? '+' : '−'}{fmt0(Math.abs(tipMarker.amount))}</b>
-                <span>{tipMarker.label}</span>
-              </span>
-            )}
-          </div>
-        )}
+        <canvas ref={canvas} role="img" aria-label="Ganancia del fondo en el período" aria-describedby="chart-hero-summary" />
       </div>
-      {!showEnds && (
-        <div className="hero-legend">
-          <span><i className="dot-valor" />{endText.valor[0]}</span>
-          <span className={endText.ganancia[1]}><i className="dot-ganancia" />{endText.ganancia[0]}</span>
-          <span><i className="dash" />{endText.aportado[0]}</span>
-        </div>
-      )}
-      <p className="sr-only" id="chart-hero-summary" aria-live="polite">
-        Valor del fondo en {RANGE_LABELS[range]}: {trend} de {fmt(first.valor)} a {fmt(last.valor)}. Aportado neto: {fmt(last.aportado)}.
+      <p className="sr-only" id="chart-hero-summary">
+        En {RANGE_LABELS[range]} el fondo {gain >= 0 ? 'ganó' : 'perdió'} {fmt(Math.abs(gain))}.
       </p>
     </>
   );

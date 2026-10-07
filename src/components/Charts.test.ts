@@ -1,20 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { alignedRanges, bucketStart, currentPeriodPoint, fitBarThickness, periodToDateLabel, computeCalendarTicks, downsample, grainFor, nextTooltipTap, periodGainPct, periodSummary, spreadLabels, valueAt } from './Charts';
+import { alignedRanges, bucketStart, currentPeriodPoint, fitBarThickness, periodToDateLabel, computeCalendarTicks, downsample, heroGain, nextTooltipTap, periodGainPct, periodSummary } from './Charts';
 
 describe('chart data helpers', () => {
-  it('interpolates the line value between points and clamps at the ends', () => {
-    const points = [{ ts: 0, valor: 100 }, { ts: 10, valor: 200 }];
-    expect(valueAt(points, 5)).toBe(150);
-    expect(valueAt(points, 10)).toBe(200);
-    expect(valueAt(points, -3)).toBe(100);
-    expect(valueAt(points, 50)).toBe(200);
-    expect(valueAt([], 5)).toBe(0);
-  });
-
-  it('pushes overlapping end labels apart without reordering', () => {
-    const spread = spreadLabels([{ y: 100, kind: 'a' }, { y: 105, kind: 'b' }, { y: 200, kind: 'c' }], 17);
-    expect(spread.map(label => label.y)).toEqual([100, 117, 200]);
-    expect(spread.map(label => label.kind)).toEqual(['a', 'b', 'c']);
+  it('measures the period gain without counting contributions or withdrawals', () => {
+    const point = (ganancia: number, valor: number) => ({ ts: 0, fecha: '', valor, aportado: valor - ganancia, ganancia, ganancia_cop: 0, trm: 1 });
+    expect(heroGain(point(300, 29000), point(1300, 23000))).toBe(1000);
+    expect(heroGain(point(300, 29000), point(-200, 35000))).toBe(-500);
+    expect(heroGain(undefined, point(300, 29000))).toBe(0);
   });
 
   it('keeps the visible range boundaries as ticks', () => {
@@ -34,12 +26,6 @@ describe('chart data helpers', () => {
 
 describe('grouping and downsampling', () => {
   const day = (date: string) => new Date(`${date}T12:00:00`).getTime();
-
-  it('picks the grain from the visible span', () => {
-    expect(grainFor(30)).toBe('day');
-    expect(grainFor(100)).toBe('week');
-    expect(grainFor(200)).toBe('month');
-  });
 
   it('starts weeks on Monday and months on the 1st', () => {
     expect(new Date(bucketStart(day('2026-09-26'), 'week')).getDate()).toBe(21);

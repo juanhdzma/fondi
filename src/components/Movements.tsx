@@ -3,12 +3,12 @@ import { AnimatePresence, motion } from 'motion/react';
 import { S, type Movement } from '../state.js';
 import { calcParticipante, cuotasCirc, estadoParticipante, historialParticipante, participanteColor, participantesTodos, participantesVisiblesActivos, porcentajeRetiro } from '../computed.js';
 import { quickTransition, springTransition, staggered, surfaceMotion } from '../motion';
-import { COP, fmt, fmtN0, fmtPct, signStr } from '../utils/format.js';
+import { COP, fmt, fmt0, fmtN0, fmtPct, signStr } from '../utils/format.js';
 import { fmtDateShort, normDate } from '../utils/dates.js';
 import { filterMovements, groupByMonth, PERIODS } from '../utils/movements.js';
 import { CHART_PERIODS, currentPeriodPoint, ParticipantBars, periodSummary, periodToDateLabel, type Period, type PeriodPoint } from './Charts';
 import { nextTabIndex } from '../utils/tabs';
-import { Delta, tone } from './Delta';
+import { tone } from './Delta';
 import { PageHeading } from './PageHeading';
 import { SelectMenu } from './SelectMenu';
 
@@ -67,6 +67,26 @@ function PersonPanel({ name, period, setPeriod }: { name: string; period: Period
     return Object.fromEntries(CHART_PERIODS.map(([value]) => [value, periodSummary(rows, value)])) as Record<Period, PeriodPoint[]>;
   }, [name, S.historial, S.movimientos]);
   const since = desde ? `desde ${fmtDateShort(desde)} ${normDate(desde).slice(0, 4)}` : '';
+  const closed = estado === 'cerrado';
+  const sides = [
+    {
+      title: closed ? 'Retiró, en dólares' : 'Hoy tiene, en dólares',
+      top: fmt0(closed ? participant.retiros_monto : participant.valor_actual),
+      put: fmt0(closed ? participant.aportes_monto : participant.aportes_monto - participant.retiros_monto),
+      gain: participant.ganancia_monto,
+      gainText: fmt0(Math.abs(participant.ganancia_monto)),
+      pct: participant.ganancia_pct,
+    },
+    ...(participant.has_cop ? [{
+      title: closed ? 'Retiró, en pesos' : 'Hoy tiene, en pesos',
+      top: COP(Math.round(closed ? participant.cop_invertido + participant.ganancia_cop : participant.valor_cop)),
+      put: COP(Math.round(closed ? participant.cop_invertido : participant.valor_cop - participant.ganancia_cop)),
+      gain: participant.ganancia_cop,
+      gainText: COP(Math.round(Math.abs(participant.ganancia_cop))),
+      pct: participant.ganancia_cop_pct,
+    }] : []),
+  ];
+  const gainLabel = (gain: number) => closed ? (gain >= 0 ? 'Ganó' : 'Perdió') : gain >= 0 ? 'Va ganando' : 'Va perdiendo';
 
   return (
     <motion.section id="mov-persona-panel" className={`card person-panel ${estado}`} variants={surfaceMotion} initial="hidden" animate="visible" transition={springTransition}>
@@ -86,30 +106,18 @@ function PersonPanel({ name, period, setPeriod }: { name: string; period: Period
           </div>
         </div>
         {estado !== 'nuevo' && (
-          <dl className="person-figs">
-            <div>
-              <dt>Valor actual</dt>
-              <dd>
-                <b>{fmt(participant.valor_actual)}</b>
-                <small>{COP(Math.round(participant.valor_cop))}</small>
-              </dd>
-            </div>
-            <div className={`person-gain ${tone(participant.ganancia_monto)}`}>
-              <dt>Ganancia</dt>
-              <dd>
-                <b className={tone(participant.ganancia_monto)}>{signStr(participant.ganancia_monto)}{fmt(Math.abs(participant.ganancia_monto))} <Delta value={participant.ganancia_pct} lead /></b>
-                <small className={tone(participant.ganancia_cop)}>{signStr(participant.ganancia_cop)}{COP(Math.round(Math.abs(participant.ganancia_cop)))} <Delta value={participant.ganancia_cop_pct} /></small>
-              </dd>
-            </div>
-            <div>
-              <dt>Total aportado</dt>
-              <dd>
-                <b>{fmt(participant.aportes_monto)}</b>
-                {participant.has_cop && <small>{COP(participant.cop_invertido)} · TRM prom {fmtN0(participant.trm_avg_entrada)}</small>}
-                {participant.retiros_monto > 0 && <small>{fmt(participant.retiros_monto)} retirados</small>}
-              </dd>
-            </div>
-          </dl>
+          <div className="person-figs">
+            {sides.map(side => (
+              <section key={side.title}>
+                <h3>{side.title}</h3>
+                <b>{side.top}</b>
+                <dl>
+                  <div><dt>{closed ? 'Puso en total' : 'Tiene puesto'}</dt><dd>{side.put}</dd></div>
+                  <div><dt>{gainLabel(side.gain)}</dt><dd className={tone(side.gain)}>{signStr(side.gain)}{side.gainText} · {signStr(side.pct)}{fmtPct(Math.abs(side.pct))}%</dd></div>
+                </dl>
+              </section>
+            ))}
+          </div>
         )}
       </div>
       {estado !== 'nuevo' && (

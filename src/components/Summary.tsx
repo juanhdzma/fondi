@@ -3,10 +3,10 @@ import { motion } from 'motion/react';
 import { S } from '../state.js';
 import { calcParticipante, cuotasCirc, gananciaCop, historialGananciaFondo, historialParticipante, latest, participanteColor, participantesActivos, participantesTodos, participantesVisiblesActivos, rendimientoPct } from '../computed.js';
 import { springTransition, staggered, surfaceMotion } from '../motion';
-import { COP, fmt0, fmtN, fmtPct, fmtQuota, signStr } from '../utils/format.js';
+import { compact, COP, fmt0, fmtN, fmtN0, fmtPct, fmtQuota, signStr } from '../utils/format.js';
 import { fmtDateShort } from '../utils/dates.js';
 import { cssVar, useTheme } from '../theme';
-import { heroChange, HeroChart, heroSeries, RANGE_LABELS, RANGES, type HeroPoint } from './Charts';
+import { heroChange, HeroChart, heroGain, heroSeries, RANGE_LABELS, RANGES, type HeroPoint } from './Charts';
 import { CountUp } from './CountUp';
 import { Delta, tone } from './Delta';
 import { PageHeading } from './PageHeading';
@@ -16,14 +16,22 @@ import { SetupSteps } from './States';
 type Participant = ReturnType<typeof calcParticipante>;
 
 const SHARE_TOLERANCE = 1e-6;
+const RANGE_PHRASES: Record<string, string> = {
+  '1W': 'En la última semana',
+  '2W': 'En las últimas 2 semanas',
+  '1M': 'En el último mes',
+  '3M': 'En los últimos 3 meses',
+  '6M': 'En los últimos 6 meses',
+  '1A': 'En el último año',
+  todo: 'Desde el inicio',
+};
 
-function TrmChip({ cached }: { cached: boolean }) {
-  if (!S.trm) return null;
-  return (
-    <span className={`trm-chip${cached ? ' cached' : ''}`} title={cached ? 'TRM cacheada: no se pudo consultar la de hoy' : 'TRM de hoy, Superfinanciera'}>
-      TRM {cached ? '~' : ''}${fmtN(S.trm)}
-    </span>
-  );
+// Dónde cae el valor de hoy entre el mínimo y el máximo del período, en porcentaje del tramo.
+export function rangeSpot(series: number[], today: number) {
+  if (series.length < 2) return null;
+  const min = Math.min(...series, today);
+  const max = Math.max(...series, today);
+  return { min, max, at: max > min ? (today - min) / (max - min) * 100 : 50 };
 }
 
 function SummarySkeleton() {
@@ -31,9 +39,11 @@ function SummarySkeleton() {
   return (
     <div className="resumen-grid" aria-busy="true" aria-label="Cargando resumen">
       <div className="resumen-main">
+        <div className="value-tiles">
+          {[0, 1, 2].map(index => <div className="total-tile skeleton-card" key={index}>{bar('45%', 11)}{bar('70%', 26, { marginTop: 8 })}{bar('100%', 30, { marginTop: 14 })}</div>)}
+        </div>
         <section className="chart-card summary-hero skeleton-card">
-          {bar('55%', 30)}
-          {bar('30%', 12, { marginTop: 10 })}
+          {bar('55%', 18)}
           {bar('100%', 300, { marginTop: 18, borderRadius: 12 })}
           {bar('100%', 44, { marginTop: 12, borderRadius: 12 })}
         </section>
@@ -74,12 +84,11 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
   const history = useMemo(() => historialGananciaFondo(), [S.historial, S.movimientos]);
 
   const base = points[0];
-  const shownUsd = hover ? hover.valor : current?.valor_total ?? 0;
-  const shownTrm = hover ? hover.trm : S.trm || 1;
   const shownPoint = hover ?? points.at(-1);
-  const usdChange = heroChange(base, shownPoint);
-  const copChange = heroChange(base, shownPoint, 'cop');
-  const when = hover ? `${fmtDateShort(hover.fecha)} · desde el inicio del período` : `cambio en ${RANGE_LABELS[range]}`;
+  const periodGain = Math.round(heroGain(base, shownPoint));
+  const periodPct = heroChange(base, shownPoint);
+  const gainTone = tone(periodGain);
+  const gainVerb = hover ? { pos: 'iba ganando', neg: 'iba perdiendo' } : { pos: 'ganó', neg: 'perdió' };
 
   const totalShares = cuotasCirc();
   const participants = participantesTodos()
@@ -132,6 +141,14 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
   });
   const dim = (name: string) => highlightedParticipant && highlightedParticipant !== name ? ' dimmed' : '';
 
+  const rangeEnd = points.at(-1);
+  const pesos = (current?.valor_total ?? 0) * (S.trm || 1);
+  const values = [
+    { label: 'Valor en dólares', value: current ? <CountUp value={current.valor_total} format={fmt0} /> : '—', change: heroChange(base, rangeEnd), neutral: false, spot: rangeSpot(points.map(point => point.valor), current?.valor_total ?? 0), format: fmt0 },
+    { label: 'Valor en pesos', value: current ? <CountUp value={pesos} format={value => COP(Math.round(value))} /> : '—', change: heroChange(base, rangeEnd, 'cop'), neutral: false, spot: rangeSpot(points.map(point => point.valor * point.trm), pesos), format: (value: number) => `$ ${compact(value)}` },
+    { label: trmCached ? 'TRM guardada' : 'TRM de hoy', value: S.trm ? `$ ${fmtN(S.trm)}` : '—', change: base?.trm && S.trm && points.length > 1 ? (S.trm - base.trm) / base.trm * 100 : null, neutral: true, spot: S.trm ? rangeSpot(points.map(point => point.trm), S.trm) : null, format: (value: number) => `$ ${fmtN0(value)}` },
+  ];
+
   const totals = [
     { label: 'Aportado', value: current ? fmt0(contributed) : '—', tone: '', pct: null, series: history.map(row => row.aportado), color: colors.muted },
     { label: 'Ganancia USD', value: current ? `${signStr(gain)}${fmt0(Math.abs(gain))}` : '—', tone: tone(gain), pct: gainPercentage, series: history.map(row => row.ganancia), color: gain >= 0 ? colors.pos : colors.neg },
@@ -163,21 +180,34 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
 
       <div className="resumen-grid">
         <div className="resumen-main">
-          <motion.section className="chart-card summary-hero" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(0)}>
-            <div className="hero-line">
-              <span className="hero-label">Valor del fondo</span>
-              <span className="hero-figure">
-                <b className="hero-value">{current ? <CountUp value={shownUsd} format={fmt0} /> : '—'}</b>
-                <Delta value={usdChange} lead />
-              </span>
-              <span className="hero-sep" aria-hidden="true" />
-              <span className="hero-figure">
-                <b className="hero-value">{current ? <CountUp value={shownUsd * shownTrm} format={value => COP(Math.round(value))} /> : '—'}</b>
-                <Delta value={copChange} lead />
-                <TrmChip cached={trmCached} />
-              </span>
-              <span className="hero-when" aria-live="polite">{when}</span>
-            </div>
+          <section className="value-tiles" aria-label="Valor del fondo">
+            {values.map((item, index) => (
+              <motion.div key={item.label} className="total-tile" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(index)}>
+                <span className="total-label">{item.label}</span>
+                <b className="total-value">{item.value}</b>
+                <span className={`tile-change${item.neutral ? ' neutral' : ''}`}>{item.change !== null && <><Delta value={item.change} lead /> en {RANGE_LABELS[range]}</>}</span>
+                {item.spot && (
+                  <>
+                    <div className={`range-track${item.neutral ? ' neutral' : ''}`} role="img" aria-label={`En ${RANGE_LABELS[range]}: mínimo ${item.format(item.spot.min)}, máximo ${item.format(item.spot.max)}`}><i style={{ left: `${item.spot.at}%` }} /></div>
+                    <div className="range-ends" aria-hidden="true"><span><em>mín. </em>{item.format(item.spot.min)}</span><span><em>máx. </em>{item.format(item.spot.max)}</span></div>
+                  </>
+                )}
+              </motion.div>
+            ))}
+          </section>
+
+          <motion.section className="chart-card summary-hero" variants={surfaceMotion} initial="hidden" animate="visible" transition={staggered(1)}>
+            {points.length > 0 && (
+              <p className="hero-story">
+                {hover ? `Al ${fmtDateShort(hover.fecha)}` : RANGE_PHRASES[range]} el fondo{' '}
+                {gainTone === 'zero' ? 'no ganó ni perdió' : (
+                  <>
+                    <b className={gainTone}>{gainVerb[gainTone]} {fmt0(Math.abs(periodGain))}</b>
+                    {periodPct !== null && <span className={gainTone}> ({signStr(periodPct)}{fmtPct(Math.abs(periodPct))}%)</span>}
+                  </>
+                )}
+              </p>
+            )}
             <div className="chart-wrap">
               <HeroChart range={range} onHover={setHover} />
             </div>
