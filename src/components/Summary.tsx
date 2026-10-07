@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { S } from '../state.js';
 import { calcParticipante, cuotasCirc, gananciaCop, historialGananciaFondo, historialParticipante, latest, participanteColor, participantesActivos, participantesTodos, participantesVisiblesActivos, rendimientoPct } from '../computed.js';
 import { springTransition, staggered, surfaceMotion } from '../motion';
-import { COP, fmt0, fmtN, fmtPct, signStr } from '../utils/format.js';
+import { COP, fmt0, fmtN, fmtPct, fmtQuota, signStr } from '../utils/format.js';
 import { fmtDateShort } from '../utils/dates.js';
 import { cssVar, useTheme } from '../theme';
 import { heroChange, HeroChart, heroSeries, RANGE_LABELS, RANGES, type HeroPoint } from './Charts';
@@ -16,24 +16,6 @@ import { SetupSteps } from './States';
 type Participant = ReturnType<typeof calcParticipante>;
 
 const SHARE_TOLERANCE = 1e-6;
-const WAFFLE_CELLS = 100;
-
-// Reparte las 100 celdas por el mayor residuo, así suman exactamente 100; cualquier
-// participación mayor a cero se lleva al menos una celda para no desaparecer.
-export function waffleCells<T extends { weight: number }>(slices: T[], total = WAFFLE_CELLS) {
-  const sum = slices.reduce((acc, slice) => acc + slice.weight, 0);
-  if (!sum) return [];
-  const raw = slices.map(slice => slice.weight / sum * total);
-  const counts = raw.map(value => value > 0 ? Math.max(1, Math.floor(value)) : 0);
-  const byRemainder = raw.map((value, index) => index).sort((a, b) => (raw[b] - Math.floor(raw[b])) - (raw[a] - Math.floor(raw[a])));
-  let left = total - counts.reduce((acc, count) => acc + count, 0);
-  for (let step = 0; left > 0; step++, left--) counts[byRemainder[step % byRemainder.length]]++;
-  while (left < 0) {
-    counts[counts.indexOf(Math.max(...counts))]--;
-    left++;
-  }
-  return slices.flatMap((slice, index) => Array<T>(counts[index]).fill(slice));
-}
 
 function TrmChip({ cached }: { cached: boolean }) {
   if (!S.trm) return null;
@@ -56,12 +38,12 @@ function SummarySkeleton() {
           {bar('100%', 44, { marginTop: 12, borderRadius: 12 })}
         </section>
         <div className="totals-tiles">
-          {[0, 1, 2].map(index => <div className="total-tile skeleton-card" key={index}>{bar('50%', 11)}{bar('70%', 18, { marginTop: 6 })}{bar('100%', 30, { marginTop: 8 })}</div>)}
+          {[0, 1, 2, 3].map(index => <div className="total-tile skeleton-card" key={index}>{bar('50%', 11)}{bar('70%', 18, { marginTop: 6 })}{bar('100%', 30, { marginTop: 8 })}</div>)}
         </div>
       </div>
       <section className="participants-card skeleton-card">
         {bar('40%', 16)}
-        {bar('100%', 220, { marginTop: 14, borderRadius: 12 })}
+        {bar('100%', 12, { marginTop: 14 })}
         {[0, 1, 2].map(index => (
           <div className="skeleton-row" key={index}>
             {bar(36, 36, { borderRadius: 18, flexShrink: 0 })}
@@ -154,6 +136,7 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
     { label: 'Aportado', value: current ? fmt0(contributed) : '—', tone: '', pct: null, series: history.map(row => row.aportado), color: colors.muted },
     { label: 'Ganancia USD', value: current ? `${signStr(gain)}${fmt0(Math.abs(gain))}` : '—', tone: tone(gain), pct: gainPercentage, series: history.map(row => row.ganancia), color: gain >= 0 ? colors.pos : colors.neg },
     { label: 'Ganancia COP', value: current ? `${signStr(gainCop)}${COP(Math.round(Math.abs(gainCop)))}` : '—', tone: tone(gainCop), pct: gainCopPercentage, series: history.map(row => row.ganancia_cop), color: gainCop >= 0 ? colors.pos : colors.neg },
+    { label: 'Valor de la cuota', value: current ? `US$ ${fmtQuota(current.precio_cuota)}` : '—', tone: '', pct: null, series: history.map(row => row.precio_cuota), color: colors.muted },
   ];
 
   if (loading) return <><PageHeading title="Resumen" /><SummarySkeleton /></>;
@@ -231,30 +214,25 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
             <div className="empty"><div className="empty-title">Sin participantes visibles</div><div className="empty-text">Puedes volver a mostrarlos desde el panel Admin.</div></div>
           ) : (
             <>
-              <div className="waffle" role="img" aria-label={`Distribución de la participación: ${participants.map(participant => `${participant.nombre} ${share(participant).toFixed(0)}%`).join(', ')}`}>
-                {waffleCells(slices).map((cell, index) => (
+              <div className="share-bar" role="img" aria-label={`Distribución de la participación: ${participants.map(participant => `${participant.nombre} ${share(participant).toFixed(0)}%`).join(', ')}`}>
+                {slices.map(slice => (
                   <span
-                    key={index}
-                    className={`waffle-cell${cell.key ? dim(cell.key) : ''}`}
-                    style={{ background: cell.color }}
-                    data-participant-highlight={cell.key ? true : undefined}
-                    onPointerEnter={event => { if (cell.key && event.pointerType === 'mouse') setHighlightedParticipant(cell.key); }}
+                    key={slice.key || 'hidden'}
+                    className={slice.key ? dim(slice.key).trim() : ''}
+                    style={{ flexGrow: slice.weight, background: slice.color }}
+                    data-participant-highlight={slice.key ? true : undefined}
+                    onPointerEnter={event => { if (slice.key && event.pointerType === 'mouse') setHighlightedParticipant(slice.key); }}
                     onPointerLeave={event => { if (event.pointerType === 'mouse') setHighlightedParticipant(''); }}
-                    onPointerUp={event => { if (cell.key && event.pointerType !== 'mouse') setHighlightedParticipant(currentName => currentName === cell.key ? '' : cell.key); }}
+                    onPointerUp={event => { if (slice.key && event.pointerType !== 'mouse') setHighlightedParticipant(currentName => currentName === slice.key ? '' : slice.key); }}
                   />
                 ))}
               </div>
-              <div className="waffle-legend" aria-hidden="true">
-                {slices.map(slice => (
-                  <span key={slice.key || 'hidden'} className={slice.key ? dim(slice.key).trim() : ''}><i style={{ background: slice.color }} />{slice.key || 'Oculto'} {slice.weight.toFixed(0)}%</span>
-                ))}
-              </div>
-              <div className="p-cards">
+              <div className="p-rows">
                 {participants.map((participant, index) => (
                   <motion.button
                     type="button"
                     key={participant.nombre}
-                    className={`p-card${highlightedParticipant === participant.nombre ? ' highlighted' : ''}${dim(participant.nombre)}`}
+                    className={`p-row${highlightedParticipant === participant.nombre ? ' highlighted' : ''}${dim(participant.nombre)}`}
                     variants={surfaceMotion}
                     initial="hidden"
                     animate="visible"
@@ -263,22 +241,18 @@ export function Summary({ loading, trmCached, onGoAdmin }: { loading: boolean; t
                     aria-pressed={highlightedParticipant === participant.nombre}
                     {...participantInteraction(participant.nombre)}
                   >
-                    <span className="p-card-top">
-                      <span className="p-avatar" style={{ background: participanteColor(participant.nombre) }}>{participant.nombre.charAt(0).toUpperCase()}</span>
-                      <span className="p-main">
-                        <span className="p-name">{participant.nombre}{!activeNames.has(participant.nombre) && <span className="p-hist">histórico</span>}</span>
-                        <span className="p-pct">{share(participant).toFixed(0)}% del fondo</span>
-                      </span>
-                      <span className="p-figures">
-                        <span className="p-monto">{fmt0(participant.valor_actual)}</span>
-                        <Delta value={participant.ganancia_pct} lead />
-                        <span className="p-cop">{COP(Math.round(participant.valor_cop))}</span>
-                        <Delta value={participant.ganancia_cop_pct} />
-                      </span>
-                    </span>
-                    <Sparkline values={historialParticipante(participant.nombre).map(row => row.valor)} color={participant.ganancia_monto >= 0 ? colors.pos : colors.neg} />
+                    <span className="p-share" style={{ '--c': participanteColor(participant.nombre) } as React.CSSProperties}>{share(participant).toFixed(0)}%</span>
+                    <span className="p-name">{participant.nombre}{!activeNames.has(participant.nombre) && <span className="p-hist">histórico</span>}</span>
+                    <span className="p-spark"><Sparkline values={historialParticipante(participant.nombre).map(row => row.valor - row.invertido)} color={participant.ganancia_monto >= 0 ? colors.pos : colors.neg} /></span>
+                    <span className="p-monto">{fmt0(participant.valor_actual)}</span>
+                    <Delta value={participant.ganancia_pct} lead />
+                    <span className="p-cop">{COP(Math.round(participant.valor_cop))}</span>
+                    <Delta value={participant.ganancia_cop_pct} />
                   </motion.button>
                 ))}
+                {hiddenPercentage > 0.5 && (
+                  <div className="p-row p-row-hidden"><span className="p-share">{hiddenPercentage.toFixed(0)}%</span><span className="p-name">Oculto</span></div>
+                )}
               </div>
             </>
           )}

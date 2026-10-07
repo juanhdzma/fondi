@@ -16,17 +16,17 @@ const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
   {
     id: 'resumen',
     label: 'Resumen',
-    icon: <><rect x="4" y="12" width="3.5" height="8" /><rect x="10.25" y="7" width="3.5" height="13" /><rect x="16.5" y="4" width="3.5" height="16" /></>,
+    icon: <><path d="M4 20v-5l5-5 4 3.5L20 6v14z" stroke="none" /><path d="M4 15l5-5 4 3.5L20 6" fill="none" /><path d="M4 20h16" /></>,
   },
   {
     id: 'movimientos',
     label: 'Movimientos',
-    icon: <><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="14" y2="17" /></>,
+    icon: <path d="M7.5 20V4.5M4 8l3.5-3.5L11 8M16.5 4v15.5M13 16l3.5 3.5L20 16" fill="none" />,
   },
   {
     id: 'admin',
     label: 'Admin',
-    icon: <><line x1="6" y1="4" x2="6" y2="20" /><circle cx="6" cy="9" r="2.2" fill="currentColor" stroke="none" /><line x1="12" y1="4" x2="12" y2="20" /><circle cx="12" cy="15" r="2.2" fill="currentColor" stroke="none" /><line x1="18" y1="4" x2="18" y2="20" /><circle cx="18" cy="7" r="2.2" fill="currentColor" stroke="none" /></>,
+    icon: <><rect x="5" y="10.5" width="14" height="10" rx="2.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" /><path d="M12 14.5v2" /></>,
   },
 ];
 
@@ -98,7 +98,7 @@ export function App() {
                 }}
               >
                 {active && <motion.span className="nav-active" layoutId="active-navigation" transition={springTransition} />}
-                <svg className="nav-icon" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <svg className="nav-icon" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   {item.icon}
                 </svg>
                 <span className="nav-label">{item.label}</span>

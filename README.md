@@ -33,7 +33,7 @@ https://github.com/user-attachments/assets/dad26a1d-c2f3-40fc-845d-3de9d9268754
 
 - Value vs. contributed chart with every movement marked
 - Hover the chart to see the fund on any past date
-- Ownership waffle and a card per participant
+- Ownership bar and a row per participant
 
 <table><tr>
 <td width="74%"><img src="docs/img/resumen.png" alt="Resumen, desktop"></td>

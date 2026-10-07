@@ -717,20 +717,6 @@ function barOptions(onArea: (pad: Pad) => void, thickness: (width: number) => nu
 // Reporta el chartArea para alinear las filas HTML del eje con el centro de cada categoría.
 const areaSync = { id: 'areaSync', afterLayout: (chart: any) => chart.options._onArea?.({ left: chart.chartArea.left, right: chart.width - chart.chartArea.right }) };
 
-function hatch(color: string) {
-  const tile = document.createElement('canvas');
-  tile.width = tile.height = 6;
-  const context = tile.getContext('2d');
-  if (!context) return color;
-  context.strokeStyle = color;
-  context.lineWidth = 1.5;
-  context.beginPath();
-  context.moveTo(0, 6);
-  context.lineTo(6, 0);
-  context.stroke();
-  return context.createPattern(tile, 'repeat') ?? color;
-}
-
 // Chips sobre el cero en los períodos sin barras: "Inicio" en el primero (su ganancia siempre sería
 // 0) y "Sin valor" donde no hubo valuación. Si el chip no entra en el ancho del período, queda "—".
 function periodChips(points: PeriodPoint[], withStart: boolean) {
@@ -775,7 +761,7 @@ function totalsChart(canvas: HTMLCanvasElement, points: PeriodPoint[], onArea: (
       datasets: [
         { label: 'Aportado', data: points.map(point => point.gap ? null : [0, Math.max(0, Math.min(point.invertido, point.valor))]), backgroundColor: withAlpha(cssVar('--muted'), 0.45), ...segment },
         { label: 'Ganancia', data: points.map(point => !point.gap && point.valor > point.invertido ? [Math.max(0, point.invertido), point.valor] : null), backgroundColor: withAlpha(cssVar('--pos'), 0.7), borderRadius: 4, ...segment },
-        { label: 'Pérdida', data: points.map(point => !point.gap && point.valor < point.invertido ? [Math.max(0, point.valor), point.invertido] : null), backgroundColor: hatch(cssVar('--neg')), borderColor: cssVar('--neg'), borderWidth: 1, ...segment },
+        { label: 'Pérdida', data: points.map(point => !point.gap && point.valor < point.invertido ? [Math.max(0, point.valor), point.invertido] : null), backgroundColor: withAlpha(cssVar('--neg'), 0.7), borderRadius: 4, ...segment },
       ] as any,
     },
     plugins: [areaSync, periodChips(points, false)],
