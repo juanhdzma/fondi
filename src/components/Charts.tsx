@@ -352,6 +352,10 @@ export function periodLabel(ts: number, grain: Grain) {
   return formatTimestamp(ts);
 }
 
+export function zeroStop(zeroPixel: number, top: number, height: number) {
+  return height > 0 ? Math.min(1, Math.max(0, (zeroPixel - top) / height)) : 0;
+}
+
 export function HeroChart({ range, onHover }: { range: string; onHover: (point: HeroPoint | null) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const theme = useTheme();
@@ -371,7 +375,7 @@ export function HeroChart({ range, onHover }: { range: string; onHover: (point: 
     const split = (chart: any, alpha: number) => {
       const { ctx, chartArea, scales } = chart;
       if (!chartArea) return 'transparent';
-      const zero = Math.min(1, Math.max(0, (scales.y.getPixelForValue(0) - chartArea.top) / chartArea.height));
+      const zero = zeroStop(scales.y.getPixelForValue(0), chartArea.top, chartArea.height);
       const fill = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
       fill.addColorStop(0, withAlpha(pos, alpha));
       fill.addColorStop(zero, withAlpha(pos, alpha));

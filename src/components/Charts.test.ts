@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alignedRanges, bucketStart, currentPeriodPoint, fitBarThickness, periodToDateLabel, computeCalendarTicks, downsample, heroGain, nextTooltipTap, periodGainPct, periodSummary } from './Charts';
+import { alignedRanges, bucketStart, currentPeriodPoint, fitBarThickness, periodToDateLabel, computeCalendarTicks, downsample, heroGain, nextTooltipTap, periodGainPct, periodSummary, zeroStop } from './Charts';
 
 describe('chart data helpers', () => {
   it('measures the period gain without counting contributions or withdrawals', () => {
@@ -7,6 +7,12 @@ describe('chart data helpers', () => {
     expect(heroGain(point(300, 29000), point(1300, 23000))).toBe(1000);
     expect(heroGain(point(300, 29000), point(-200, 35000))).toBe(-500);
     expect(heroGain(undefined, point(300, 29000))).toBe(0);
+  });
+
+  it('returns a finite gradient stop when the chart is built inside a hidden tab', () => {
+    expect(zeroStop(0, 0, 0)).toBe(0);
+    expect(zeroStop(50, 0, 200)).toBe(0.25);
+    expect(zeroStop(500, 0, 200)).toBe(1);
   });
 
   it('keeps the visible range boundaries as ticks', () => {
