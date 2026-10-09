@@ -31,9 +31,9 @@ https://github.com/user-attachments/assets/6f0da4bf-12f4-449f-bafb-3aa351731307
 
 **Resumen**
 
-- Value vs. contributed chart with every movement marked
-- Hover the chart to see the fund on any past date
-- Ownership bar and a row per participant
+- Fund value in USD and COP, with the change and range for the selected period
+- Period gain chart from one week to all time; hover it to read any past date
+- Ownership bar and a row per participant with value and gain
 
 <table><tr>
 <td width="74%"><img src="docs/img/resumen.png" alt="Resumen, desktop"></td>
@@ -42,8 +42,8 @@ https://github.com/user-attachments/assets/6f0da4bf-12f4-449f-bafb-3aa351731307
 
 **Movimientos**
 
-- Per-person value, gain and total contributed
-- Personal chart with its own date range
+- Per-person value, amount contributed and gain, in USD and COP
+- Weekly, monthly and yearly summary with value and gain bars per period
 - Timeline grouped by month, with search and filters
 
 <table><tr>
