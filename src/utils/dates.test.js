@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysSince, freshness, greeting } from './dates.js';
+import { daysSince, freshness, greeting, shiftToCurrentWeek } from './dates.js';
 
 describe('greeting', () => {
   it('depends on the local hour', () => {
@@ -20,5 +20,20 @@ describe('freshness', () => {
   it('describes the last valuation', () => {
     expect(freshness('2026-09-24T18:40', now)).toBe('Actualizado hace 2 días · última valuación 24 sep, 18:40');
     expect(freshness('2026-09-26', now)).toBe('Actualizado hoy · última valuación 26 sep');
+  });
+});
+
+describe('shiftToCurrentWeek', () => {
+  const rows = [{ fecha: '2026-09-21', valor: 1 }, { fecha: '2026-09-28', valor: 2 }];
+
+  it('moves every date by whole weeks so the last one lands in the current week', () => {
+    expect(shiftToCurrentWeek(rows, '2026-09-28', new Date(2026, 9, 10, 10))).toEqual([
+      { fecha: '2026-09-28', valor: 1 },
+      { fecha: '2026-10-05', valor: 2 },
+    ]);
+  });
+
+  it('never moves dates backwards', () => {
+    expect(shiftToCurrentWeek(rows, '2026-09-28', new Date(2026, 8, 20, 10))).toEqual(rows);
   });
 });

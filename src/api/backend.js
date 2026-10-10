@@ -1,5 +1,6 @@
 import { API_BASE_URL, MOCK_MODE, MOCK_HISTORIAL, MOCK_MOVIMIENTOS, MOCK_PARTICIPANTES_LOG } from '../config.js';
 import { S } from '../state.js';
+import { shiftToCurrentWeek } from '../utils/dates.js';
 
 async function postJSON(path, body, adminKey) {
   const r = await fetch(`${API_BASE_URL}${path}`, {
@@ -90,9 +91,10 @@ export async function fetchAll() {
   try {
     let historial, movimientos, participantesLog;
     if (MOCK_MODE) {
-      historial = MOCK_HISTORIAL;
-      movimientos = MOCK_MOVIMIENTOS;
-      participantesLog = MOCK_PARTICIPANTES_LOG;
+      const last = MOCK_HISTORIAL.at(-1).fecha;
+      historial = shiftToCurrentWeek(MOCK_HISTORIAL, last);
+      movimientos = shiftToCurrentWeek(MOCK_MOVIMIENTOS, last);
+      participantesLog = shiftToCurrentWeek(MOCK_PARTICIPANTES_LOG, last);
     } else {
       const r = await fetch(`${API_BASE_URL}/api/all`);
       if (!r.ok) throw new Error(`Error ${r.status} leyendo el backend`);

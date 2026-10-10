@@ -66,3 +66,12 @@ export function freshness(fecha, now = new Date()) {
   const time = normDate(fecha).split('T')[1];
   return `Actualizado ${ago} · última valuación ${fmtDateShort(fecha)}${time ? `, ${time.slice(0, 5)}` : ''}`;
 }
+
+export function shiftToCurrentWeek(rows, lastFecha, now = new Date()) {
+  const weeks = Math.max(0, Math.floor(daysSince(lastFecha, now) / 7));
+  return rows.map(row => {
+    const d = new Date(`${row.fecha}T12:00`);
+    d.setDate(d.getDate() + weeks * 7);
+    return { ...row, fecha: todayLocal(d) };
+  });
+}
