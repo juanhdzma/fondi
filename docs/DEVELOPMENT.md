@@ -5,7 +5,7 @@ Frontend and backend run as two processes in development: Vite on `:8080` and Fa
 ## Prerequisites
 
 - Node.js 24 (the version the Docker build uses)
-- Python 3.12
+- Python 3.13
 
 ## Setup
 
