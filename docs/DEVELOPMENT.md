@@ -32,11 +32,13 @@ To work on the UI without a backend, set `MOCK_MODE = true` in `src/config.js`. 
 ```bash
 npm test                         # vitest
 npm run typecheck                # tsc --noEmit
+npm run e2e                      # playwright (first time: npx playwright install chromium)
 cd backend && python -m pytest   # pytest
 ```
 
 - **vitest** covers DOM-free logic: share math (`src/domain/`), derived participant figures (`src/computed.js`), money inputs, formatting, dates, movement filters and chart transforms.
 - **pytest** covers the API end to end with `TestClient`: auth and rate limit, validation, the withdrawal balance check, movement plus valuation in one transaction, import/export and the backend share math (`app/domain.py`).
+- **playwright** (`e2e/`) is one smoke test against the real stack: it builds `dist/`, starts the backend on a temp database, adds a participant, records a contribution in Admin and checks it in Resumen and Movimientos. It uses `backend/.venv` when present, otherwise `python` on the PATH.
 
 CI runs both suites on every push to `main` and on every pull request, and publishes the image only from `main` when they pass.
 

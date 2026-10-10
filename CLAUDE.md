@@ -16,6 +16,7 @@ npm run dev       # http://localhost:8080 — needs the backend running separate
 npm run build     # generates dist/ (what the root Dockerfile copies into the image)
 npm run preview   # serves dist/ to verify before deploying
 npm test          # vitest — unit tests of the share math (src/domain/)
+npm run e2e       # playwright — builds dist/, starts the backend on a temp DB and records a contribution end to end
 
 # Backend, for local frontend dev
 cd backend && pip install -r requirements-dev.txt

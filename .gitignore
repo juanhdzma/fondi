@@ -7,3 +7,5 @@ __pycache__/
 *.db
 .codegraph/
 brag-output/
+test-results/
+playwright-report/

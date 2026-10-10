@@ -10,6 +10,8 @@ on:
       - package.json
       - package-lock.json
       - vite.config.ts
+      - playwright.config.ts
+      - e2e/**
       - tsconfig.json
       - Dockerfile
       - backend/**
@@ -22,6 +24,8 @@ on:
       - package.json
       - package-lock.json
       - vite.config.ts
+      - playwright.config.ts
+      - e2e/**
       - tsconfig.json
       - Dockerfile
       - backend/**
@@ -52,6 +56,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
 
   build:
     needs: test
