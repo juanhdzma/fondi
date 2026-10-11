@@ -65,7 +65,7 @@ To test changes without hitting the real backend, set `MOCK_MODE = true` in `src
 
 - `participantesActivos()` takes the latest `agregar`/`quitar` per name **by sorting on `fecha`, not arrival order**: after an import an old `quitar` below a newer `agregar` would drop an active participant. The backend `ORDER BY` makes it redundant in the normal path; keep both, the failure is silent.
 - `participantesTodos()` (active ∪ anyone in `movimientos`) is what charts and cards use, so someone with real shares never disappears for leaving the active list. Removing a participant never deletes history or shares.
-- **`agregar`/`quitar` decide who can receive movements; `ocultar`/`mostrar` decide who is shown** (`participanteOculto()`). They're independent: a hidden participant can still be active.
+- **`agregar`/`quitar` decide who can receive movements; `ocultar`/`mostrar` decide who is shown** (`participanteOculto()`). They're stored independently, but a hidden participant disappears everywhere except Admin → Participantes, the movement form included (`participantesVisiblesActivos()`); fund totals still count their shares.
 
 ### The "shares" model
 

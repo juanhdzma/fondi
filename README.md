@@ -73,7 +73,7 @@ Admin → Movimiento → pick the person, type the USD amount, the COP you paid 
 Admin → Actualizar valor → type the total the broker shows. Only the share price changes; nobody's share count does.
 
 ### Hide someone who left
-Admin → Participantes. Removing a person takes them out of the movement form; hiding them takes them out of Resumen and Movimientos. Neither deletes their history or shares.
+Admin → Participantes. Removing a person takes them out of the movement form; hiding them takes them out of Resumen, Movimientos and the movement form, until you show them again from the same list. Neither deletes their history or shares, and the fund totals still count them.
 
 ### Fix a wrong entry
 Export the `.xlsx` (Admin → Exportar respaldo), edit the row, and import it back (Admin → Restaurar desde archivo). A database backup is taken before every import.

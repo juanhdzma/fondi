@@ -40,6 +40,7 @@ backend/
   app/db.py            Schema, connection helper, backups and the import swap
   app/xlsx.py          xlsx export/import format and validation
   tests/               pytest + FastAPI TestClient
+e2e/                   Playwright smoke test against the built app and a real backend
 Dockerfile             Node build stage, then the Python runtime serving dist/
 ```
 
@@ -51,7 +52,7 @@ One SQLite file (`/data/fondi.db`) with three append-only tables. The backend on
 |---|---|
 | `historial_fondo` | Valuations: total value, share price, shares outstanding and exchange rate at a point in time. Several per day are allowed; the frontend keeps the last one per day. |
 | `movimientos` | Contributions and withdrawals: person, USD amount, share price used, shares (negative for a withdrawal), COP paid and the day's rate. |
-| `participantes_config` | Log of `agregar`/`quitar` (who can receive movements) and `ocultar`/`mostrar` (who is shown). The latest action per person wins. |
+| `participantes_config` | Log of `agregar`/`quitar` (who can receive movements) and `ocultar`/`mostrar` (who is shown, in the dashboard and in the movement form). The latest action per person wins. |
 
 Invariants the code relies on:
 
